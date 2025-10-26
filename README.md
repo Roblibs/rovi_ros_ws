@@ -19,3 +19,6 @@ test the rplidar
 source /opt/ros/jazzy/setup.bash
 ros2 launch rplidar_ros view_rplidar.launch.py
 ```
+
+# Data Flow
+![packafe_flow](./docs/package_flow.drawio.svg)
