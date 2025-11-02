@@ -18,21 +18,30 @@ Raspberry Pi 5 running Ubuntu 24.04 (ROS 2 Jazzy). These steps assume you are on
 ## Prerequisites
 
 1) Install ROS 2 Jazzy (Ubuntu Debs):
-   https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
+  https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
 
-2) Install Python dependency for the hardware library (from your GitHub repo):
+2) Install uv (Python package and venv manager):
 
 ```bash
-python3 -m pip install --upgrade pip
-python3 -m pip install "rosmaster-lib @ git+https://github.com/RobLibs/Rosmaster_Lib"
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-This makes `from Rosmaster_Lib import Rosmaster` available to the node.
+3) Create a local virtual environment for this workspace and install dependencies from pyproject.toml:
+
+```bash
+cd ~/dev/rovi_ros_ws
+uv venv .venv
+uv sync
+```
+
+This creates `.venv/` and installs `pyserial` and `rosmaster-lib` from your GitHub repo so that
+`from Rosmaster_Lib import Rosmaster` is available to the node.
 
 ## Build (on the Pi)
 
 ```bash
 cd ~/dev/rovi_ros_ws
+source .venv/bin/activate
 source /opt/ros/jazzy/setup.bash
 colcon build --merge-install
 source install/setup.bash
@@ -53,6 +62,7 @@ Parameters:
 
 ## Notes
 
-- This package declares a pip dependency on your GitHub repo in `setup.py` using a PEP 508 direct URL. If
-  `colcon build` doesn’t fetch it automatically in your environment, install it with pip first as shown above.
-  After that, (re)build and source the workspace, then launch the node.
+- The virtual environment isolates Python user-space dependencies (like `pyserial` and `rosmaster-lib`). ROS 2 packages
+  such as `rclpy` come from the system (apt) and are not installed via pip/uv.
+- The package also declares the direct Git URL in `setup.py`. Using the venv with uv ensures the dependency is
+  present even if your build environment doesn’t auto-install Python deps during `colcon build`.
