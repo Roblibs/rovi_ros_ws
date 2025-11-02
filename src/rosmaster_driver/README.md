@@ -17,25 +17,10 @@ Raspberry Pi 5 running Ubuntu 24.04 (ROS 2 Jazzy). These steps assume you are on
 
 ## Prerequisites
 
-1) Install ROS 2 Jazzy (Ubuntu Debs):
-  https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
-
-2) Install uv (Python package and venv manager):
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-3) Create a local virtual environment for this workspace and install dependencies from pyproject.toml:
-
 ```bash
 cd ~/dev/rovi_ros_ws
-uv venv .venv
 uv sync
 ```
-
-This creates `.venv/` and installs `pyserial` and `rosmaster-lib` from your GitHub repo so that
-`from Rosmaster_Lib import Rosmaster` is available to the node.
 
 ## Build (on the Pi)
 
