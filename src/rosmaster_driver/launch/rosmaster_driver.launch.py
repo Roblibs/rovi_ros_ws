@@ -13,6 +13,8 @@ def generate_launch_description() -> LaunchDescription:
                 'imu_link': 'imu_link',
                 'publish_rate': 10.0,
                 'prefix': '',
+                'port': '/dev/my_ros_board',
+                'debug': False,
             }],
         )
     ])

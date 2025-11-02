@@ -10,8 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-from typing import Optional, Tuple
+from typing import Tuple
 
 import rclpy
 from rclpy.node import Node
@@ -21,109 +20,44 @@ from std_msgs.msg import Float32
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu, MagneticField, JointState
 
-
-def _safe_import_rosmaster():
-    try:
-        from Rosmaster_Lib import Rosmaster  # type: ignore
-        return Rosmaster
-    except Exception:
-        return None
+from Rosmaster_Lib import Rosmaster  # uses your GitHub dependency
 
 
 class RosmasterAdapter:
-    """Thin wrapper around Rosmaster library with graceful fallback.
+    """Thin wrapper around Rosmaster library using your GitHub dependency."""
 
-    If the underlying library is missing, publishes zeros and logs a warning once.
-    """
-
-    def __init__(self, node: Node) -> None:
+    def __init__(self, node: Node, port: str = '/dev/my_ros_board', debug: bool = False) -> None:
         self._node = node
-        self._rosmaster_cls = _safe_import_rosmaster()
-        self._hw = None
-        self._warned = False
-        if self._rosmaster_cls is not None:
-            try:
-                self._hw = self._rosmaster_cls()
-                # Some boards require a receive thread to be started
-                if hasattr(self._hw, 'create_receive_threading'):
-                    self._hw.create_receive_threading()
-            except Exception as exc:
-                self._node.get_logger().warn(f"Failed to init Rosmaster hardware: {exc}")
-                self._hw = None
-
-    def _log_missing(self):
-        if not self._warned:
-            self._node.get_logger().warn(
-                "Rosmaster_Lib not available or failed to initialize. "
-                "Publishing zeros and ignoring cmd_vel until the library is installed."
-            )
-            self._warned = True
+        # Instantiate hardware using provided port and debug flag
+        self._hw = Rosmaster(com=port, debug=debug)
+        # Start background receive thread when available
+        if hasattr(self._hw, 'create_receive_threading'):
+            self._hw.create_receive_threading()
 
     def set_motion(self, vx: float, vy: float, wz: float) -> None:
-        if self._hw is None:
-            self._log_missing()
-            return
-        try:
-            if hasattr(self._hw, 'set_car_motion'):
-                self._hw.set_car_motion(vx, vy, wz)
-        except Exception as exc:
-            self._node.get_logger().error(f"set_car_motion failed: {exc}")
+        self._hw.set_car_motion(vx, vy, wz)
 
     def get_version(self) -> float:
-        if self._hw is None:
-            self._log_missing()
-            return 0.0
-        try:
-            v = self._hw.get_version()
-            return float(v)
-        except Exception:
-            return 0.0
+        return float(self._hw.get_version())
 
     def get_battery_voltage(self) -> float:
-        if self._hw is None:
-            self._log_missing()
-            return 0.0
-        try:
-            v = self._hw.get_battery_voltage()
-            return float(v)
-        except Exception:
-            return 0.0
+        return float(self._hw.get_battery_voltage())
 
     def get_accelerometer(self) -> Tuple[float, float, float]:
-        if self._hw is None:
-            self._log_missing()
-            return (0.0, 0.0, 0.0)
-        try:
-            return tuple(float(x) for x in self._hw.get_accelerometer_data())  # type: ignore
-        except Exception:
-            return (0.0, 0.0, 0.0)
+        ax, ay, az = self._hw.get_accelerometer_data()
+        return float(ax), float(ay), float(az)
 
     def get_gyroscope(self) -> Tuple[float, float, float]:
-        if self._hw is None:
-            self._log_missing()
-            return (0.0, 0.0, 0.0)
-        try:
-            return tuple(float(x) for x in self._hw.get_gyroscope_data())  # type: ignore
-        except Exception:
-            return (0.0, 0.0, 0.0)
+        gx, gy, gz = self._hw.get_gyroscope_data()
+        return float(gx), float(gy), float(gz)
 
     def get_magnetometer(self) -> Tuple[float, float, float]:
-        if self._hw is None:
-            self._log_missing()
-            return (0.0, 0.0, 0.0)
-        try:
-            return tuple(float(x) for x in self._hw.get_magnetometer_data())  # type: ignore
-        except Exception:
-            return (0.0, 0.0, 0.0)
+        mx, my, mz = self._hw.get_magnetometer_data()
+        return float(mx), float(my), float(mz)
 
     def get_motion(self) -> Tuple[float, float, float]:
-        if self._hw is None:
-            self._log_missing()
-            return (0.0, 0.0, 0.0)
-        try:
-            return tuple(float(x) for x in self._hw.get_motion_data())  # type: ignore
-        except Exception:
-            return (0.0, 0.0, 0.0)
+        vx, vy, wz = self._hw.get_motion_data()
+        return float(vx), float(vy), float(wz)
 
 
 class RosmasterDriverNode(Node):
@@ -136,15 +70,19 @@ class RosmasterDriverNode(Node):
         self.declare_parameter('imu_link', 'imu_link')
         self.declare_parameter('prefix', '')
         self.declare_parameter('publish_rate', 10.0)  # Hz
+        self.declare_parameter('port', '/dev/my_ros_board')
+        self.declare_parameter('debug', False)
 
         self.imu_link = self.get_parameter('imu_link').get_parameter_value().string_value
         self.prefix = self.get_parameter('prefix').get_parameter_value().string_value
         self.publish_rate = float(self.get_parameter('publish_rate').get_parameter_value().double_value)
+        self.port = self.get_parameter('port').get_parameter_value().string_value
+        self.debug = bool(self.get_parameter('debug').get_parameter_value().bool_value)
         if self.publish_rate <= 0.0:
             self.publish_rate = 10.0
 
         # Hardware adapter
-        self.hw = RosmasterAdapter(self)
+        self.hw = RosmasterAdapter(self, port=self.port, debug=self.debug)
 
         # Interfaces
         self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self._on_cmd_vel, 10)
@@ -160,7 +98,7 @@ class RosmasterDriverNode(Node):
         self.timer = self.create_timer(1.0 / self.publish_rate, self._on_timer)
 
         self.get_logger().info(
-            f"rosmaster_driver started (imu_link={self.imu_link}, prefix='{self.prefix}', rate={self.publish_rate} Hz)"
+            f"rosmaster_driver started (imu_link={self.imu_link}, prefix='{self.prefix}', rate={self.publish_rate} Hz, port={self.port}, debug={self.debug})"
         )
 
     # --- Callbacks ---

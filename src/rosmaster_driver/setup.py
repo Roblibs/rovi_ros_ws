@@ -12,7 +12,11 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
     ],
-    install_requires=['setuptools'],
+    install_requires=[
+        'setuptools',
+        # Use your GitHub repo for the hardware lib
+        'rosmaster-lib @ git+https://github.com/RobLibs/Rosmaster_Lib'
+    ],
     zip_safe=True,
     maintainer='maintainer',
     maintainer_email='todo@example.com',
