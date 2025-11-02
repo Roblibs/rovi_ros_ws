@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rosmaster_driver</name>
+  <version>0.1.0</version>
+  <description>Minimal driver for Rosmaster-based robot: subscribes to cmd_vel and publishes IMU, mag, voltage, edition, joint_states, and vel_raw.</description>
+  <maintainer email="wassim.filali@gmail.com">wassfila</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
