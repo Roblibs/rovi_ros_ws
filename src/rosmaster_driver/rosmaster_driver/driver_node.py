@@ -19,6 +19,7 @@ from rclpy.clock import Clock
 from std_msgs.msg import Float32
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu, MagneticField, JointState
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 
 from Rosmaster_Lib import Rosmaster  # uses your GitHub dependency
 
@@ -85,17 +86,24 @@ class RosmasterDriverNode(Node):
         self.hw = RosmasterAdapter(self, port=self.port, debug=self.debug)
 
         # Interfaces
-        self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self._on_cmd_vel, 10)
+        # Use explicit QoS for subscriptions/publishers
 
-        self.pub_edition = self.create_publisher(Float32, 'edition', 10)
-        self.pub_voltage = self.create_publisher(Float32, 'voltage', 10)
-        self.pub_joint_states = self.create_publisher(JointState, 'joint_states', 10)
-        self.pub_vel_raw = self.create_publisher(Twist, 'vel_raw', 10)
-        self.pub_imu_raw = self.create_publisher(Imu, '/imu/data_raw', 10)
-        self.pub_mag = self.create_publisher(MagneticField, '/imu/mag', 10)
+        # For cmd_vel (control): reliable with small depth
+        qos_cmd = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.RELIABLE)
+        self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self._on_cmd_vel, qos_cmd)
+
+        # For IMU/Mag (high-rate sensors): best-effort with small depth to reduce latency
+        qos_imu = QoSProfile(depth=5, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+
+        self.pub_edition = self.create_publisher(Float32, 'edition', qos_imu)
+        self.pub_voltage = self.create_publisher(Float32, 'voltage', qos_imu)
+        #self.pub_joint_states = self.create_publisher(JointState, 'joint_states', qos_imu)
+        self.pub_vel_raw = self.create_publisher(Twist, 'vel_raw', qos_imu)
+        self.pub_imu_raw = self.create_publisher(Imu, '/imu/data_raw', qos_imu)
+        self.pub_mag = self.create_publisher(MagneticField, '/imu/mag', qos_imu)
 
         # Timer
-        self.timer = self.create_timer(1.0 / self.publish_rate, self._on_timer)
+        self.timer = self.create_timer(0.1 / self.publish_rate, self._on_timer)
 
         self.get_logger().info(
             f"rosmaster_driver started (imu_link={self.imu_link}, prefix='{self.prefix}', rate={self.publish_rate} Hz, port={self.port}, debug={self.debug})"
@@ -157,27 +165,6 @@ class RosmasterDriverNode(Node):
         twist.linear.y = float(vy)
         twist.angular.z = float(wz)
         self.pub_vel_raw.publish(twist)
-
-        # joint_states (names only; positions unknown -> zeros)
-        js = JointState()
-        js.header.stamp = now
-        js.header.frame_id = 'joint_states'
-        names = [
-            'back_right_joint',
-            'back_left_joint',
-            'front_left_steer_joint',
-            'front_left_wheel_joint',
-            'front_right_steer_joint',
-            'front_right_wheel_joint',
-        ]
-        if self.prefix:
-            names = [self.prefix + n for n in names]
-        js.name = names
-        js.position = [0.0] * len(names)
-        js.velocity = [0.0] * len(names)
-        js.effort = [0.0] * len(names)
-        self.pub_joint_states.publish(js)
-
 
 def main() -> None:
     rclpy.init()
