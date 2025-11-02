@@ -1,2 +1,4 @@
-# Local Python virtual environment managed by uv
 .venv/
+build
+install
+log

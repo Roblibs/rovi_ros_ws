@@ -29,11 +29,15 @@ class RosmasterAdapter:
 
     def __init__(self, node: Node, port: str = '/dev/my_ros_board', debug: bool = False) -> None:
         self._node = node
+        self._node.get_logger().info(f"[init] Creating Rosmaster(com={port}, debug={debug})")
         # Instantiate hardware using provided port and debug flag
         self._hw = Rosmaster(com=port, debug=debug)
+        self._node.get_logger().info("[init] Rosmaster instance created")
         # Start background receive thread when available
         if hasattr(self._hw, 'create_receive_threading'):
+            self._node.get_logger().info("[init] Starting receive thread")
             self._hw.create_receive_threading()
+            self._node.get_logger().info("[init] Receive thread started")
 
     def set_motion(self, vx: float, vy: float, wz: float) -> None:
         self._hw.set_car_motion(vx, vy, wz)
@@ -83,7 +87,13 @@ class RosmasterDriverNode(Node):
             self.publish_rate = 10.0
 
         # Hardware adapter
-        self.hw = RosmasterAdapter(self, port=self.port, debug=self.debug)
+        self.get_logger().info("[init] Initializing hardware adapter ...")
+        try:
+            self.hw = RosmasterAdapter(self, port=self.port, debug=self.debug)
+        except Exception as e:
+            self.get_logger().error(f"[init] Failed to init Rosmaster hardware: {e}")
+            raise
+        self.get_logger().info("[init] Hardware adapter ready")
 
         # Interfaces
         # Use explicit QoS for subscriptions/publishers
@@ -101,9 +111,13 @@ class RosmasterDriverNode(Node):
         self.pub_vel_raw = self.create_publisher(Twist, 'vel_raw', qos_imu)
         self.pub_imu_raw = self.create_publisher(Imu, '/imu/data_raw', qos_imu)
         self.pub_mag = self.create_publisher(MagneticField, '/imu/mag', qos_imu)
+        self.get_logger().info("[init] Publishers and subscriptions created")
 
         # Timer
-        self.timer = self.create_timer(0.1 / self.publish_rate, self._on_timer)
+        period = max(1e-3, 1.0 / self.publish_rate)
+        self.timer = self.create_timer(period, self._on_timer)
+        self._tick_count = 0
+        self.get_logger().info(f"[init] Timer created with period {period:.3f}s")
 
         self.get_logger().info(
             f"rosmaster_driver started (imu_link={self.imu_link}, prefix='{self.prefix}', rate={self.publish_rate} Hz, port={self.port}, debug={self.debug})"
@@ -118,6 +132,9 @@ class RosmasterDriverNode(Node):
 
     def _on_timer(self) -> None:
         now = Clock().now().to_msg()
+        if self._tick_count == 0:
+            self.get_logger().info("[timer] First timer callback")
+        self._tick_count += 1
 
         # Read hardware
         edition_val = self.hw.get_version()
@@ -175,4 +192,9 @@ def main() -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # Guard against double-shutdown in some launch/SIGINT sequences
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            pass
