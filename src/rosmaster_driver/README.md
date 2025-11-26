@@ -57,6 +57,10 @@ source install/setup.bash
 ## Run
 
 ```bash
+cd ~/dev/rovi_ros_ws
+source /opt/ros/jazzy/setup.bash
+source .venv/bin/activate
+source install/setup.bash
 ros2 launch rosmaster_driver rosmaster_driver.launch.py
 ```
 
