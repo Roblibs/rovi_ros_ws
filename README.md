@@ -53,3 +53,13 @@ ros2 run tf2_ros static_transform_publisher \
 
 # Data Flow
 ![packafe_flow](./docs/package_flow.drawio.svg)
+
+
+# ELP Stereo camera
+
+```bash
+v4l2-ctl --list-devices
+v4l2-ctl -d /dev/video0 --list-formats-ext
+```
+see more details in [stereo camera](./docs/stereo.md)
+
