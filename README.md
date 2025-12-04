@@ -55,6 +55,48 @@ ros2 run tf2_ros static_transform_publisher \
 ![packafe_flow](./docs/package_flow.drawio.svg)
 
 
+```mermaid
+flowchart TD
+  Rosmaster[rosmaster_driver node]
+
+  CMD(["cmd_vel<br/>(Twist)"])
+  CMD -->|subscribe| Rosmaster
+
+  EDT(["edition<br/>(Float32)"])
+  Rosmaster -->|publish| EDT
+
+  VOL(["voltage<br/>(Float32)"])
+  Rosmaster -->|publish| VOL
+
+  VRAW(["vel_raw<br/>(Twist)"])
+  Rosmaster -->|publish| VRAW
+
+  IMU(["/imu/data_raw<br/>(Imu)"])
+  Rosmaster -->|publish| IMU
+
+  MAG(["/imu/mag<br/>(MagneticField)"])
+  Rosmaster -->|publish| MAG
+
+  Joystick["ros-jazzy-joy node"]
+  JOY(["/joy<br/>(Joy)"])
+  Joystick -->|publish| JOY
+
+  RoviJoy["rovi_joy_control node"]
+  JOY -->|subscribe| RoviJoy
+  RoviJoy -->|publish| CMD
+
+  RoviBase["rovi_base node"]
+  VRAW -->|subscribe| RoviBase
+  ODRAW(["/odom_raw<br/>(Odometry)"])
+  RoviBase -->|publish| ODRAW
+
+```
+
+## plan
+* decide between ros-jazzy-twist-mux and custom rovi_joy_control, what would be easier to configure and maintain
+
+
+
 # ELP Stereo camera
 
 ```bash
