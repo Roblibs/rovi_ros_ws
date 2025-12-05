@@ -107,6 +107,8 @@ source install/setup.bash
 ros2 launch rovi_bringup joy.launch.py \
   joy_dev:=0 \
   cmd_vel_topic:=/cmd_vel
+
+ros2 topic echo /cmd_vel
 ```
 
   - `joy_dev` is the SDL device index (0 ≈ `/dev/input/js0`).
