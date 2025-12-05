@@ -6,18 +6,18 @@ teleop_twist_joy:
     inverted_reverse: false
     publish_stamped_twist: false
     frame: teleop_twist_joy
-    axis_linear.x: 4        # right stick vertical (matches set_car_joystick)
-    scale_linear.x: 0.7
-    scale_linear_turbo.x: 1.2
-    axis_linear.y: 0        # left stick horizontal for mecanum strafe
-    scale_linear.y: 0.7
-    scale_linear_turbo.y: 1.0
+    axis_linear.x: 4        # right stick vertical: up -> forward, down -> reverse
+    scale_linear.x: -0.7
+    scale_linear_turbo.x: -1.2
+    axis_linear.y: 3        # right stick horizontal: left/right strafe
+    scale_linear.y: -0.7
+    scale_linear_turbo.y: -1.0
     axis_linear.z: -1
     scale_linear.z: 0.0
     scale_linear_turbo.z: 0.0
-    axis_angular.yaw: 3     # right stick horizontal for rotation
-    scale_angular.yaw: -3.2
-    scale_angular_turbo.yaw: -5.0
+    axis_angular.yaw: 0     # left stick horizontal for rotation
+    scale_angular.yaw: 3.2
+    scale_angular_turbo.yaw: 5.0
     axis_angular.pitch: -1
     axis_angular.roll: -1
     scale_angular.pitch: 0.0

@@ -26,6 +26,8 @@ source /opt/ros/jazzy/setup.bash
 ros2 launch rplidar_ros view_rplidar.launch.py
 ```
 
+# Usage
+
 ## remote robot on windows
 when the robot is running in headless mode, it is possible to see the laser output on a windows PC.
 
@@ -50,6 +52,44 @@ ros2 run tf2_ros static_transform_publisher \
 >ros2 run rviz2 rviz2
 ```
 - select default `map` on `Global Options/Fixed Frame` add a LaserScan and configure its topic to `/scan`
+
+
+## Teleop bringup
+
+1. Build the workspace (single merged install tree keeps the sourced path short when you add more packages later):
+
+```bash
+colcon build --merge-install
+source install/setup.bash
+```
+
+2. Check joystick → twist without touching the robot hardware:
+
+```bash
+ros2 launch rovi_bringup joy.launch.py \
+  joy_dev:=0 \
+  cmd_vel_topic:=/cmd_vel
+
+ros2 topic echo /cmd_vel
+```
+
+  - `joy_dev` is the SDL device index (0 ≈ `/dev/input/js0`).
+  - Override `joy_params_file` or `teleop_params_file` if you keep custom YAMLs elsewhere.
+
+3. Drive the robot with the Rosmaster board attached:
+
+```bash
+ros2 launch rovi_bringup teleop.launch.py \
+  joy_dev:=0 \
+  rosmaster_port:=/dev/ttyUSB0 \
+  cmd_vel_topic:=/cmd_vel
+```
+
+  - `rosmaster_port` must match the serial device exposed by your controller board.
+  - Set `rosmaster_debug:=true` if you want verbose logs while tuning.
+
+4. Re-source `install/setup.bash` whenever you rebuild so the launch files and configs stay on your ROS 2 path.
+
 
 # Data Flow
 ![packafe_flow](./docs/package_flow.drawio.svg)
@@ -91,49 +131,21 @@ flowchart TD
   RoviBase -->|publish| ODRAW
 
 ```
-
-## Teleop bringup
-
-1. Build the workspace (single merged install tree keeps the sourced path short when you add more packages later):
-
-```bash
-colcon build --merge-install
-source install/setup.bash
-```
-
-2. Check joystick → twist without touching the robot hardware:
-
-```bash
-ros2 launch rovi_bringup joy.launch.py \
-  joy_dev:=0 \
-  cmd_vel_topic:=/cmd_vel
-
-ros2 topic echo /cmd_vel
-```
-
-  - `joy_dev` is the SDL device index (0 ≈ `/dev/input/js0`).
-  - Override `joy_params_file` or `teleop_params_file` if you keep custom YAMLs elsewhere.
-
-3. Drive the robot with the Rosmaster board attached:
-
-```bash
-ros2 launch rovi_bringup teleop.launch.py \
-  joy_dev:=0 \
-  rosmaster_port:=/dev/ttyUSB0 \
-  cmd_vel_topic:=/cmd_vel
-```
-
-  - `rosmaster_port` must match the serial device exposed by your controller board.
-  - Set `rosmaster_debug:=true` if you want verbose logs while tuning.
-
-4. Re-source `install/setup.bash` whenever you rebuild so the launch files and configs stay on your ROS 2 path.
-
-## plan
-* decide between ros-jazzy-twist-mux and custom rovi_joy_control, what would be easier to configure and maintain
+# Devices
+## Joystick
+| Control           | Axis   | Direction | Value trend | Robot action        |
+|-------------------|--------|-----------|-------------|---------------------|
+| Left stick right  | axis 0 | right     | -           | turn clockwise      |
+| Left stick left   | axis 0 | left      | +           | turn anti-clockwise |
+| Right stick left  | axis 3 | left      | -           | move left           |
+| Right stick right | axis 3 | right     | +           | move right          |
+| Right stick down  | axis 4 | down      | +           | move rear           |
+| Right stick up    | axis 4 | up        | -           | move front          |
 
 
+![Joystick Control](./docs/joystick_control.drawio.svg)
 
-# ELP Stereo camera
+## ELP Stereo camera
 
 ```bash
 v4l2-ctl --list-devices
