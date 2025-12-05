@@ -133,14 +133,14 @@ flowchart TD
 ```
 # Devices
 ## Joystick
-| Control           | Axis   | Direction | Value trend | Robot action        |
-|-------------------|--------|-----------|-------------|---------------------|
-| Left stick right  | axis 0 | right     | -           | turn clockwise      |
-| Left stick left   | axis 0 | left      | +           | turn anti-clockwise |
-| Right stick left  | axis 3 | left      | -           | move left           |
-| Right stick right | axis 3 | right     | +           | move right          |
-| Right stick down  | axis 4 | down      | +           | move rear           |
-| Right stick up    | axis 4 | up        | -           | move front          |
+| Control           | Axis   | Axis sign | Robot action        | Robot command | command scale sign |
+|-------------------|--------|-----------|---------------------|---------------|---------------|
+| Left stick right  | axis 0  - | -     | turn clockwise      | axis_angular.yaw | + |
+| Left stick left   | axis 0  + | +     | turn anti-clockwise | axis_angular.yaw | + |
+| Right stick left  | axis 3  - | -     | move left           | axis_linear.x +  | + |
+| Right stick right | axis 3  + | +     | move right          | axis_linear.x -  | + |
+| Right stick down  | axis 4  + | +     | move rear           | axis_linear.y -  | - |
+| Right stick up    | axis 4  - | -     | move front          | axis_linear.y +  | - |
 
 
 ![Joystick Control](./docs/joystick_control.drawio.svg)
