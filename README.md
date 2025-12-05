@@ -92,6 +92,40 @@ flowchart TD
 
 ```
 
+## Teleop bringup
+
+1. Build the workspace (single merged install tree keeps the sourced path short when you add more packages later):
+
+```bash
+colcon build --merge-install
+source install/setup.bash
+```
+
+2. Check joystick → twist without touching the robot hardware:
+
+```bash
+ros2 launch rovi_bringup joy.launch.py \
+  joy_dev:=0 \
+  cmd_vel_topic:=/cmd_vel
+```
+
+  - `joy_dev` is the SDL device index (0 ≈ `/dev/input/js0`).
+  - Override `joy_params_file` or `teleop_params_file` if you keep custom YAMLs elsewhere.
+
+3. Drive the robot with the Rosmaster board attached:
+
+```bash
+ros2 launch rovi_bringup teleop.launch.py \
+  joy_dev:=0 \
+  rosmaster_port:=/dev/ttyUSB0 \
+  cmd_vel_topic:=/cmd_vel
+```
+
+  - `rosmaster_port` must match the serial device exposed by your controller board.
+  - Set `rosmaster_debug:=true` if you want verbose logs while tuning.
+
+4. Re-source `install/setup.bash` whenever you rebuild so the launch files and configs stay on your ROS 2 path.
+
 ## plan
 * decide between ros-jazzy-twist-mux and custom rovi_joy_control, what would be easier to configure and maintain
 
