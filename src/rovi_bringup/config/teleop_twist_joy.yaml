@@ -1,0 +1,26 @@
+teleop_twist_joy:
+  ros__parameters:
+    require_enable_button: true
+    enable_button: 5          # RB to move at nominal speed
+    enable_turbo_button: 4    # LB to engage turbo scaling
+    inverted_reverse: false
+    publish_stamped_twist: false
+    frame: teleop_twist_joy
+    axis_linear.x: 1
+    scale_linear.x: 0.6
+    scale_linear_turbo.x: 1.0
+    axis_linear.y: 0
+    scale_linear.y: 0.4
+    scale_linear_turbo.y: 0.8
+    axis_linear.z: -1
+    scale_linear.z: 0.0
+    scale_linear_turbo.z: 0.0
+    axis_angular.yaw: 3
+    scale_angular.yaw: 1.0
+    scale_angular_turbo.yaw: 2.0
+    axis_angular.pitch: -1
+    axis_angular.roll: -1
+    scale_angular.pitch: 0.0
+    scale_angular.roll: 0.0
+    scale_angular_turbo.pitch: 0.0
+    scale_angular_turbo.roll: 0.0

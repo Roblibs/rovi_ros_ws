@@ -81,7 +81,7 @@ flowchart TD
   JOY(["/joy<br/>(Joy)"])
   Joystick -->|publish| JOY
 
-  RoviJoy["rovi_joy_control node"]
+  RoviJoy["ros-jazzy-teleop-twist-joy node"]
   JOY -->|subscribe| RoviJoy
   RoviJoy -->|publish| CMD
 

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rovi_bringup</name>
+  <version>0.1.0</version>
+  <description>Launch and configuration files for Room View Bot teleoperation.</description>
+  <maintainer email="wassim.filali@gmail.com">wassfila</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>joy</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rosmaster_driver</exec_depend>
+  <exec_depend>teleop_twist_joy</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
