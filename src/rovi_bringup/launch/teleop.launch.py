@@ -2,11 +2,12 @@
 """Bringup joystick + teleop_twist_joy + Rosmaster driver for manual control."""
 
 import os
+import sys
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInfo
+from launch.substitutions import LaunchConfiguration, EnvironmentVariable, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -47,6 +48,29 @@ def generate_launch_description() -> LaunchDescription:
         description='Enable verbose hardware driver logging',
     )
 
+    actions = []
+
+    # If user activated a virtual env (uv, venv, etc.), prepend its site-packages so
+    # the Rosmaster dependency is available even when colcon installs elsewhere.
+    venv_root = os.environ.get('VIRTUAL_ENV')
+    py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    venv_site = os.path.join(venv_root, 'lib', py_ver, 'site-packages') if venv_root else ''
+    if venv_site and os.path.isdir(venv_site):
+        actions.append(
+            SetEnvironmentVariable(
+                name='PYTHONPATH',
+                value=[
+                    TextSubstitution(text=venv_site),
+                    TextSubstitution(text=os.pathsep),
+                    EnvironmentVariable('PYTHONPATH', default_value='')
+                ],
+            )
+        )
+        actions.append(SetEnvironmentVariable(name='PYTHONUNBUFFERED', value='1'))
+        actions.append(LogInfo(msg=f"Using venv site-packages: {venv_site}"))
+    else:
+        actions.append(LogInfo(msg='No active virtual env detected; using default PYTHONPATH'))
+
     joy_node = Node(
         package='joy',
         executable='joy_node',
@@ -76,7 +100,7 @@ def generate_launch_description() -> LaunchDescription:
         remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_topic'))],
     )
 
-    return LaunchDescription([
+    actions.extend([
         joy_params_arg,
         teleop_params_arg,
         joy_dev_arg,
@@ -87,3 +111,5 @@ def generate_launch_description() -> LaunchDescription:
         teleop_node,
         rosmaster_driver_node,
     ])
+
+    return LaunchDescription(actions)
