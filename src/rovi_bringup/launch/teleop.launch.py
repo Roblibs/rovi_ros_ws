@@ -17,6 +17,7 @@ def generate_launch_description() -> LaunchDescription:
     default_joy_params = os.path.join(pkg_share, 'config', 'joy.params.yaml')
     default_teleop_params = os.path.join(pkg_share, 'config', 'teleop_twist_joy.yaml')
     default_rovi_base_params = os.path.join(pkg_share, 'config', 'rovi_base.yaml')
+    default_rosmaster_params = os.path.join(pkg_share, 'config', 'rosmaster_driver.yaml')
 
     joy_params_arg = DeclareLaunchArgument(
         'joy_params_file',
@@ -27,6 +28,11 @@ def generate_launch_description() -> LaunchDescription:
         'teleop_params_file',
         default_value=default_teleop_params,
         description='YAML file with parameters for teleop_twist_joy',
+    )
+    rosmaster_params_arg = DeclareLaunchArgument(
+        'rosmaster_params_file',
+        default_value=default_rosmaster_params,
+        description='YAML file with parameters for rosmaster_driver',
     )
     rovi_base_params_arg = DeclareLaunchArgument(
         'rovi_base_params_file',
@@ -115,6 +121,7 @@ def generate_launch_description() -> LaunchDescription:
         executable='rosmaster_driver_node',
         name='rosmaster_driver',
         parameters=[
+            LaunchConfiguration('rosmaster_params_file'),
             {'port': LaunchConfiguration('rosmaster_port')},
             {'debug': ParameterValue(LaunchConfiguration('rosmaster_debug'), value_type=bool)},
         ],
@@ -138,6 +145,7 @@ def generate_launch_description() -> LaunchDescription:
     actions.extend([
         joy_params_arg,
         teleop_params_arg,
+        rosmaster_params_arg,
         rovi_base_params_arg,
         joy_dev_arg,
         cmd_vel_arg,

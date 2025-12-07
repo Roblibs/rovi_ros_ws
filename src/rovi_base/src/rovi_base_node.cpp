@@ -25,15 +25,29 @@ public:
     publish_tf_ = declare_parameter<bool>("publish_tf", true);
     linear_scale_x_ = declare_parameter<double>("linear_scale_x", 1.0);
     linear_scale_y_ = declare_parameter<double>("linear_scale_y", 1.0);
-    integrator_period_ = declare_parameter<double>("integrator_period", 0.1);
+    publish_rate_ = declare_parameter<double>("publish_rate", 10.0);
+    const double integrator_period_param = declare_parameter<double>("integrator_period", 0.0);
     drop_warn_factor_ = declare_parameter<double>("drop_warn_factor", 3.0);
     vel_topic_ = declare_parameter<std::string>("vel_topic", "vel_raw");
     odom_topic_ = declare_parameter<std::string>("odom_topic", "odom_raw");
     diag_period_sec_ = declare_parameter<double>("diagnostics_period", 10.0);
 
-    if (integrator_period_ <= 0.0) {
-      RCLCPP_WARN(get_logger(), "integrator_period must be > 0, defaulting to 0.1");
-      integrator_period_ = 0.1;
+    if (publish_rate_ <= 0.0) {
+      RCLCPP_WARN(get_logger(), "publish_rate must be > 0, defaulting to 10.0");
+      publish_rate_ = 10.0;
+    }
+    const double derived_period = 1.0 / publish_rate_;
+    if (integrator_period_param > 0.0) {
+      integrator_period_ = integrator_period_param;
+      const double diff = std::fabs(integrator_period_ - derived_period);
+      const double tol = 0.1 * derived_period;  // warn if >10% mismatch
+      if (diff > tol) {
+        RCLCPP_WARN(get_logger(),
+          "integrator_period (%.4f) differs from 1/publish_rate (%.4f); verify configs are aligned",
+          integrator_period_, derived_period);
+      }
+    } else {
+      integrator_period_ = derived_period;
     }
 
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -208,7 +222,8 @@ private:
 
   double linear_scale_x_{1.0};
   double linear_scale_y_{1.0};
-  double integrator_period_{0.1};
+  double publish_rate_{10.0};
+  double integrator_period_{0.0};
   double drop_warn_factor_{3.0};
   double diag_period_sec_{10.0};
   std::string odom_frame_{"odom"};
