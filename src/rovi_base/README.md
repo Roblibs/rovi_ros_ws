@@ -37,3 +37,34 @@ ros2 run rovi_base rovi_base_node --ros-args \
   -p publish_rate:=10.0 \
   -p drop_warn_factor:=3.0
 ```
+
+# Diagnostics
+* diagnostics shows a healthy output steady at 100 message_count delta (10 Hz x 10 s) and arrival only jitters between ~ 0.91 and 0.1004
+
+```bash
+>ros2 topic echo /diagnostics
+---
+header:
+  stamp:
+    sec: 1765117525
+    nanosec: 457757048
+  frame_id: ''
+status:
+- level: "\0"
+  name: 'rovi_base: timing'
+  message: Timing OK
+  hardware_id: rovi_base
+  values:
+  - key: message_count
+    value: '5992'
+  - key: last_arrival_dt
+    value: '0.0998525'
+  - key: last_age
+    value: '0.0971692'
+  - key: min_arrival_dt
+    value: '0.0918049'
+  - key: max_arrival_dt
+    value: '0.100394'
+  - key: dt_nonpositive_count
+    value: '0'
+```
