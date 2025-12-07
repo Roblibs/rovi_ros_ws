@@ -16,6 +16,7 @@ def generate_launch_description() -> LaunchDescription:
     pkg_share = get_package_share_directory('rovi_bringup')
     default_joy_params = os.path.join(pkg_share, 'config', 'joy.params.yaml')
     default_teleop_params = os.path.join(pkg_share, 'config', 'teleop_twist_joy.yaml')
+    default_rovi_base_params = os.path.join(pkg_share, 'config', 'rovi_base.yaml')
 
     joy_params_arg = DeclareLaunchArgument(
         'joy_params_file',
@@ -26,6 +27,11 @@ def generate_launch_description() -> LaunchDescription:
         'teleop_params_file',
         default_value=default_teleop_params,
         description='YAML file with parameters for teleop_twist_joy',
+    )
+    rovi_base_params_arg = DeclareLaunchArgument(
+        'rovi_base_params_file',
+        default_value=default_rovi_base_params,
+        description='YAML file with parameters for rovi_base',
     )
     joy_dev_arg = DeclareLaunchArgument(
         'joy_dev',
@@ -46,6 +52,21 @@ def generate_launch_description() -> LaunchDescription:
         'rosmaster_debug',
         default_value='false',
         description='Enable verbose hardware driver logging',
+    )
+    rovi_base_tf_arg = DeclareLaunchArgument(
+        'rovi_base_publish_tf',
+        default_value='true',
+        description='Enable TF broadcast from rovi_base',
+    )
+    rovi_base_frame_arg = DeclareLaunchArgument(
+        'rovi_base_frame',
+        default_value='base_footprint',
+        description='Child frame id for rovi_base',
+    )
+    rovi_base_odom_arg = DeclareLaunchArgument(
+        'rovi_base_odom_frame',
+        default_value='odom',
+        description='Odom frame id for rovi_base',
     )
 
     actions = []
@@ -100,16 +121,35 @@ def generate_launch_description() -> LaunchDescription:
         remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_topic'))],
     )
 
+    rovi_base_node = Node(
+        package='rovi_base',
+        executable='rovi_base_node',
+        name='rovi_base',
+        parameters=[
+            LaunchConfiguration('rovi_base_params_file'),
+            {
+                'publish_tf': ParameterValue(LaunchConfiguration('rovi_base_publish_tf'), value_type=bool),
+                'odom_frame': LaunchConfiguration('rovi_base_odom_frame'),
+                'base_frame': LaunchConfiguration('rovi_base_frame'),
+            },
+        ],
+    )
+
     actions.extend([
         joy_params_arg,
         teleop_params_arg,
+        rovi_base_params_arg,
         joy_dev_arg,
         cmd_vel_arg,
         rosmaster_port_arg,
         rosmaster_debug_arg,
+        rovi_base_tf_arg,
+        rovi_base_frame_arg,
+        rovi_base_odom_arg,
         joy_node,
         teleop_node,
         rosmaster_driver_node,
+        rovi_base_node,
     ])
 
     return LaunchDescription(actions)

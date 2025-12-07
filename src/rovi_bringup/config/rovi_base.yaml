@@ -1,0 +1,4 @@
+rovi_base:
+  ros__parameters:
+    integrator_period: 0.1
+    diagnostics_period: 10.0
