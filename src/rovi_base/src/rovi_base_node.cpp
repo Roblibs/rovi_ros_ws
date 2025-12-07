@@ -18,7 +18,8 @@ class RoviBaseNode : public rclcpp::Node
 public:
   explicit RoviBaseNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("rovi_base", options),
-    steady_clock_(RCL_STEADY_TIME)
+    steady_clock_(RCL_STEADY_TIME),
+    diag_updater_(this)
   {
     odom_frame_ = declare_parameter<std::string>("odom_frame", "odom");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_footprint");
@@ -59,13 +60,12 @@ public:
     auto odom_qos = rclcpp::QoS(rclcpp::KeepLast(20)).reliable();
     odom_publisher_ = create_publisher<nav_msgs::msg::Odometry>(odom_topic_, odom_qos);
 
-    diag_updater_.setHardwareID("rovi_base");
-    diag_updater_.add("timing", this, &RoviBaseNode::produce_diagnostics);
     if (diag_period_sec_ > 0.0) {
-      auto period = std::chrono::duration<double>(diag_period_sec_);
-      diag_timer_ = create_wall_timer(
-        std::chrono::duration_cast<std::chrono::milliseconds>(period),
-        [this]() { diag_updater_.force_update(); });
+      diag_updater_.setHardwareID("rovi_base");
+      diag_updater_.setPeriod(diag_period_sec_);
+      diag_updater_.add("timing", this, &RoviBaseNode::produce_diagnostics);
+    } else {
+      RCLCPP_INFO(get_logger(), "Diagnostics disabled (diagnostics_period <= 0)");
     }
 
     auto period = std::chrono::duration<double>(integrator_period_);
@@ -212,7 +212,6 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   diagnostic_updater::Updater diag_updater_;
-  rclcpp::TimerBase::SharedPtr diag_timer_;
   rclcpp::TimerBase::SharedPtr integrator_timer_;
 
   rclcpp::Clock steady_clock_;
