@@ -18,8 +18,8 @@ class RoviBaseNode : public rclcpp::Node
 public:
   explicit RoviBaseNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   : Node("rovi_base", options),
-    steady_clock_(RCL_STEADY_TIME),
-    diag_updater_(this)
+    diag_updater_(this),
+    steady_clock_(RCL_STEADY_TIME)
   {
     odom_frame_ = declare_parameter<std::string>("odom_frame", "odom");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_footprint");
