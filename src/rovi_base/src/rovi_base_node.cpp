@@ -1,10 +1,12 @@
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <string>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -23,13 +25,15 @@ public:
     publish_tf_ = declare_parameter<bool>("publish_tf", true);
     linear_scale_x_ = declare_parameter<double>("linear_scale_x", 1.0);
     linear_scale_y_ = declare_parameter<double>("linear_scale_y", 1.0);
-    max_dt_ = declare_parameter<double>("max_dt", 0.5);
+    integrator_period_ = declare_parameter<double>("integrator_period", 0.1);
+    drop_warn_factor_ = declare_parameter<double>("drop_warn_factor", 3.0);
     vel_topic_ = declare_parameter<std::string>("vel_topic", "vel_raw");
     odom_topic_ = declare_parameter<std::string>("odom_topic", "odom_raw");
+    diag_period_sec_ = declare_parameter<double>("diagnostics_period", 10.0);
 
-    if (max_dt_ <= 0.0) {
-      RCLCPP_WARN(get_logger(), "max_dt must be > 0, defaulting to 0.5");
-      max_dt_ = 0.5;
+    if (integrator_period_ <= 0.0) {
+      RCLCPP_WARN(get_logger(), "integrator_period must be > 0, defaulting to 0.1");
+      integrator_period_ = 0.1;
     }
 
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -40,6 +44,20 @@ public:
 
     auto odom_qos = rclcpp::QoS(rclcpp::KeepLast(20)).reliable();
     odom_publisher_ = create_publisher<nav_msgs::msg::Odometry>(odom_topic_, odom_qos);
+
+    diag_updater_.setHardwareID("rovi_base");
+    diag_updater_.add("timing", this, &RoviBaseNode::produce_diagnostics);
+    if (diag_period_sec_ > 0.0) {
+      auto period = std::chrono::duration<double>(diag_period_sec_);
+      diag_timer_ = create_wall_timer(
+        std::chrono::duration_cast<std::chrono::milliseconds>(period),
+        [this]() { diag_updater_.force_update(); });
+    }
+
+    auto period = std::chrono::duration<double>(integrator_period_);
+    integrator_timer_ = create_wall_timer(
+      std::chrono::duration_cast<std::chrono::milliseconds>(period),
+      std::bind(&RoviBaseNode::integrate_step, this));
   }
 
 private:
@@ -50,32 +68,53 @@ private:
     const double wz = msg->angular.z;
     const rclcpp::Time now_steady = steady_clock_.now();
 
-    if (!have_last_time_) {
-      last_vel_time_ = now_steady;  // seed timing on the first message
-      have_last_time_ = true;
-      publish_odom(vx, vy, wz);
-      return;
+    if (have_last_time_) {
+      const double dt = (now_steady - last_vel_time_).seconds();
+      if (dt <= 0.0) {
+        dt_nonpositive_count_++;
+      } else {
+        last_arrival_dt_ = dt;
+        if (dt < min_dt_) {
+          min_dt_ = dt;
+        }
+        if (dt > max_dt_observed_) {
+          max_dt_observed_ = dt;
+        }
+      }
     }
 
-    double dt = (now_steady - last_vel_time_).seconds();
     last_vel_time_ = now_steady;
+    have_last_time_ = true;
+    have_velocity_ = true;
+    vx_latest_ = vx;
+    vy_latest_ = vy;
+    wz_latest_ = wz;
+    message_count_++;
+  }
 
-    if (dt <= 0.0) {
+  void integrate_step()
+  {
+    if (!have_velocity_) {
       return;
     }
-    if (dt > max_dt_) {
-      dt = max_dt_;
+
+    const double dt = integrator_period_;
+
+    heading_ += wz_latest_ * dt;
+    x_pos_ += (vx_latest_ * std::cos(heading_) - vy_latest_ * std::sin(heading_)) * dt;
+    y_pos_ += (vx_latest_ * std::sin(heading_) + vy_latest_ * std::cos(heading_)) * dt;
+
+    const double age = (steady_clock_.now() - last_vel_time_).seconds();
+    const double drop_threshold = drop_warn_factor_ * integrator_period_;
+    if (age > drop_threshold && !drop_warned_) {
+      RCLCPP_WARN(get_logger(),
+        "vel_raw stale: age=%.3fs > threshold=%.3fs (missed samples?)", age, drop_threshold);
+      drop_warned_ = true;
+    } else if (age <= drop_threshold) {
+      drop_warned_ = false;
     }
 
-    const double delta_heading = wz * dt;
-    const double delta_x = (vx * std::cos(heading_) - vy * std::sin(heading_)) * dt;
-    const double delta_y = (vx * std::sin(heading_) + vy * std::cos(heading_)) * dt;
-
-    heading_ += delta_heading;
-    x_pos_ += delta_x;
-    y_pos_ += delta_y;
-
-    publish_odom(vx, vy, wz);
+    publish_odom(vx_latest_, vy_latest_, wz_latest_);
   }
 
   void publish_odom(double vx, double vy, double wz)
@@ -130,26 +169,66 @@ private:
     tf_broadcaster_->sendTransform(t);
   }
 
+  void produce_diagnostics(diagnostic_updater::DiagnosticStatusWrapper & status)
+  {
+    if (!have_last_time_) {
+      status.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "No vel_raw messages received");
+      return;
+    }
+
+    const double age = (steady_clock_.now() - last_vel_time_).seconds();
+    const double drop_threshold = drop_warn_factor_ * integrator_period_;
+    if (age > drop_threshold) {
+      status.summaryf(diagnostic_msgs::msg::DiagnosticStatus::WARN,
+        "Last vel_raw older than %.3fs (threshold %.3fs)", age, drop_threshold);
+    } else {
+      status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Timing OK");
+    }
+
+    const double min_dt_val = std::isinf(min_dt_) ? 0.0 : min_dt_;
+    status.add("message_count", message_count_);
+    status.add("last_arrival_dt", last_arrival_dt_);
+    status.add("last_age", age);
+    status.add("min_arrival_dt", min_dt_val);
+    status.add("max_arrival_dt", max_dt_observed_);
+    status.add("dt_nonpositive_count", dt_nonpositive_count_);
+  }
+
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subscription_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+  diagnostic_updater::Updater diag_updater_;
+  rclcpp::TimerBase::SharedPtr diag_timer_;
+  rclcpp::TimerBase::SharedPtr integrator_timer_;
 
   rclcpp::Clock steady_clock_;
   rclcpp::Time last_vel_time_;
   bool have_last_time_{false};
+  bool have_velocity_{false};
 
   double linear_scale_x_{1.0};
   double linear_scale_y_{1.0};
-  double max_dt_{0.5};
+  double integrator_period_{0.1};
+  double drop_warn_factor_{3.0};
+  double diag_period_sec_{10.0};
   std::string odom_frame_{"odom"};
   std::string base_frame_{"base_footprint"};
   std::string vel_topic_{"vel_raw"};
   std::string odom_topic_{"odom_raw"};
   bool publish_tf_{true};
 
+  double vx_latest_{0.0};
+  double vy_latest_{0.0};
+  double wz_latest_{0.0};
   double x_pos_{0.0};
   double y_pos_{0.0};
   double heading_{0.0};
+  double last_arrival_dt_{0.0};
+  uint64_t message_count_{0};
+  uint64_t dt_nonpositive_count_{0};
+  double min_dt_{std::numeric_limits<double>::infinity()};
+  double max_dt_observed_{0.0};
+  bool drop_warned_{false};
 };
 
 int main(int argc, char * argv[])

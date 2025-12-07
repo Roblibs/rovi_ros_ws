@@ -15,6 +15,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(diagnostic_updater REQUIRED)
 
 add_executable(rovi_base_node src/rovi_base_node.cpp)
 ament_target_dependencies(rovi_base_node
@@ -23,6 +24,7 @@ ament_target_dependencies(rovi_base_node
   nav_msgs
   tf2
   tf2_ros
+  diagnostic_updater
 )
 
 install(TARGETS rovi_base_node

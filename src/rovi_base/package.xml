@@ -14,6 +14,7 @@
   <depend>rclcpp</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
+  <depend>diagnostic_updater</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
