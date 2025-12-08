@@ -38,8 +38,6 @@ sudo apt install -y ros-jazzy-rplidar-ros || true
 ```
 
 # Data Flow
-![packafe_flow](./docs/package_flow.drawio.svg)
-
 
 ```mermaid
 flowchart TD
@@ -73,11 +71,11 @@ flowchart TD
   ODRAW(["/odom_raw<br/>(Odometry)"])
   TF(["/tf<br/>(TF)"])
   RoviBase -->|publish| ODRAW
-  RoviBase -->|publish| TF
+  RoviBase -->|"publish (odom)"| TF
 
   RSP["robot_state_publisher"]
   JSTATE -->|subscribe| RSP
-  RSP -->|publish| TF
+  RSP -->|"publish (wheels)"| TF
 
   RPP["robot_pose_publisher_ros2 node"]
   TF -->|subscribe| RPP
@@ -93,13 +91,31 @@ flowchart TD
 
 ```
 
-How this fits your migration and RViz view:
-- Keep the Yahboom X3 URDF/xacro and meshes in `yahboomcar_description`; feed them to `robot_state_publisher` so TF frames match the hardware and RViz can render the model.
-- The Rosmaster driver already publishes `joint_states`, so `robot_state_publisher` can drive the model directly without a GUI joint publisher.
-- `rovi_base` mirrors the Yahboom `base_node_X3`: it integrates `vel_raw` into `odom_raw` and publishes `odom -> base_footprint` TF, giving RViz a moving frame even without localization.
-- Use the ROS 2 `robot_pose_publisher` (TF-based) with `map_frame:=odom` and `base_frame:=base_footprint` to publish `/robot_pose` for tools that want a stamped pose; RViz can consume either TF alone or this topic.
-- RViz subscribes to TF plus optional `/robot_pose`, `/odom_raw`, and IMU streams, letting you see the robot move during manual joystick teleop with no extra mapping stack.
-# Devices
+# Nodes
+## rosmaster driver
+![packafe_flow](./docs/package_flow.drawio.svg)
+
+## wheels
+
+- `ROS-Driver-Board\1.Code\Factory STM32 firmware\Rosmaster_V3.5.1\ControlBoard_Rosmaster\Source\APP\app_mecanum.h`
+- `ROS-Driver-Board\1.Code\Factory STM32 firmware\Rosmaster_V3.5.1\V3.5.1\Source\APP\app_motion.h`
+
+```c++
+#define MECANUM_MAX_CIRCLE_MM        (251.327f)
+
+#define ENCODER_CIRCLE_205           (2464.0f)
+
+typedef enum _car_type
+{
+    CAR_MECANUM_MAX = 0x02,//X3 PLUS
+} car_type_t;
+```
+
+| Robot Model        | Wheel diameter (mm) | Wheel encoder steps |
+|--------------------|---------------------|---------------------|
+| X3                 | 251.327             | 2464                |
+
+
 ## Joystick
 | Control           | Axis   | Axis sign | Robot action        | Robot command | command scale sign |
 |-------------------|--------|-----------|---------------------|---------------|---------------|
