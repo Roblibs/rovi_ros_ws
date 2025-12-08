@@ -45,38 +45,60 @@ sudo apt install -y ros-jazzy-rplidar-ros || true
 flowchart TD
   Rosmaster[rosmaster_driver node]
 
-  CMD(["cmd_vel<br/>(Twist)"])
-  CMD -->|subscribe| Rosmaster
-
-  EDT(["edition<br/>(Float32)"])
-  Rosmaster -->|publish| EDT
-
-  VOL(["voltage<br/>(Float32)"])
-  Rosmaster -->|publish| VOL
-
-  VRAW(["vel_raw<br/>(Twist)"])
-  Rosmaster -->|publish| VRAW
-
-  IMU(["/imu/data_raw<br/>(Imu)"])
-  Rosmaster -->|publish| IMU
-
-  MAG(["/imu/mag<br/>(MagneticField)"])
-  Rosmaster -->|publish| MAG
-
   Joystick["ros-jazzy-joy node"]
   JOY(["/joy<br/>(Joy)"])
   Joystick -->|publish| JOY
 
   RoviJoy["ros-jazzy-teleop-twist-joy node"]
   JOY -->|subscribe| RoviJoy
+  CMD(["/cmd_vel<br/>(Twist)"])
   RoviJoy -->|publish| CMD
+
+  CMD -->|subscribe| Rosmaster
+  EDT(["/edition<br/>(Float32)"])
+  VOL(["/voltage<br/>(Float32)"])
+  VRAW(["/vel_raw<br/>(Twist)"])
+  JSTATE(["/joint_states<br/>(JointState)"])
+  IMU(["/imu/data_raw<br/>(Imu)"])
+  MAG(["/imu/mag<br/>(MagneticField)"])
+  Rosmaster -->|publish| EDT
+  Rosmaster -->|publish| VOL
+  Rosmaster -->|publish| VRAW
+  Rosmaster -->|publish| JSTATE
+  Rosmaster -->|publish| IMU
+  Rosmaster -->|publish| MAG
 
   RoviBase["rovi_base node"]
   VRAW -->|subscribe| RoviBase
   ODRAW(["/odom_raw<br/>(Odometry)"])
+  TF(["/tf<br/>(TF)"])
   RoviBase -->|publish| ODRAW
+  RoviBase -->|publish| TF
+
+  RSP["robot_state_publisher"]
+  JSTATE -->|subscribe| RSP
+  RSP -->|publish| TF
+
+  RPP["robot_pose_publisher_ros2 node"]
+  TF -->|subscribe| RPP
+  ROBPOSE(["/robot_pose<br/>(PoseStamped)"])
+  RPP -->|publish| ROBPOSE
+
+  RVIZ["rviz2"]
+  TF -->|subscribe| RVIZ
+  ROBPOSE -->|subscribe| RVIZ
+  ODRAW -->|subscribe| RVIZ
+  IMU -->|subscribe| RVIZ
+  MAG -->|subscribe| RVIZ
 
 ```
+
+How this fits your migration and RViz view:
+- Keep the Yahboom X3 URDF/xacro and meshes in `yahboomcar_description`; feed them to `robot_state_publisher` so TF frames match the hardware and RViz can render the model.
+- The Rosmaster driver already publishes `joint_states`, so `robot_state_publisher` can drive the model directly without a GUI joint publisher.
+- `rovi_base` mirrors the Yahboom `base_node_X3`: it integrates `vel_raw` into `odom_raw` and publishes `odom -> base_footprint` TF, giving RViz a moving frame even without localization.
+- Use the ROS 2 `robot_pose_publisher` (TF-based) with `map_frame:=odom` and `base_frame:=base_footprint` to publish `/robot_pose` for tools that want a stamped pose; RViz can consume either TF alone or this topic.
+- RViz subscribes to TF plus optional `/robot_pose`, `/odom_raw`, and IMU streams, letting you see the robot move during manual joystick teleop with no extra mapping stack.
 # Devices
 ## Joystick
 | Control           | Axis   | Axis sign | Robot action        | Robot command | command scale sign |
@@ -140,4 +162,3 @@ ros2 run tf2_ros static_transform_publisher \
 >ros2 run rviz2 rviz2
 ```
 - select default `map` on `Global Options/Fixed Frame` add a LaserScan and configure its topic to `/scan`
-
