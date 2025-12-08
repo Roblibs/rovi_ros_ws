@@ -57,11 +57,13 @@ flowchart TD
   VOL(["/voltage<br/>(Float32)"])
   VRAW(["/vel_raw<br/>(Twist)"])
   JSTATE(["/joint_states<br/>(JointState)"])
+  ENC(["/encoders<br/>(Int32MultiArray)"])
   IMU(["/imu/data_raw<br/>(Imu)"])
   MAG(["/imu/mag<br/>(MagneticField)"])
   Rosmaster -->|publish| EDT
   Rosmaster -->|publish| VOL
   Rosmaster -->|publish| VRAW
+  Rosmaster -->|publish| ENC
   Rosmaster -->|publish| JSTATE
   Rosmaster -->|publish| IMU
   Rosmaster -->|publish| MAG

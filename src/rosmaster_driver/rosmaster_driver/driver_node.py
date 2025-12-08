@@ -16,7 +16,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
 
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Int32MultiArray
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu, MagneticField, JointState
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
@@ -64,6 +64,10 @@ class RosmasterAdapter:
         vx, vy, wz = self._hw.get_motion_data()
         return float(vx), float(vy), float(wz)
 
+    def get_motor_encoder(self) -> Tuple[int, int, int, int]:
+        m1, m2, m3, m4 = self._hw.get_motor_encoder()
+        return int(m1), int(m2), int(m3), int(m4)
+
 
 class RosmasterDriverNode(Node):
     """ROS 2 node that bridges cmd_vel to Rosmaster board and publishes sensors/state."""
@@ -77,14 +81,18 @@ class RosmasterDriverNode(Node):
         self.declare_parameter('publish_rate', 10.0)  # Hz
         self.declare_parameter('port', '/dev/my_ros_board')
         self.declare_parameter('debug', False)
+        self.declare_parameter('encoder_ticks_per_rev', 2464.0)
 
         self.imu_link = self.get_parameter('imu_link').get_parameter_value().string_value
         self.prefix = self.get_parameter('prefix').get_parameter_value().string_value
         self.publish_rate = float(self.get_parameter('publish_rate').get_parameter_value().double_value)
         self.port = self.get_parameter('port').get_parameter_value().string_value
         self.debug = bool(self.get_parameter('debug').get_parameter_value().bool_value)
+        self.ticks_per_rev = float(self.get_parameter('encoder_ticks_per_rev').get_parameter_value().double_value)
         if self.publish_rate <= 0.0:
             self.publish_rate = 10.0
+        if self.ticks_per_rev <= 0.0:
+            self.ticks_per_rev = 2464.0
 
         # Hardware adapter
         self.get_logger().info("[init] Initializing hardware adapter ...")
@@ -107,7 +115,8 @@ class RosmasterDriverNode(Node):
 
         self.pub_edition = self.create_publisher(Float32, 'edition', qos_imu)
         self.pub_voltage = self.create_publisher(Float32, 'voltage', qos_imu)
-        #self.pub_joint_states = self.create_publisher(JointState, 'joint_states', qos_imu)
+        self.pub_joint_states = self.create_publisher(JointState, 'joint_states', qos_imu)
+        self.pub_encoders = self.create_publisher(Int32MultiArray, 'encoders', qos_imu)
         self.pub_vel_raw = self.create_publisher(Twist, 'vel_raw', qos_imu)
         self.pub_imu_raw = self.create_publisher(Imu, '/imu/data_raw', qos_imu)
         self.pub_mag = self.create_publisher(MagneticField, '/imu/mag', qos_imu)
@@ -143,6 +152,7 @@ class RosmasterDriverNode(Node):
         gx, gy, gz = self.hw.get_gyroscope()
         mx, my, mz = self.hw.get_magnetometer()
         vx, vy, wz = self.hw.get_motion()
+        m1, m2, m3, m4 = self.hw.get_motor_encoder()
 
         # edition
         edition = Float32()
@@ -182,6 +192,31 @@ class RosmasterDriverNode(Node):
         twist.linear.y = float(vy)
         twist.angular.z = float(wz)
         self.pub_vel_raw.publish(twist)
+
+        # encoders raw (debug)
+        enc = Int32MultiArray()
+        enc.data = [int(m1), int(m2), int(m3), int(m4)]
+        self.pub_encoders.publish(enc)
+
+        # joint states derived from encoders (wheel rotation only)
+        joint_state = JointState()
+        joint_state.header.stamp = now
+        joint_state.header.frame_id = 'joint_states'
+        names = [
+            f"{self.prefix}back_right_joint",
+            f"{self.prefix}back_left_joint",
+            f"{self.prefix}front_left_wheel_joint",
+            f"{self.prefix}front_right_wheel_joint",
+        ]
+        joint_state.name = names
+        rev_to_rad = 2.0 * 3.141592653589793 / self.ticks_per_rev
+        joint_state.position = [
+            float(m1) * rev_to_rad,
+            float(m2) * rev_to_rad,
+            float(m3) * rev_to_rad,
+            float(m4) * rev_to_rad,
+        ]
+        self.pub_joint_states.publish(joint_state)
 
 def main() -> None:
     rclpy.init()
