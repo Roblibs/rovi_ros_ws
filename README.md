@@ -79,14 +79,8 @@ flowchart TD
   JSTATE -->|subscribe| RSP
   RSP -->|"publish (wheels)"| TF
 
-  RPP["robot_pose_publisher_ros2 node"]
-  TF -->|subscribe| RPP
-  ROBPOSE(["/robot_pose<br/>(PoseStamped)"])
-  RPP -->|publish| ROBPOSE
-
   RVIZ["rviz2"]
   TF -->|subscribe| RVIZ
-  ROBPOSE -->|subscribe| RVIZ
   ODRAW -->|subscribe| RVIZ
   IMU -->|subscribe| RVIZ
   MAG -->|subscribe| RVIZ
