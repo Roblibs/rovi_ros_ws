@@ -12,7 +12,14 @@
   <exec_depend>joy</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>rovi_description</exec_depend>
+  <exec_depend>rovi_base</exec_depend>
   <exec_depend>rosmaster_driver</exec_depend>
+  <exec_depend>rplidar_ros</exec_depend>
   <exec_depend>teleop_twist_joy</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>

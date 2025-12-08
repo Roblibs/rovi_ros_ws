@@ -88,8 +88,8 @@ def generate_launch_description() -> LaunchDescription:
     )
     lidar_frame_arg = DeclareLaunchArgument(
         'lidar_frame',
-        default_value='laser',
-        description='Frame id published on the LaserScan',
+        default_value='laser_link',
+        description='Frame id published on the LaserScan (match URDF link name)',
     )
     lidar_baud_arg = DeclareLaunchArgument(
         'lidar_serial_baudrate',

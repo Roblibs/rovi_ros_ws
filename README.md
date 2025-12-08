@@ -37,6 +37,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Teleop + mux
 sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux
 
+# Viz: state publisher + RViz
+sudo apt install -y ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2
+
 # Lidar: try apt first; if nothing, use Slamtec’s ROS 2 driver
 sudo apt install -y ros-jazzy-rplidar-ros || true
 ```
