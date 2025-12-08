@@ -6,7 +6,9 @@ import sys
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInfo
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInfo, IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, EnvironmentVariable, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -73,6 +75,31 @@ def generate_launch_description() -> LaunchDescription:
         'rovi_base_odom_frame',
         default_value='odom',
         description='Odom frame id for rovi_base',
+    )
+    lidar_enable_arg = DeclareLaunchArgument(
+        'lidar_enabled',
+        default_value='true',
+        description='Start rplidar_ros alongside teleop stack',
+    )
+    lidar_port_arg = DeclareLaunchArgument(
+        'lidar_serial_port',
+        default_value='/dev/ttyUSB0',
+        description='Serial device for RPLIDAR (e.g., /dev/ttyUSB0)',
+    )
+    lidar_frame_arg = DeclareLaunchArgument(
+        'lidar_frame',
+        default_value='laser',
+        description='Frame id published on the LaserScan',
+    )
+    lidar_baud_arg = DeclareLaunchArgument(
+        'lidar_serial_baudrate',
+        default_value='115200',
+        description='Baudrate for the RPLIDAR serial connection',
+    )
+    lidar_angle_comp_arg = DeclareLaunchArgument(
+        'lidar_angle_compensate',
+        default_value='true',
+        description='Enable angle compensation in rplidar_ros',
     )
 
     actions = []
@@ -154,10 +181,29 @@ def generate_launch_description() -> LaunchDescription:
         rovi_base_tf_arg,
         rovi_base_frame_arg,
         rovi_base_odom_arg,
+        lidar_enable_arg,
+        lidar_port_arg,
+        lidar_frame_arg,
+        lidar_baud_arg,
+        lidar_angle_comp_arg,
         joy_node,
         teleop_node,
         rosmaster_driver_node,
         rovi_base_node,
     ])
+
+    rplidar_share = get_package_share_directory('rplidar_ros')
+    rplidar_launch = os.path.join(rplidar_share, 'launch', 'rplidar.launch.py')
+    lidar_node = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(rplidar_launch),
+        condition=IfCondition(LaunchConfiguration('lidar_enabled')),
+        launch_arguments={
+            'serial_port': LaunchConfiguration('lidar_serial_port'),
+            'serial_baudrate': LaunchConfiguration('lidar_serial_baudrate'),
+            'frame_id': LaunchConfiguration('lidar_frame'),
+            'angle_compensate': LaunchConfiguration('lidar_angle_compensate'),
+        }.items(),
+    )
+    actions.append(lidar_node)
 
     return LaunchDescription(actions)

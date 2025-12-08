@@ -11,12 +11,16 @@ source /opt/ros/jazzy/setup.bash
 colcon build
 source install/setup.bash
 source .venv/bin/activate
-ros2 launch rovi_bringup teleop.launch.py
 ```
+launch examples:
 
-when the robot is running in headless mode, it is possible to see the topics output on a windows PC.
+|command | description |
+|--------|-------------|
+|ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
+|ros2 launch rovi_bringup teleop.launch.py lidar_enabled:=false | teleoperation without lidar |
+|ros2 launch rovi_bringup viz.launch.py | run rviz2 visualization of the real robot |
+|ros2 launch rovi_bringup viz.launch.py offline_mode:=true | visulaization of the robot model offline |
 
-As a prerequisites make sure to troubleshout the connection with `ros2 multicast send` and `ros2 multicast receive`, e.g. wsl even with mirror mode might not work on some windows wifi adapters.
 
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
@@ -76,6 +80,7 @@ flowchart TD
   RoviBase -->|publish| ODRAW
   RoviBase -->|"publish (odom)"| TF
 
+
   RSP["robot_state_publisher"]
   JSTATE -->|subscribe| RSP
   RSP -->|"publish (wheels)"| TF
@@ -85,7 +90,11 @@ flowchart TD
   ODRAW -->|subscribe| RVIZ
   IMU -->|subscribe| RVIZ
   MAG -->|subscribe| RVIZ
+  SCAN -->|subscribe| RVIZ
 
+  RPLidar["rplidar_ros node"]
+  SCAN(["/scan<br/>(LaserScan)"])
+  RPLidar -->|publish| SCAN
 ```
 
 ## Offline model
