@@ -37,7 +37,8 @@ sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux
 sudo apt install -y ros-jazzy-rplidar-ros || true
 ```
 
-# Data Flow
+# Diagrams
+## Data Flow
 
 ```mermaid
 flowchart TD
@@ -85,6 +86,25 @@ flowchart TD
   IMU -->|subscribe| RVIZ
   MAG -->|subscribe| RVIZ
 
+```
+
+## Offline model
+This launch from rovi_bringup helps to visualize the robot model without needing the actual robot hardware
+
+```mermaid
+flowchart TD
+  RoviDesc["rovi_description package"]
+  RSP["robot_state_publisher"]
+  JSPG["joint_state_publisher_gui"]
+  JSTATE(["/joint_states<br/>(JointState)"])
+  TF(["/tf<br/>(TF)"])
+  RVIZ["rviz2"]
+
+  RoviDesc -->|provides URDF| RSP
+  JSPG -->|publish| JSTATE
+  JSTATE -->|subscribe| RSP
+  RSP -->|publish| TF
+  TF -->|subscribe| RVIZ
 ```
 
 # Nodes
