@@ -19,32 +19,8 @@ Visualization Manager:
     - Class: rviz_default_plugins/TF
       Name: TF
       Value: true
-    - Class: rviz_default_plugins/Odometry
-      Enabled: true
-      Name: OdomRaw
-      Topic:
-        Value: /odom_raw
-      Value: true
-    - Class: rviz_default_plugins/LaserScan
-      Enabled: true
-      Name: Lidar
-      Topic:
-        Value: /scan
-      Value: true
-    - Class: rviz_default_plugins/Imu
-      Enabled: true
-      Name: IMU
-      Topic:
-        Value: /imu/data_raw
-      Value: true
-    - Class: rviz_default_plugins/MagneticField
-      Enabled: true
-      Name: MAG
-      Topic:
-        Value: /imu/mag
-      Value: true
   Global Options:
-    Fixed Frame: odom
+    Fixed Frame: base_footprint
     Frame Rate: 30
   Name: root
   Tools:
@@ -56,7 +32,7 @@ Visualization Manager:
       Distance: 1.7
       Name: LiveView
       Pitch: 0.33
-      Target Frame: odom
+      Target Frame: base_footprint
       Value: Orbit (rviz)
       Yaw: 5.5
 Window Geometry:

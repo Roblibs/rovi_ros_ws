@@ -49,7 +49,17 @@ def generate_launch_description() -> LaunchDescription:
     jsp_gui_node = Node(
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
-        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            {'robot_description': robot_description},
+        ],
+    )
+
+    static_odom_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='odom_to_basefootprint',
+        arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_footprint'],
     )
 
     rviz_node = Node(
@@ -64,6 +74,7 @@ def generate_launch_description() -> LaunchDescription:
         rviz_arg,
         sim_time_arg,
         jsp_gui_node,
+        static_odom_tf,
         rsp_node,
         rviz_node,
     ])
