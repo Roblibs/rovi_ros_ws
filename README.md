@@ -20,17 +20,7 @@ launch examples:
 |ros2 launch rovi_bringup teleop.launch.py lidar_enabled:=false | teleoperation without lidar |
 |ros2 launch rovi_bringup viz.launch.py | run rviz2 visualization of the real robot |
 |ros2 launch rovi_bringup viz.launch.py offline_mode:=true | visulaization of the robot model offline |
-
-
-on windows, clone this repo under `C:\pixi_ws\src` then
-```cmd
->pixi shell
->call C:\pixi_ws\ros2-windows\local_setup.bat
->colcon build --merge-install --base-paths src --packages-select rovi_description
-call install\setup.bat
-ros2 launch rovi_description offline_view.launch.py
-```
-
+|ros2 launch rovi_description offline_view.launch.py| offline with less dependencies |
 
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
@@ -53,6 +43,16 @@ sudo apt install -y ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publis
 # Lidar: try apt first; if nothing, use Slamtec’s ROS 2 driver
 sudo apt install -y ros-jazzy-rplidar-ros || true
 ```
+
+pixi on windows
+```cmd
+>pixi shell
+>call C:\pixi_ws\ros2-windows\local_setup.bat
+>colcon build --merge-install --base-paths src --packages-select rovi_description
+call install\setup.bat
+ros2 launch rovi_description offline_view.launch.py
+```
+
 
 # Diagrams
 ## Data Flow
