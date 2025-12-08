@@ -22,6 +22,16 @@ launch examples:
 |ros2 launch rovi_bringup viz.launch.py offline_mode:=true | visulaization of the robot model offline |
 
 
+on windows, clone this repo under `C:\pixi_ws\src` then
+```cmd
+>pixi shell
+>call C:\pixi_ws\ros2-windows\local_setup.bat
+>colcon build --merge-install --base-paths src --packages-select rovi_description
+call install\setup.bat
+ros2 launch rovi_description offline_view.launch.py
+```
+
+
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
 
@@ -201,8 +211,6 @@ ros2 run tf2_ros static_transform_publisher \
 ```
 - then on windows open rviz
 ```cmd
->pixi shell
->call C:\pixi_ws\ros2-windows\local_setup.bat
 >ros2 run rviz2 rviz2
 ```
 - select default `map` on `Global Options/Fixed Frame` add a LaserScan and configure its topic to `/scan`
