@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Offline visualization: joint_state_publisher_gui + robot_state_publisher + RViz."""
+"""Offline visualization: joint_state_publisher(+gui) + robot_state_publisher + RViz."""
 
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, Command
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -33,7 +33,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     robot_description = ParameterValue(
-        Command(['cat ', LaunchConfiguration('model')]),
+        PythonExpression(["open('", LaunchConfiguration('model'), "', 'r').read()"]),
         value_type=str,
     )
 
@@ -44,6 +44,16 @@ def generate_launch_description() -> LaunchDescription:
             {'robot_description': robot_description},
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
         ],
+    )
+
+    jsp_node = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        parameters=[
+            {'use_sim_time': LaunchConfiguration('use_sim_time')},
+            {'robot_description': robot_description},
+        ],
+        output='screen',
     )
 
     jsp_gui_node = Node(
@@ -73,6 +83,7 @@ def generate_launch_description() -> LaunchDescription:
         model_arg,
         rviz_arg,
         sim_time_arg,
+        jsp_node,
         jsp_gui_node,
         static_odom_tf,
         rsp_node,
