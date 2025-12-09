@@ -19,14 +19,14 @@ launch examples:
 |ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
 |ros2 launch rovi_bringup teleop.launch.py lidar_enabled:=false | teleoperation without lidar |
 |ros2 launch rovi_bringup viz.launch.py | run rviz2 visualization of the real robot |
-|ros2 launch rovi_bringup viz.launch.py offline_mode:=true | visulaization of the robot model offline |
-|ros2 launch rovi_description offline_view.launch.py| offline with less dependencies |
+|ros2 launch rovi_description offline_view.launch.py| offline robot model visualization |
 
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
 
 2) Install uv (Python package and venv manager):
 
+uv needed by the robot for control board python dependencies
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
@@ -37,11 +37,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Teleop + mux
 sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux
 
-# Viz: state publisher + RViz
+# Diagnostics (rovi_base depends on it)
+sudo apt install -y ros-jazzy-diagnostic-updater
+
+# Viz + state publisher for offline visualization
 sudo apt install -y ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2
 
-# Lidar: try apt first; if nothing, use Slamtec’s ROS 2 driver
-sudo apt install -y ros-jazzy-rplidar-ros || true
+# Lidar
+sudo apt install -y ros-jazzy-rplidar-ros
 ```
 
 pixi on windows
@@ -129,6 +132,42 @@ flowchart TD
   TF -->|subscribe| RVIZ
 ```
 
+## Package dependencies
+```mermaid
+flowchart TD
+  subgraph Internal
+    RoviBringup[rovi_bringup]
+    RoviDesc[rovi_description]
+    Rosmaster[rosmaster_driver]
+    RoviBase[rovi_base]
+  end
+
+  subgraph External
+    Joy[ros-jazzy-joy]
+    Teleop[ros-jazzy-teleop-twist-joy]
+  RSP[robot_state_publisher]
+  JSPG[joint_state_publisher_gui]
+  RVIZ[rviz2]
+  Diag[diagnostic_updater]
+  RPLidar[rplidar_ros]
+  end
+
+  RoviBringup --> RoviDesc
+  RoviBringup --> Rosmaster
+  RoviBringup --> RoviBase
+  RoviBringup --> Joy
+  RoviBringup --> Teleop
+  RoviBringup --> RSP
+  RoviDesc --> RVIZ
+  RoviBringup --> RVIZ
+  RoviBringup --> RPLidar
+
+  RoviDesc --> RSP
+  RoviDesc --> JSPG
+
+  RoviBase --> Diag
+```
+
 # Nodes
 ## rosmaster driver
 ![packafe_flow](./docs/package_flow.drawio.svg)
@@ -214,3 +253,7 @@ ros2 run tf2_ros static_transform_publisher \
 >ros2 run rviz2 rviz2
 ```
 - select default `map` on `Global Options/Fixed Frame` add a LaserScan and configure its topic to `/scan`
+
+## wifi adapter
+* using AX1800 from BrosTrend model No.: AX4L
+* linux install doc https://linux.brostrend.com/

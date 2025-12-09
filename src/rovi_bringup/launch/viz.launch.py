@@ -17,11 +17,6 @@ def generate_launch_description() -> LaunchDescription:
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
     default_rviz = os.path.join(desc_share, 'rviz', 'rovi.rviz')
 
-    offline_arg = DeclareLaunchArgument(
-        'offline_mode',
-        default_value='false',
-        description='If true, start joint_state_publisher_gui and a static odom->base_footprint TF for offline viewing.',
-    )
     model_arg = DeclareLaunchArgument(
         'model',
         default_value=default_model,
@@ -36,11 +31,6 @@ def generate_launch_description() -> LaunchDescription:
         'use_sim_time',
         default_value='false',
         description='Use /clock for simulation time.',
-    )
-    jsp_arg = DeclareLaunchArgument(
-        'use_joint_state_gui',
-        default_value='true',
-        description='Start joint_state_publisher_gui (only when offline_mode is true).',
     )
 
     robot_description = ParameterValue(
@@ -57,23 +47,6 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    jsp_gui_node = Node(
-        package='joint_state_publisher_gui',
-        executable='joint_state_publisher_gui',
-        condition=IfCondition(PythonExpression([
-            "'", LaunchConfiguration('offline_mode'), "' == 'true' and '",
-            LaunchConfiguration('use_joint_state_gui'), "' == 'true'"
-        ])),
-    )
-
-    static_odom_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='odom_to_basefootprint',
-        condition=IfCondition(LaunchConfiguration('offline_mode')),
-        arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_footprint'],
-    )
-
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -82,13 +55,9 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
-        offline_arg,
         model_arg,
         rviz_arg,
         sim_time_arg,
-        jsp_arg,
         rsp_node,
-        jsp_gui_node,
-        static_odom_tf,
         rviz_node,
     ])
