@@ -18,7 +18,7 @@ launch examples:
 |--------|-------------|
 |ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
 |ros2 launch rovi_bringup teleop.launch.py lidar_enabled:=false | teleoperation without lidar |
-|ros2 launch rovi_bringup viz.launch.py | run rviz2 visualization of the real robot |
+|ros2 launch rovi_description view.launch.py| run rviz2 visualization of the real robot  |
 |ros2 launch rovi_description offline_view.launch.py| offline robot model visualization |
 
 # Install
