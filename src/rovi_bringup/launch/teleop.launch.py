@@ -9,7 +9,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInfo, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, EnvironmentVariable, TextSubstitution
+from launch.substitutions import LaunchConfiguration, EnvironmentVariable, TextSubstitution, Command
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -20,6 +20,8 @@ def generate_launch_description() -> LaunchDescription:
     default_teleop_params = os.path.join(pkg_share, 'config', 'teleop_twist_joy.yaml')
     default_rovi_base_params = os.path.join(pkg_share, 'config', 'rovi_base.yaml')
     default_rosmaster_params = os.path.join(pkg_share, 'config', 'rosmaster_driver.yaml')
+    desc_share = get_package_share_directory('rovi_description')
+    default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
 
     joy_params_arg = DeclareLaunchArgument(
         'joy_params_file',
@@ -101,6 +103,11 @@ def generate_launch_description() -> LaunchDescription:
         default_value='true',
         description='Enable angle compensation in rplidar_ros',
     )
+    model_arg = DeclareLaunchArgument(
+        'model',
+        default_value=default_model,
+        description='Absolute path to the robot URDF.',
+    )
 
     actions = []
 
@@ -169,6 +176,14 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    rsp_node = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        parameters=[
+            {'robot_description': ParameterValue(Command(['cat ', LaunchConfiguration('model')]), value_type=str)},
+        ],
+    )
+
     actions.extend([
         joy_params_arg,
         teleop_params_arg,
@@ -186,10 +201,12 @@ def generate_launch_description() -> LaunchDescription:
         lidar_frame_arg,
         lidar_baud_arg,
         lidar_angle_comp_arg,
+        model_arg,
         joy_node,
         teleop_node,
         rosmaster_driver_node,
         rovi_base_node,
+        rsp_node,
     ])
 
     rplidar_share = get_package_share_directory('rplidar_ros')
