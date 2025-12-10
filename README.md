@@ -19,7 +19,7 @@ launch examples:
 |ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
 |ros2 launch rovi_bringup teleop.launch.py lidar_enabled:=false | teleoperation without lidar |
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
-|rviz2 -d <path-to>/install/rovi_description/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
+|rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
 
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
@@ -158,12 +158,9 @@ flowchart TD
   RoviBringup --> Joy
   RoviBringup --> Teleop
   RoviBringup --> RSP
-  RoviDesc --> RVIZ
+  RoviBringup --> JSPG
   RoviBringup --> RVIZ
   RoviBringup --> RPLidar
-
-  RoviDesc --> RSP
-  RoviDesc --> JSPG
 
   RoviBase --> Diag
 ```
