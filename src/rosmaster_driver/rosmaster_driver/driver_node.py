@@ -211,10 +211,10 @@ class RosmasterDriverNode(Node):
         joint_state.name = names
         rev_to_rad = 2.0 * 3.141592653589793 / self.ticks_per_rev
         joint_state.position = [
-            float(m1) * rev_to_rad,
+            float(m1) * rev_to_rad * (-1.0),  # invert front_left_joint
             float(m2) * rev_to_rad,
             float(m3) * rev_to_rad,
-            float(m4) * rev_to_rad,
+            float(m4) * rev_to_rad * (-1.0),  # invert back_right_joint
         ]
         self.pub_joint_states.publish(joint_state)
 
