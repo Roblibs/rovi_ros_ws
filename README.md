@@ -188,8 +188,8 @@ typedef enum _car_type
 |-------|-------|
 |m1     | Front Left |
 |m2     | Front Right |
-|m3     | Back Right |
-|m4     | Back Left |
+|m3     | Back Left |
+|m4     | Back Right |
 
 
 | Robot Model        | Wheel diameter (mm) | Wheel encoder steps |
