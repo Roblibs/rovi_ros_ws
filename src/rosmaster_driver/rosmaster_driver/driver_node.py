@@ -203,10 +203,10 @@ class RosmasterDriverNode(Node):
         joint_state.header.stamp = now
         joint_state.header.frame_id = 'joint_states'
         names = [
-            f"{self.prefix}back_right_joint",
-            f"{self.prefix}back_left_joint",
             f"{self.prefix}front_left_joint",
             f"{self.prefix}front_right_joint",
+            f"{self.prefix}back_right_joint",
+            f"{self.prefix}back_left_joint",
         ]
         joint_state.name = names
         rev_to_rad = 2.0 * 3.141592653589793 / self.ticks_per_rev

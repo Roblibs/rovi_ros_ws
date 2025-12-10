@@ -184,6 +184,13 @@ typedef enum _car_type
     CAR_MECANUM_MAX = 0x02,//X3 PLUS
 } car_type_t;
 ```
+| Motor | wheel |
+|-------|-------|
+|m1     | Front Left |
+|m2     | Front Right |
+|m3     | Back Right |
+|m4     | Back Left |
+
 
 | Robot Model        | Wheel diameter (mm) | Wheel encoder steps |
 |--------------------|---------------------|---------------------|
