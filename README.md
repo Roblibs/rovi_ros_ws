@@ -51,9 +51,9 @@ pixi on windows
 ```cmd
 >pixi shell
 >call C:\pixi_ws\ros2-windows\local_setup.bat
->colcon build --merge-install --base-paths src --packages-select rovi_description
+>colcon build --merge-install --base-paths rovi_ros_ws --packages-select rovi_description
 call install\setup.bat
-ros2 launch rovi_description offline_view.launch.py
+rviz2 -d install/share/rovi_description/rviz/rovi.rviz
 ```
 
 
