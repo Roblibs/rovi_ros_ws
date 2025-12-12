@@ -209,17 +209,20 @@ def generate_launch_description() -> LaunchDescription:
         rsp_node,
     ])
 
-    rplidar_share = get_package_share_directory('rplidar_ros')
-    rplidar_launch = os.path.join(rplidar_share, 'launch', 'rplidar.launch.py')
-    lidar_node = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(rplidar_launch),
+    # Stand up rplidar directly so we can enforce frame_id and other params via launch arguments.
+    lidar_node = Node(
         condition=IfCondition(LaunchConfiguration('lidar_enabled')),
-        launch_arguments={
+        package='rplidar_ros',
+        executable='rplidar_composition',
+        name='rplidar_composition',
+        output='screen',
+        parameters=[{
             'serial_port': LaunchConfiguration('lidar_serial_port'),
-            'serial_baudrate': LaunchConfiguration('lidar_serial_baudrate'),
+            'serial_baudrate': ParameterValue(LaunchConfiguration('lidar_serial_baudrate'), value_type=int),
             'frame_id': LaunchConfiguration('lidar_frame'),
-            'angle_compensate': LaunchConfiguration('lidar_angle_compensate'),
-        }.items(),
+            'inverted': False,
+            'angle_compensate': ParameterValue(LaunchConfiguration('lidar_angle_compensate'), value_type=bool),
+        }],
     )
     actions.append(lidar_node)
 
