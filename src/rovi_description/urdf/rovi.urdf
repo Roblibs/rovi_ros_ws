@@ -183,6 +183,6 @@
   <joint name="laser_joint" type="fixed">
     <parent link="base_link"/>
     <child link="laser_link"/>
-    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+    <origin xyz="0.129 0 0.1645" rpy="0 0 0"/>
   </joint>
 </robot>
