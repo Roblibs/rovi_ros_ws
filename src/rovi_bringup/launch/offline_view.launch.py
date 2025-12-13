@@ -5,7 +5,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler, TimerAction
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler, TimerAction, SetEnvironmentVariable
 from launch.event_handlers import OnProcessStart
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
@@ -16,6 +16,9 @@ def generate_launch_description() -> LaunchDescription:
     desc_share = get_package_share_directory('rovi_description')
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
     default_rviz = os.path.join(desc_share, 'rviz', 'rovi.rviz')
+
+    # Use shared memory transport instead of UDP multicast for reliable local DDS discovery
+    localhost_only = SetEnvironmentVariable('ROS_LOCALHOST_ONLY', '1')
 
     model_arg = DeclareLaunchArgument(
         'model',
@@ -78,6 +81,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
+        localhost_only,
         model_arg,
         rviz_arg,
         sim_time_arg,
