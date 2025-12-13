@@ -166,7 +166,7 @@
 
   <link name="laser_link">
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0" rpy="0 0 -3.14159"/>
       <geometry>
         <mesh filename="package://rovi_description/meshes/sensor/laser_link.STL"/>
       </geometry>
@@ -183,6 +183,6 @@
   <joint name="laser_joint" type="fixed">
     <parent link="base_link"/>
     <child link="laser_link"/>
-    <origin xyz="0.129 0 0.1645" rpy="0 0 0"/>
+    <origin xyz="0.129 0 0.1645" rpy="0 0 3.14159"/>
   </joint>
 </robot>
