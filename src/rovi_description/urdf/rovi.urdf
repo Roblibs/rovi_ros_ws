@@ -20,14 +20,14 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/base_link_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/chassis.stl"/>
       </geometry>
       <material name="Green"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/base_link_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/chassis.stl"/>
       </geometry>
     </collision>
   </link>
@@ -35,7 +35,7 @@
   <joint name="base_joint" type="fixed">
     <parent link="base_footprint"/>
     <child link="base_link"/>
-    <origin xyz="0.0 0.0 0.0815" rpy="0 0 0"/>
+    <origin xyz="0.0 0.0 0.029" rpy="0 0 0"/>
   </joint>
 
   <joint name="base_imu" type="fixed">
@@ -54,14 +54,14 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/front_right_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RL_FR.stl"/>
       </geometry>
       <material name="White"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/front_right_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RL_FR.stl"/>
       </geometry>
     </collision>
   </link>
@@ -69,7 +69,7 @@
   <joint name="front_right_joint" type="continuous">
     <parent link="base_link"/>
     <child link="front_right_wheel"/>
-    <origin xyz="0.08 -0.0845 -0.0389" rpy="-1.57079632679 0 3.14159265359"/>
+    <origin xyz="0.13902 -0.10414 0.010269" rpy="-1.57079632679 0 3.14159265359"/>
     <axis xyz="0 0 1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>
@@ -84,14 +84,14 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/front_left_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RR_FL.stl"/>
       </geometry>
       <material name="White"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/front_left_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RR_FL.stl"/>
       </geometry>
     </collision>
   </link>
@@ -99,7 +99,7 @@
   <joint name="front_left_joint" type="continuous">
     <parent link="base_link"/>
     <child link="front_left_wheel"/>
-    <origin xyz="0.08 0.084492 -0.0389" rpy="1.57079632679 0 0"/>
+    <origin xyz="0.139 0.10406 0.0139" rpy="1.57079632679 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>
@@ -114,14 +114,14 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/back_right_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RR_FL.stl"/>
       </geometry>
       <material name="White"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/back_right_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RR_FL.stl"/>
       </geometry>
     </collision>
   </link>
@@ -129,7 +129,7 @@
   <joint name="back_right_joint" type="continuous">
     <parent link="base_link"/>
     <child link="back_right_wheel"/>
-    <origin xyz="-0.08 -0.0845 -0.03946" rpy="-1.57079632679 0 3.14159265359"/>
+    <origin xyz="-0.080231 -0.1041 0.0135" rpy="-1.57079632679 0 3.14159265359"/>
     <axis xyz="0 0 1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>
@@ -144,14 +144,14 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/back_left_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RL_FR.stl"/>
       </geometry>
       <material name="White"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/back_left_wheel_X3.STL"/>
+        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RL_FR.stl"/>
       </geometry>
     </collision>
   </link>
@@ -159,7 +159,7 @@
   <joint name="back_left_joint" type="continuous">
     <parent link="base_link"/>
     <child link="back_left_wheel"/>
-    <origin xyz="-0.08 0.084492 -0.03954" rpy="1.57079632679 0 0"/>
+    <origin xyz="-0.08231 0.1041 0.0135" rpy="1.57079632679 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>

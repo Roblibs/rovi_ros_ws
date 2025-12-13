@@ -5,7 +5,8 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler, TimerAction
+from launch.event_handlers import OnProcessStart
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -51,7 +52,6 @@ def generate_launch_description() -> LaunchDescription:
         executable='joint_state_publisher_gui',
         parameters=[
             {'use_sim_time': LaunchConfiguration('use_sim_time')},
-            {'robot_description': robot_description},
         ],
     )
 
@@ -69,12 +69,20 @@ def generate_launch_description() -> LaunchDescription:
         output='screen',
     )
 
+    # Delay jsp_gui to ensure robot_description topic is available
+    delayed_jsp_gui = RegisterEventHandler(
+        OnProcessStart(
+            target_action=rsp_node,
+            on_start=[TimerAction(period=0.5, actions=[jsp_gui_node])],
+        )
+    )
+
     return LaunchDescription([
         model_arg,
         rviz_arg,
         sim_time_arg,
-        jsp_gui_node,
         static_odom_tf,
         rsp_node,
+        delayed_jsp_gui,
         rviz_node,
     ])
