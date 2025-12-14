@@ -18,6 +18,8 @@
   <exec_depend>rviz2</exec_depend>
   <exec_depend>rovi_description</exec_depend>
   <exec_depend>rovi_base</exec_depend>
+  <exec_depend>rovi_localization</exec_depend>
+  <exec_depend>rovi_slam</exec_depend>
   <exec_depend>rosmaster_driver</exec_depend>
   <exec_depend>rplidar_ros</exec_depend>
   <exec_depend>teleop_twist_joy</exec_depend>

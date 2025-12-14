@@ -18,8 +18,11 @@ launch examples:
 |--------|-------------|
 |ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
 |ros2 launch rovi_bringup teleop.launch.py lidar_enabled:=false | teleoperation without lidar |
+|ros2 launch rovi_bringup mapping.launch.py | teleop + slam_toolbox mapping |
+|ros2 launch rovi_bringup localization.launch.py map_file_name:=/path/to/map.posegraph | teleop + slam_toolbox localization on a saved pose-graph |
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
 |rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
+|rviz2 -d install/share/rovi_description/rviz/rovi_map.rviz| visualization for SLAM (Fixed Frame: `map`, shows `/map`) |
 
 ## SLAM + localization (clean layering)
 Goal: add `map -> odom` TF (SLAM) so RViz can use `map` as the fixed frame (real-room/global), not only `odom` (local/drifty).
