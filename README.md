@@ -21,6 +21,29 @@ launch examples:
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
 |rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
 
+## Planned: SLAM + localization (clean layering)
+Goal: add `map -> odom` TF (SLAM) so RViz can use `map` as the fixed frame (real-room/global), not only `odom` (local/drifty).
+
+Planned new internal packages:
+- `rovi_localization` (optional): IMU filtering + `robot_localization` EKF, publishing `odom -> base_footprint`.
+- `rovi_slam` (optional): `slam_toolbox` mapping/localization, publishing `map -> odom` and `/map`.
+
+Planned config toggles (names may change):
+- `ekf_enabled` (bool): when `true`, disable `rovi_base publish_tf` to avoid duplicate `odom -> base_footprint` TF.
+- `imu_enabled` (bool): when `true`, run an IMU filter (to estimate orientation) and fuse it in EKF; when `false`, EKF runs odom-only.
+- `slam_enabled` (bool) + `slam_mode` (`mapping`/`localization`): start SLAM toolbox and choose behavior.
+
+Planned folder layout:
+```text
+rovi_ros_ws/src/
+  rovi_bringup/         # top-level "robot bringup" launch files
+  rovi_description/     # URDF + meshes + rviz configs
+  rosmaster_driver/     # hardware driver (cmd_vel, joint_states, IMU, vel_raw)
+  rovi_base/            # odom_raw integrator from vel_raw (optional TF)
+  rovi_localization/    # planned: ekf + imu filter config/launch
+  rovi_slam/            # planned: slam_toolbox config/launch
+```
+
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
 
@@ -45,6 +68,15 @@ sudo apt install -y ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publis
 
 # Lidar
 sudo apt install -y ros-jazzy-rplidar-ros
+
+# Planned: SLAM + localization
+sudo apt install -y ros-jazzy-slam-toolbox ros-jazzy-robot-localization
+
+# Optional (recommended when fusing IMU orientation)
+sudo apt install -y ros-jazzy-imu-filter-madgwick
+
+# Optional (map saving CLI)
+sudo apt install -y ros-jazzy-nav2-map-server
 ```
 
 pixi on windows
@@ -79,14 +111,14 @@ flowchart TD
   VRAW(["/vel_raw<br/>(Twist)"])
   JSTATE(["/joint_states<br/>(JointState)"])
   ENC(["/encoders<br/>(Int32MultiArray)"])
-  IMU(["/imu/data_raw<br/>(Imu)"])
+  IMU_RAW(["/imu/data_raw<br/>(Imu)"])
   MAG(["/imu/mag<br/>(MagneticField)"])
   Rosmaster -->|publish| EDT
   Rosmaster -->|publish| VOL
   Rosmaster -->|publish| VRAW
   Rosmaster -->|publish| ENC
   Rosmaster -->|publish| JSTATE
-  Rosmaster -->|publish| IMU
+  Rosmaster -->|publish| IMU_RAW
   Rosmaster -->|publish| MAG
 
   RoviBase["rovi_base node"]
@@ -94,23 +126,94 @@ flowchart TD
   ODRAW(["/odom_raw<br/>(Odometry)"])
   TF(["/tf<br/>(TF)"])
   RoviBase -->|publish| ODRAW
-  RoviBase -->|"publish (odom)"| TF
+  RoviBase -->|"publish (odom->base_footprint, when EKF disabled)"| TF
+
+  ImuFilter["imu_filter_madgwick (optional)"]
+  IMU_RAW -->|subscribe| ImuFilter
+  MAG -->|subscribe| ImuFilter
+  IMU(["/imu/data<br/>(Imu)"])
+  ImuFilter -->|publish| IMU
+
+  EKF["robot_localization/ekf_node (optional)"]
+  ODRAW -->|subscribe| EKF
+  IMU -->|subscribe| EKF
+  ODOMF(["/odometry/filtered<br/>(Odometry)"])
+  EKF -->|publish| ODOMF
+  EKF -->|"publish (odom->base_footprint)"| TF
 
 
   RSP["robot_state_publisher"]
   JSTATE -->|subscribe| RSP
-  RSP -->|"publish (wheels)"| TF
-
-  RVIZ["rviz2"]
-  TF -->|subscribe| RVIZ
-  ODRAW -->|subscribe| RVIZ
-  IMU -->|subscribe| RVIZ
-  MAG -->|subscribe| RVIZ
-  SCAN -->|subscribe| RVIZ
+  RSP -->|"publish (links/joints)"| TF
 
   RPLidar["rplidar_ros node"]
   SCAN(["/scan<br/>(LaserScan)"])
   RPLidar -->|publish| SCAN
+
+  Slam["slam_toolbox (optional)"]
+  SCAN -->|subscribe| Slam
+  TF -->|subscribe| Slam
+  MAP(["/map<br/>(OccupancyGrid)"])
+  Slam -->|publish| MAP
+  Slam -->|"publish (map->odom)"| TF
+
+  RVIZ["rviz2"]
+  TF -->|subscribe| RVIZ
+  ODRAW -->|subscribe| RVIZ
+  ODOMF -->|subscribe| RVIZ
+  IMU_RAW -->|subscribe| RVIZ
+  IMU -->|subscribe| RVIZ
+  MAG -->|subscribe| RVIZ
+  SCAN -->|subscribe| RVIZ
+  MAP -->|subscribe| RVIZ
+```
+
+## TF Tree (planned runtime)
+TF frames are not regular ROS topics; this is the chain RViz and SLAM use at runtime.
+
+```mermaid
+flowchart LR
+  MAP[map] -->|slam_toolbox| ODOM[odom]
+  ODOM -->|ekf_node OR rovi_base| BASEF[base_footprint]
+  BASEF -->|robot_state_publisher| BASEL[base_link]
+  BASEL -->|robot_state_publisher| LASER[laser_link]
+  BASEL -->|robot_state_publisher| IMU[imu_link]
+```
+
+## Localization (planned: EKF + optional IMU)
+This produces a single authoritative `odom -> base_footprint` transform (required by SLAM/navigation).
+
+```mermaid
+flowchart TD
+  Rosmaster[rosmaster_driver] -->|publish| IMU_RAW(["/imu/data_raw<br/>(Imu)"])
+  Rosmaster -->|publish| MAG(["/imu/mag<br/>(MagneticField)"])
+  RoviBase[rovi_base] -->|publish| ODRAW(["/odom_raw<br/>(Odometry)"])
+
+  ImuFilter["imu_filter_madgwick (optional)"]
+  IMU_RAW -->|subscribe| ImuFilter
+  MAG -->|subscribe| ImuFilter
+  IMU(["/imu/data<br/>(Imu, orientation)"])
+  ImuFilter -->|publish| IMU
+
+  EKF["robot_localization/ekf_node"]
+  ODRAW -->|subscribe| EKF
+  IMU -->|subscribe| EKF
+  ODOMF(["/odometry/filtered<br/>(Odometry)"])
+  EKF -->|publish| ODOMF
+  EKF -->|publish| TF(["/tf<br/>odom -> base_footprint"])
+```
+
+## SLAM (planned: slam_toolbox)
+This produces `map -> odom` so the robot pose is expressed in a stable map frame.
+
+```mermaid
+flowchart TD
+  RPLidar[rplidar_ros] -->|publish| SCAN(["/scan<br/>(LaserScan)"])
+  TFCHAIN(["/tf<br/> odom -> base_footprint -> laser_link"]) --> Slam[slam_toolbox]
+  SCAN -->|subscribe| Slam
+  MAP(["/map<br/>(OccupancyGrid)"])
+  Slam -->|publish| MAP
+  Slam -->|publish| TF(["tf<br/>map -> odom"])
 ```
 
 ## Offline model
@@ -140,6 +243,8 @@ flowchart TD
     RoviDesc[rovi_description]
     Rosmaster[rosmaster_driver]
     RoviBase[rovi_base]
+    RoviLoc["rovi_localization (planned)"]
+    RoviSlam["rovi_slam (planned)"]
   end
 
   subgraph External
@@ -150,11 +255,17 @@ flowchart TD
   RVIZ[rviz2]
   Diag[diagnostic_updater]
   RPLidar[rplidar_ros]
+  EKF[robot_localization]
+  ImuFilter[imu_filter_madgwick]
+  SlamToolbox[slam_toolbox]
+  MapServer["nav2_map_server (map_saver_cli)"]
   end
 
   RoviBringup --> RoviDesc
   RoviBringup --> Rosmaster
   RoviBringup --> RoviBase
+  RoviBringup -.-> RoviLoc
+  RoviBringup -.-> RoviSlam
   RoviBringup --> Joy
   RoviBringup --> Teleop
   RoviBringup --> RSP
@@ -163,6 +274,11 @@ flowchart TD
   RoviBringup --> RPLidar
 
   RoviBase --> Diag
+
+  RoviLoc --> EKF
+  RoviLoc -.-> ImuFilter
+  RoviSlam --> SlamToolbox
+  RoviSlam -.-> MapServer
 ```
 
 # Nodes
