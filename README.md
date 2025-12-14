@@ -21,28 +21,39 @@ launch examples:
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
 |rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
 
-## Planned: SLAM + localization (clean layering)
+## SLAM + localization (clean layering)
 Goal: add `map -> odom` TF (SLAM) so RViz can use `map` as the fixed frame (real-room/global), not only `odom` (local/drifty).
 
-Planned new internal packages:
-- `rovi_localization` (optional): IMU filtering + `robot_localization` EKF, publishing `odom -> base_footprint`.
-- `rovi_slam` (optional): `slam_toolbox` mapping/localization, publishing `map -> odom` and `/map`.
+### Packages
+| Package | Role |
+|---|---|
+| `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
+| `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
+| `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
+| `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; publishes TF `odom -> base_footprint` when EKF is disabled |
+| `rovi_localization` | Localization pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` when enabled |
+| `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 
-Planned config toggles (names may change):
-- `ekf_enabled` (bool): when `true`, disable `rovi_base publish_tf` to avoid duplicate `odom -> base_footprint` TF.
-- `imu_enabled` (bool): when `true`, run an IMU filter (to estimate orientation) and fuse it in EKF; when `false`, EKF runs odom-only.
-- `slam_enabled` (bool) + `slam_mode` (`mapping`/`localization`): start SLAM toolbox and choose behavior.
+### Launches
+| Package | Launch | Description |
+|---|---|---|
+| `rovi_bringup` | `teleop.launch.py` | Manual driving: joystick + teleop + base bringup (+ LiDAR if enabled) |
+| `rovi_bringup` | `offline_view.launch.py` | Offline visualization: URDF + joint_state_publisher_gui + RViz |
+| `rovi_bringup` | `joy.launch.py` | Debug joystick → `/cmd_vel` only (no hardware required) |
+| `rosmaster_driver` | `rosmaster_driver.launch.py` | Hardware driver only (serial/IMU/joints sanity checks) |
+| `rovi_bringup` | `mapping.launch.py` | Bringup + SLAM mapping (`slam_toolbox`) |
+| `rovi_bringup` | `localization.launch.py` | Bringup + SLAM localization on an existing map (`slam_toolbox` localization mode) |
+| `rovi_localization` | `ekf.launch.py` | Component launch: IMU filter + EKF (useful to test/fuse odometry without SLAM) |
+| `rovi_slam` | `slam_toolbox.launch.py` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
 
-Planned folder layout:
-```text
-rovi_ros_ws/src/
-  rovi_bringup/         # top-level "robot bringup" launch files
-  rovi_description/     # URDF + meshes + rviz configs
-  rosmaster_driver/     # hardware driver (cmd_vel, joint_states, IMU, vel_raw)
-  rovi_base/            # odom_raw integrator from vel_raw (optional TF)
-  rovi_localization/    # planned: ekf + imu filter config/launch
-  rovi_slam/            # planned: slam_toolbox config/launch
-```
+### Params
+| Package | Launch | Param | Default | Explanation |
+|---|---|---|---|---|
+| `rovi_bringup` | `teleop.launch.py` | `lidar_enabled` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
+| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `slam_enabled` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
+| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `ekf_enabled` | `false` | Starts `robot_localization/ekf_node` and makes it the only TF source for `odom -> base_footprint` (disables TF from `rovi_base`) |
+| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `imu_enabled` | `false` | Starts IMU orientation filter and fuses IMU into EKF (keeps EKF odom-only when `false`) |
+| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `mag_enable` | `false` | Enables magnetometer input for the IMU filter (disabled by default due to interference risk) |
 
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
@@ -69,14 +80,11 @@ sudo apt install -y ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publis
 # Lidar
 sudo apt install -y ros-jazzy-rplidar-ros
 
-# Planned: SLAM + localization
+# SLAM + localization
 sudo apt install -y ros-jazzy-slam-toolbox ros-jazzy-robot-localization
 
-# Optional (recommended when fusing IMU orientation)
+# IMU orientation filter (used when imu_enabled:=true)
 sudo apt install -y ros-jazzy-imu-filter-madgwick
-
-# Optional (map saving CLI)
-sudo apt install -y ros-jazzy-nav2-map-server
 ```
 
 pixi on windows
@@ -128,15 +136,15 @@ flowchart TD
   RoviBase -->|publish| ODRAW
   RoviBase -->|"publish (odom->base_footprint, when EKF disabled)"| TF
 
-  ImuFilter["imu_filter_madgwick (optional)"]
+  ImuFilter["imu_filter_madgwick (imu_enabled)"]
   IMU_RAW -->|subscribe| ImuFilter
-  MAG -->|subscribe| ImuFilter
+  MAG -.->|"subscribe (mag_enable)"| ImuFilter
   IMU(["/imu/data<br/>(Imu)"])
   ImuFilter -->|publish| IMU
 
-  EKF["robot_localization/ekf_node (optional)"]
+  EKF["robot_localization/ekf_node (ekf_enabled)"]
   ODRAW -->|subscribe| EKF
-  IMU -->|subscribe| EKF
+  IMU -.->|"subscribe (imu_enabled)"| EKF
   ODOMF(["/odometry/filtered<br/>(Odometry)"])
   EKF -->|publish| ODOMF
   EKF -->|"publish (odom->base_footprint)"| TF
@@ -150,7 +158,7 @@ flowchart TD
   SCAN(["/scan<br/>(LaserScan)"])
   RPLidar -->|publish| SCAN
 
-  Slam["slam_toolbox (optional)"]
+  Slam["slam_toolbox (slam_enabled)"]
   SCAN -->|subscribe| Slam
   TF -->|subscribe| Slam
   MAP(["/map<br/>(OccupancyGrid)"])
@@ -168,7 +176,7 @@ flowchart TD
   MAP -->|subscribe| RVIZ
 ```
 
-## TF Tree (planned runtime)
+## TF Tree (runtime)
 TF frames are not regular ROS topics; this is the chain RViz and SLAM use at runtime.
 
 ```mermaid
@@ -180,8 +188,8 @@ flowchart LR
   BASEL -->|robot_state_publisher| IMU[imu_link]
 ```
 
-## Localization (planned: EKF + optional IMU)
-This produces a single authoritative `odom -> base_footprint` transform (required by SLAM/navigation).
+## Localization (EKF + IMU filter)
+This produces a single authoritative `odom -> base_footprint` transform; IMU fusion is gated by `imu_enabled` and magnetometer usage by `mag_enable`.
 
 ```mermaid
 flowchart TD
@@ -189,21 +197,21 @@ flowchart TD
   Rosmaster -->|publish| MAG(["/imu/mag<br/>(MagneticField)"])
   RoviBase[rovi_base] -->|publish| ODRAW(["/odom_raw<br/>(Odometry)"])
 
-  ImuFilter["imu_filter_madgwick (optional)"]
+  ImuFilter["imu_filter_madgwick (imu_enabled)"]
   IMU_RAW -->|subscribe| ImuFilter
-  MAG -->|subscribe| ImuFilter
+  MAG -.->|"subscribe (mag_enable)"| ImuFilter
   IMU(["/imu/data<br/>(Imu, orientation)"])
   ImuFilter -->|publish| IMU
 
   EKF["robot_localization/ekf_node"]
   ODRAW -->|subscribe| EKF
-  IMU -->|subscribe| EKF
+  IMU -.->|"subscribe (imu_enabled)"| EKF
   ODOMF(["/odometry/filtered<br/>(Odometry)"])
   EKF -->|publish| ODOMF
   EKF -->|publish| TF(["/tf<br/>odom -> base_footprint"])
 ```
 
-## SLAM (planned: slam_toolbox)
+## SLAM (slam_toolbox)
 This produces `map -> odom` so the robot pose is expressed in a stable map frame.
 
 ```mermaid
@@ -243,8 +251,8 @@ flowchart TD
     RoviDesc[rovi_description]
     Rosmaster[rosmaster_driver]
     RoviBase[rovi_base]
-    RoviLoc["rovi_localization (planned)"]
-    RoviSlam["rovi_slam (planned)"]
+    RoviLoc[rovi_localization]
+    RoviSlam[rovi_slam]
   end
 
   subgraph External
@@ -258,7 +266,6 @@ flowchart TD
   EKF[robot_localization]
   ImuFilter[imu_filter_madgwick]
   SlamToolbox[slam_toolbox]
-  MapServer["nav2_map_server (map_saver_cli)"]
   end
 
   RoviBringup --> RoviDesc
@@ -278,7 +285,6 @@ flowchart TD
   RoviLoc --> EKF
   RoviLoc -.-> ImuFilter
   RoviSlam --> SlamToolbox
-  RoviSlam -.-> MapServer
 ```
 
 # Nodes
