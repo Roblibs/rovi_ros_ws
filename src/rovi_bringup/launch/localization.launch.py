@@ -25,18 +25,13 @@ def generate_launch_description() -> LaunchDescription:
         default_value='true',
         description='Start slam_toolbox and publish TF map->odom.',
     )
-    ekf_enabled = DeclareLaunchArgument(
-        'ekf_enabled',
-        default_value='false',
-        description='Start robot_localization EKF and publish TF odom->base_footprint.',
+    odom_mode = DeclareLaunchArgument(
+        'odom_mode',
+        default_value='fusion_wheels_imu',
+        description="Odometry mode: 'raw' (rovi_base), 'filtered' (EKF wheel-only), 'fusion_wheels_imu' (EKF + IMU).",
     )
-    imu_enabled = DeclareLaunchArgument(
-        'imu_enabled',
-        default_value='false',
-        description='Start IMU orientation filter and fuse IMU into EKF.',
-    )
-    mag_enable = DeclareLaunchArgument(
-        'mag_enable',
+    mag_enabled = DeclareLaunchArgument(
+        'mag_enabled',
         default_value='false',
         description='Enable magnetometer usage in IMU orientation filter.',
     )
@@ -55,7 +50,7 @@ def generate_launch_description() -> LaunchDescription:
         PythonLaunchDescriptionSource(teleop_launch),
         launch_arguments={
             'rovi_base_publish_tf': PythonExpression([
-                "'false' if '", LaunchConfiguration('ekf_enabled'), "' == 'true' else 'true'",
+                "'true' if '", LaunchConfiguration('odom_mode'), "' == 'raw' else 'false'",
             ]),
         }.items(),
     )
@@ -63,9 +58,8 @@ def generate_launch_description() -> LaunchDescription:
     localization = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(ekf_launch),
         launch_arguments={
-            'ekf_enabled': LaunchConfiguration('ekf_enabled'),
-            'imu_enabled': LaunchConfiguration('imu_enabled'),
-            'mag_enable': LaunchConfiguration('mag_enable'),
+            'odom_mode': LaunchConfiguration('odom_mode'),
+            'mag_enabled': LaunchConfiguration('mag_enabled'),
             'use_sim_time': LaunchConfiguration('use_sim_time'),
         }.items(),
     )
@@ -82,9 +76,8 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         slam_enabled,
-        ekf_enabled,
-        imu_enabled,
-        mag_enable,
+        odom_mode,
+        mag_enabled,
         use_sim_time,
         map_file_name,
         teleop,

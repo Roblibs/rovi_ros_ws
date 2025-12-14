@@ -18,18 +18,13 @@ def generate_launch_description() -> LaunchDescription:
     ekf_odom_imu_params = os.path.join(pkg_share, 'config', 'ekf_odom_imu.yaml')
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter_madgwick.yaml')
 
-    ekf_enabled = DeclareLaunchArgument(
-        'ekf_enabled',
-        default_value='false',
-        description='Start robot_localization EKF and publish TF odom->base_footprint.',
+    odom_mode = DeclareLaunchArgument(
+        'odom_mode',
+        default_value='fusion_wheels_imu',
+        description="Odometry mode: 'raw' (no nodes), 'filtered' (EKF wheel-only), 'fusion_wheels_imu' (EKF + IMU).",
     )
-    imu_enabled = DeclareLaunchArgument(
-        'imu_enabled',
-        default_value='false',
-        description='Start IMU orientation filter and fuse IMU into EKF.',
-    )
-    mag_enable = DeclareLaunchArgument(
-        'mag_enable',
+    mag_enabled = DeclareLaunchArgument(
+        'mag_enabled',
         default_value='false',
         description='Enable magnetometer usage in IMU orientation filter.',
     )
@@ -40,7 +35,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     imu_filter_node = Node(
-        condition=IfCondition(LaunchConfiguration('imu_enabled')),
+        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('odom_mode'), "' == 'fusion_wheels_imu'"])),
         package='imu_filter_madgwick',
         executable='imu_filter_madgwick_node',
         name='imu_filter',
@@ -48,24 +43,14 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[
             imu_filter_params,
             {
-                'use_mag': ParameterValue(LaunchConfiguration('mag_enable'), value_type=bool),
+                'use_mag': ParameterValue(LaunchConfiguration('mag_enabled'), value_type=bool),
                 'use_sim_time': ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool),
             },
         ],
     )
 
-    ekf_condition_odom = IfCondition(
-        PythonExpression([
-            "('", LaunchConfiguration('ekf_enabled'), "' == 'true') and ",
-            "('", LaunchConfiguration('imu_enabled'), "' != 'true')",
-        ])
-    )
-    ekf_condition_imu = IfCondition(
-        PythonExpression([
-            "('", LaunchConfiguration('ekf_enabled'), "' == 'true') and ",
-            "('", LaunchConfiguration('imu_enabled'), "' == 'true')",
-        ])
-    )
+    ekf_condition_odom = IfCondition(PythonExpression(["'", LaunchConfiguration('odom_mode'), "' == 'filtered'"]))
+    ekf_condition_imu = IfCondition(PythonExpression(["'", LaunchConfiguration('odom_mode'), "' == 'fusion_wheels_imu'"]))
 
     ekf_node_odom = Node(
         condition=ekf_condition_odom,
@@ -86,9 +71,8 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
-        ekf_enabled,
-        imu_enabled,
-        mag_enable,
+        odom_mode,
+        mag_enabled,
         use_sim_time,
         imu_filter_node,
         ekf_node_odom,

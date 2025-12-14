@@ -33,8 +33,8 @@ Goal: add `map -> odom` TF (SLAM) so RViz can use `map` as the fixed frame (real
 | `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
 | `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
 | `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
-| `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; publishes TF `odom -> base_footprint` when EKF is disabled |
-| `rovi_localization` | Localization pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` when enabled |
+| `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom) |
+| `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 
 ### Launches
@@ -46,7 +46,7 @@ Goal: add `map -> odom` TF (SLAM) so RViz can use `map` as the fixed frame (real
 | `rosmaster_driver` | `rosmaster_driver.launch.py` | Hardware driver only (serial/IMU/joints sanity checks) |
 | `rovi_bringup` | `mapping.launch.py` | Bringup + SLAM mapping (`slam_toolbox`) |
 | `rovi_bringup` | `localization.launch.py` | Bringup + SLAM localization on an existing map (`slam_toolbox` localization mode) |
-| `rovi_localization` | `ekf.launch.py` | Component launch: IMU filter + EKF (useful to test/fuse odometry without SLAM) |
+| `rovi_localization` | `ekf.launch.py` | Component launch: odometry pipeline (`odom_mode` selects raw/filtered/fusion_wheels_imu; useful without SLAM) |
 | `rovi_slam` | `slam_toolbox.launch.py` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
 
 ### Params
@@ -54,9 +54,20 @@ Goal: add `map -> odom` TF (SLAM) so RViz can use `map` as the fixed frame (real
 |---|---|---|---|---|
 | `rovi_bringup` | `teleop.launch.py` | `lidar_enabled` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
 | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `slam_enabled` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
-| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `ekf_enabled` | `false` | Starts `robot_localization/ekf_node` and makes it the only TF source for `odom -> base_footprint` (disables TF from `rovi_base`) |
-| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `imu_enabled` | `false` | Starts IMU orientation filter and fuses IMU into EKF (keeps EKF odom-only when `false`) |
-| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `mag_enable` | `false` | Enables magnetometer input for the IMU filter (disabled by default due to interference risk) |
+| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `odom_mode` | `fusion_wheels_imu` | Selects who publishes TF `odom -> base_footprint` (and whether IMU is used in that odom estimate) |
+| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `mag_enabled` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
+| `rovi_localization` | `ekf.launch.py` | `odom_mode` | `fusion_wheels_imu` | Same as above, but for running the odometry pipeline without SLAM |
+| `rovi_localization` | `ekf.launch.py` | `mag_enabled` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
+| `rovi_slam` | `slam_toolbox.launch.py` | `slam_enabled` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
+
+### Odometry Modes (`odom_mode`)
+Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
+
+| `odom_mode` | `rovi_base_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
+|---|---|---|---|---|
+| `raw` | `true` | `rovi_base` | (none) | Fastest/simplest; wheel odom only (`/odom_raw`), no `/odometry/filtered` |
+| `filtered` | `false` | `robot_localization/ekf_node` | `robot_localization/ekf_node` | Filters wheel odom (`/odom_raw` → `/odometry/filtered`) |
+| `fusion_wheels_imu` | `false` | `robot_localization/ekf_node` | `imu_filter_madgwick` + `robot_localization/ekf_node` | Adds IMU yaw + yaw rate (`/imu/data_raw` → `/imu/data`); set `mag_enabled:=true` to use `/imu/mag` |
 
 # Install
 1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
@@ -86,7 +97,7 @@ sudo apt install -y ros-jazzy-rplidar-ros
 # SLAM + localization
 sudo apt install -y ros-jazzy-slam-toolbox ros-jazzy-robot-localization
 
-# IMU orientation filter (used when imu_enabled:=true)
+# IMU orientation filter (used when odom_mode=fusion_wheels_imu)
 sudo apt install -y ros-jazzy-imu-filter-madgwick
 ```
 
@@ -137,17 +148,17 @@ flowchart TD
   ODRAW(["/odom_raw<br/>(Odometry)"])
   TF(["/tf<br/>(TF)"])
   RoviBase -->|publish| ODRAW
-  RoviBase -->|"publish (odom->base_footprint, when EKF disabled)"| TF
+  RoviBase -->|"publish (odom->base_footprint, odom_mode=raw)"| TF
 
-  ImuFilter["imu_filter_madgwick (imu_enabled)"]
+  ImuFilter["imu_filter_madgwick (odom_mode=fusion_wheels_imu)"]
   IMU_RAW -->|subscribe| ImuFilter
-  MAG -.->|"subscribe (mag_enable)"| ImuFilter
+  MAG -.->|"subscribe (mag_enabled)"| ImuFilter
   IMU(["/imu/data<br/>(Imu)"])
   ImuFilter -->|publish| IMU
 
-  EKF["robot_localization/ekf_node (ekf_enabled)"]
+  EKF["robot_localization/ekf_node (odom_mode=filtered|fusion_wheels_imu)"]
   ODRAW -->|subscribe| EKF
-  IMU -.->|"subscribe (imu_enabled)"| EKF
+  IMU -.->|"subscribe (odom_mode=fusion_wheels_imu)"| EKF
   ODOMF(["/odometry/filtered<br/>(Odometry)"])
   EKF -->|publish| ODOMF
   EKF -->|"publish (odom->base_footprint)"| TF
@@ -183,7 +194,7 @@ flowchart TD
 TF frames are not regular ROS topics; this is the chain RViz and SLAM use at runtime.
 
 ```mermaid
-flowchart LR
+flowchart TD
   MAP[map] -->|slam_toolbox| ODOM[odom]
   ODOM -->|ekf_node OR rovi_base| BASEF[base_footprint]
   BASEF -->|robot_state_publisher| BASEL[base_link]
@@ -191,8 +202,8 @@ flowchart LR
   BASEL -->|robot_state_publisher| IMU[imu_link]
 ```
 
-## Localization (EKF + IMU filter)
-This produces a single authoritative `odom -> base_footprint` transform; IMU fusion is gated by `imu_enabled` and magnetometer usage by `mag_enable`.
+## Odometry filtering (odom_mode=fusion_wheels_imu)
+This produces a single authoritative `odom -> base_footprint` transform using EKF + IMU. For `odom_mode=filtered`, omit the IMU branch; magnetometer usage is gated by `mag_enabled`.
 
 ```mermaid
 flowchart TD
@@ -200,15 +211,15 @@ flowchart TD
   Rosmaster -->|publish| MAG(["/imu/mag<br/>(MagneticField)"])
   RoviBase[rovi_base] -->|publish| ODRAW(["/odom_raw<br/>(Odometry)"])
 
-  ImuFilter["imu_filter_madgwick (imu_enabled)"]
+  ImuFilter["imu_filter_madgwick (odom_mode=fusion_wheels_imu)"]
   IMU_RAW -->|subscribe| ImuFilter
-  MAG -.->|"subscribe (mag_enable)"| ImuFilter
+  MAG -.->|"subscribe (mag_enabled)"| ImuFilter
   IMU(["/imu/data<br/>(Imu, orientation)"])
   ImuFilter -->|publish| IMU
 
   EKF["robot_localization/ekf_node"]
   ODRAW -->|subscribe| EKF
-  IMU -.->|"subscribe (imu_enabled)"| EKF
+  IMU -.->|"subscribe (odom_mode=fusion_wheels_imu)"| EKF
   ODOMF(["/odometry/filtered<br/>(Odometry)"])
   EKF -->|publish| ODOMF
   EKF -->|publish| TF(["/tf<br/>odom -> base_footprint"])
@@ -248,7 +259,7 @@ flowchart TD
 
 ## Package dependencies
 ```mermaid
-flowchart TD
+flowchart LR
   subgraph Internal
     RoviBringup[rovi_bringup]
     RoviDesc[rovi_description]
