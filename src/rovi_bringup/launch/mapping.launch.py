@@ -5,10 +5,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetLaunchConfiguration
-from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, TextSubstitution
+from launch.substitutions import LaunchConfiguration, PythonExpression, TextSubstitution
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -47,15 +46,13 @@ def generate_launch_description() -> LaunchDescription:
         description='Use /clock time.',
     )
 
-    # If EKF publishes TF odom->base_footprint, disable TF broadcast from rovi_base to avoid duplicates.
-    disable_rovi_base_tf = SetLaunchConfiguration(
-        'rovi_base_publish_tf',
-        'false',
-        condition=IfCondition(LaunchConfiguration('ekf_enabled')),
-    )
-
     teleop = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(teleop_launch),
+        launch_arguments={
+            'rovi_base_publish_tf': PythonExpression([
+                "'false' if '", LaunchConfiguration('ekf_enabled'), "' == 'true' else 'true'",
+            ]),
+        }.items(),
     )
 
     localization = IncludeLaunchDescription(
@@ -83,9 +80,7 @@ def generate_launch_description() -> LaunchDescription:
         imu_enabled,
         mag_enable,
         use_sim_time,
-        disable_rovi_base_tf,
         teleop,
         localization,
         slam,
     ])
-
