@@ -5,6 +5,7 @@ slam_toolbox:
     map_frame: map
     base_frame: base_footprint
     scan_topic: /scan
+    max_laser_range: 12.0
 
     # Behavior
     mode: mapping
@@ -56,4 +57,3 @@ slam_toolbox:
     use_response_expansion: true
     min_pass_through: 2
     occupancy_threshold: 0.1
-
