@@ -2,7 +2,7 @@
 ROS2 Jazzy workspace for Room View Bot
 
 # Usage
-clone this repo and change to the `rovi_ros_ws` directory then run `uv sync` at least once
+For new environments, see [install](#install) first
 
 clean build and run, notice venv activation after build and before launch :
 ```bash
@@ -12,74 +12,31 @@ colcon build
 source install/setup.bash
 source .venv/bin/activate
 ```
-launch examples:
+
+common launch examples :
 
 |command | description |
 |--------|-------------|
 |ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
-|ros2 launch rovi_bringup teleop.launch.py lidar_enabled:=false | teleoperation without lidar |
 |ros2 launch rovi_bringup mapping.launch.py | teleop + slam_toolbox mapping |
 |ros2 launch rovi_bringup localization.launch.py map_file_name:=/path/to/map.posegraph | teleop + slam_toolbox localization on a saved pose-graph |
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
 |rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
 |rviz2 -d install/share/rovi_description/rviz/rovi_map.rviz| visualization for SLAM (Fixed Frame: `map`, shows `/map`) |
 
-## SLAM + localization (clean layering)
-Goal: add `map -> odom` TF (SLAM) so RViz can use `map` as the fixed frame (real-room/global), not only `odom` (local/drifty).
-
-### Packages
-| Package | Role |
-|---|---|
-| `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
-| `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
-| `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
-| `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom) |
-| `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
-| `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
-
-### Launches
-| Package | Launch | Description |
-|---|---|---|
-| `rovi_bringup` | `teleop.launch.py` | Manual driving: joystick + teleop + base bringup (+ LiDAR if enabled) |
-| `rovi_bringup` | `offline_view.launch.py` | Offline visualization: URDF + joint_state_publisher_gui + RViz |
-| `rovi_bringup` | `joy.launch.py` | Debug joystick → `/cmd_vel` only (no hardware required) |
-| `rosmaster_driver` | `rosmaster_driver.launch.py` | Hardware driver only (serial/IMU/joints sanity checks) |
-| `rovi_bringup` | `mapping.launch.py` | Bringup + SLAM mapping (`slam_toolbox`) |
-| `rovi_bringup` | `localization.launch.py` | Bringup + SLAM localization on an existing map (`slam_toolbox` localization mode) |
-| `rovi_localization` | `ekf.launch.py` | Component launch: odometry pipeline (`odom_mode` selects raw/filtered/fusion_wheels_imu; useful without SLAM) |
-| `rovi_slam` | `slam_toolbox.launch.py` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
-
-### Params
-| Package | Launch | Param | Default | Explanation |
-|---|---|---|---|---|
-| `rovi_bringup` | `teleop.launch.py` | `lidar_enabled` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
-| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `slam_enabled` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
-| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `odom_mode` | `fusion_wheels_imu` | Selects who publishes TF `odom -> base_footprint` (and whether IMU is used in that odom estimate) |
-| `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `mag_enabled` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
-| `rovi_localization` | `ekf.launch.py` | `odom_mode` | `fusion_wheels_imu` | Same as above, but for running the odometry pipeline without SLAM |
-| `rovi_localization` | `ekf.launch.py` | `mag_enabled` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
-| `rovi_slam` | `slam_toolbox.launch.py` | `slam_enabled` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
-
-### Odometry Modes (`odom_mode`)
-Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
-
-| `odom_mode` | `rovi_base_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
-|---|---|---|---|---|
-| `raw` | `true` | `rovi_base` | (none) | Fastest/simplest; wheel odom only (`/odom_raw`), no `/odometry/filtered` |
-| `filtered` | `false` | `robot_localization/ekf_node` | `robot_localization/ekf_node` | Filters wheel odom (`/odom_raw` → `/odometry/filtered`) |
-| `fusion_wheels_imu` | `false` | `robot_localization/ekf_node` | `imu_filter_madgwick` + `robot_localization/ekf_node` | Adds IMU yaw + yaw rate (`/imu/data_raw` → `/imu/data`); set `mag_enabled:=true` to use `/imu/mag` |
-
 # Install
-1) Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
 
-2) Install uv (Python package and venv manager):
+* Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
+
+* Install uv (Python package and venv manager):
 
 uv needed by the robot for control board python dependencies
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+* clone this repo and change to the `rovi_ros_ws` directory then run `uv sync`
 
-3) Install joystick and rplidar ros packages
+* Install joystick and rplidar ros packages
 
 ```bash
 # Teleop + mux
@@ -109,9 +66,50 @@ pixi on windows
 call install\setup.bat
 rviz2 -d install/share/rovi_description/rviz/rovi.rviz
 ```
+# Description
+## Packages
+| Package | Role |
+|---|---|
+| `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
+| `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
+| `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
+| `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom) |
+| `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
+| `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
+
+## Launches
+| Package | Launch | Description |
+|---|---|---|
+| `rovi_bringup` | `teleop.launch.py` | Manual driving: joystick + teleop + base bringup (+ LiDAR if enabled) |
+| `rovi_bringup` | `mapping.launch.py` | Teleoperation with SLAM mapping (`slam_toolbox`) |
+| `rovi_bringup` | `offline_view.launch.py` | Offline Inspection of the robot model : URDF + joint_state_publisher_gui + RViz |
+| `rovi_bringup` | `joy.launch.py` | Debug joystick → `/cmd_vel` only (no hardware required) |
+| `rovi_bringup` | `localization.launch.py` | Bringup + SLAM localization on an existing map (`slam_toolbox` localization mode) |
+| `rosmaster_driver` | `rosmaster_driver.launch.py` | Hardware driver only (serial/IMU/joints sanity checks) |
+| `rovi_localization` | `ekf.launch.py` | Component launch: odometry pipeline (`odom_mode` selects raw/filtered/fusion_wheels_imu; useful without SLAM) |
+| `rovi_slam` | `slam_toolbox.launch.py` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
+
+## Params
+| Param | Package | Launch | Default | Explanation |
+|---|---|---|---|---|
+| `lidar_enabled` | `rovi_bringup` | `teleop.launch.py` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
+| `slam_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
+| `slam_enabled` | `rovi_slam` | `slam_toolbox.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
+| `odom_mode` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `fusion_wheels_imu` | Selects who publishes TF `odom -> base_footprint` (and whether IMU is used in that odom estimate) |
+| `odom_mode` | `rovi_localization` | `ekf.launch.py` | `fusion_wheels_imu` | Same as above, but for running the odometry pipeline without SLAM |
+| `mag_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
+| `mag_enabled` | `rovi_localization` | `ekf.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
+
+### Odometry Modes (`odom_mode`)
+Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
+
+| `odom_mode` | `rovi_base_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
+|---|---|---|---|---|
+| `raw` | `true` | `rovi_base` | (none) | Fastest/simplest; wheel odom only (`/odom_raw`), no `/odometry/filtered` |
+| `filtered` | `false` | `robot_localization/ekf_node` | `robot_localization/ekf_node` | Filters wheel odom (`/odom_raw` → `/odometry/filtered`) |
+| `fusion_wheels_imu` | `false` | `robot_localization/ekf_node` | `imu_filter_madgwick` + `robot_localization/ekf_node` | Adds IMU yaw + yaw rate (`/imu/data_raw` → `/imu/data`); set `mag_enabled:=true` to use `/imu/mag` |
 
 
-# Diagrams
 ## Data Flow
 
 ```mermaid
@@ -301,9 +299,9 @@ flowchart LR
   RoviSlam --> SlamToolbox
 ```
 
-# Nodes
+# Nodes details
 ## rosmaster driver
-![packafe_flow](./docs/package_flow.drawio.svg)
+![packafe_flow](./docs/rosmaster.drawio.svg)
 
 ## wheels
 
