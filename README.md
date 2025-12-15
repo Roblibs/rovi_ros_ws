@@ -342,10 +342,10 @@ typedef enum _car_type
 |-------------------|--------|-----------|---------------------|---------------|---------------|
 | Left stick right  | axis 0  | +     | turn clockwise      | axis_angular.yaw | + |
 | Left stick left   | axis 0  | -     | turn anti-clockwise | axis_angular.yaw | + |
-| Right stick right | axis 3  | +     | move right          | axis_linear.x    | + |
-| Right stick left  | axis 3  | -     | move left           | axis_linear.x    | + |
-| Right stick down  | axis 4  | +     | move rear           | axis_linear.y    | - |
-| Right stick up    | axis 4  | -     | move front          | axis_linear.y    | - |
+| Right stick right | axis 3  | +     | move right          | axis_linear.y    | - |
+| Right stick left  | axis 3  | -     | move left           | axis_linear.y    | - |
+| Right stick down  | axis 4  | +     | move rear           | axis_linear.x    | - |
+| Right stick up    | axis 4  | -     | move front          | axis_linear.x    | - |
 
 
 ![Joystick Control](./docs/joystick_control.drawio.svg)

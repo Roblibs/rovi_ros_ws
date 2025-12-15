@@ -24,6 +24,27 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 from Rosmaster_Lib import Rosmaster  # uses your GitHub dependency
 
 
+def apply_rot90_xy(x: float, y: float, *, rot90: bool, reverse: bool) -> Tuple[float, float]:
+    """Apply the documented Rosmaster<->ROS 90° XY mapping using only swap/sign.
+
+    Mapping (rot90=True):
+      - HW -> ROS: (x_ros, y_ros) = (-y_hw, x_hw)
+      - ROS -> HW: (x_hw, y_hw) = (y_ros, -x_ros)
+
+    Z is unaffected and handled by `apply_rot90_xyz`.
+    """
+    if not rot90:
+        return x, y
+    if reverse:
+        return y, -x
+    return -y, x
+
+
+def apply_rot90_xyz(x: float, y: float, z: float, *, rot90: bool, reverse: bool) -> Tuple[float, float, float]:
+    x_out, y_out = apply_rot90_xy(x, y, rot90=rot90, reverse=reverse)
+    return x_out, y_out, z
+
+
 class RosmasterAdapter:
     """Thin wrapper around Rosmaster library using your GitHub dependency."""
 
@@ -82,6 +103,7 @@ class RosmasterDriverNode(Node):
         self.declare_parameter('port', '/dev/my_ros_board')
         self.declare_parameter('debug', False)
         self.declare_parameter('encoder_ticks_per_rev', 2464.0)
+        self.declare_parameter('rot90', True)
 
         self.imu_link = self.get_parameter('imu_link').get_parameter_value().string_value
         self.prefix = self.get_parameter('prefix').get_parameter_value().string_value
@@ -89,6 +111,7 @@ class RosmasterDriverNode(Node):
         self.port = self.get_parameter('port').get_parameter_value().string_value
         self.debug = bool(self.get_parameter('debug').get_parameter_value().bool_value)
         self.ticks_per_rev = float(self.get_parameter('encoder_ticks_per_rev').get_parameter_value().double_value)
+        self.rot90 = bool(self.get_parameter('rot90').get_parameter_value().bool_value)
         if self.publish_rate <= 0.0:
             self.publish_rate = 10.0
         if self.ticks_per_rev <= 0.0:
@@ -129,15 +152,17 @@ class RosmasterDriverNode(Node):
         self.get_logger().info(f"[init] Timer created with period {period:.3f}s")
 
         self.get_logger().info(
-            f"rosmaster_driver started (imu_link={self.imu_link}, prefix='{self.prefix}', rate={self.publish_rate} Hz, port={self.port}, debug={self.debug})"
+            "rosmaster_driver started (imu_link=%s, prefix='%s', rate=%.1f Hz, port=%s, debug=%s, rot90=%s)"
+            % (self.imu_link, self.prefix, self.publish_rate, self.port, self.debug, self.rot90)
         )
 
     # --- Callbacks ---
     def _on_cmd_vel(self, msg: Twist) -> None:
-        vx = float(msg.linear.x)
-        vy = float(msg.linear.y)
-        wz = float(msg.angular.z)
-        self.hw.set_motion(vx, vy, wz)
+        vx_ros = float(msg.linear.x)
+        vy_ros = float(msg.linear.y)
+        wz_ros = float(msg.angular.z)
+        vx_hw, vy_hw, wz_hw = apply_rot90_xyz(vx_ros, vy_ros, wz_ros, rot90=self.rot90, reverse=True)
+        self.hw.set_motion(vx_hw, vy_hw, wz_hw)
 
     def _on_timer(self) -> None:
         now = Clock().now().to_msg()
@@ -165,32 +190,36 @@ class RosmasterDriverNode(Node):
         self.pub_voltage.publish(voltage)
 
         # IMU
+        ax_ros, ay_ros, az_ros = apply_rot90_xyz(ax, ay, az, rot90=self.rot90, reverse=False)
+        gx_ros, gy_ros, gz_ros = apply_rot90_xyz(gx, gy, gz, rot90=self.rot90, reverse=False)
         imu = Imu()
         imu.header.stamp = now
         imu.header.frame_id = self.imu_link
-        imu.linear_acceleration.x = float(ax)
-        imu.linear_acceleration.y = float(ay)
-        imu.linear_acceleration.z = float(az)
-        imu.angular_velocity.x = float(gx)
-        imu.angular_velocity.y = float(gy)
-        imu.angular_velocity.z = float(gz)
+        imu.linear_acceleration.x = float(ax_ros)
+        imu.linear_acceleration.y = float(ay_ros)
+        imu.linear_acceleration.z = float(az_ros)
+        imu.angular_velocity.x = float(gx_ros)
+        imu.angular_velocity.y = float(gy_ros)
+        imu.angular_velocity.z = float(gz_ros)
         # Orientation is unknown; leave default zeros with covariance unset
         self.pub_imu_raw.publish(imu)
 
         # Magnetometer
+        mx_ros, my_ros, mz_ros = apply_rot90_xyz(mx, my, mz, rot90=self.rot90, reverse=False)
         mag = MagneticField()
         mag.header.stamp = now
         mag.header.frame_id = self.imu_link
-        mag.magnetic_field.x = float(mx)
-        mag.magnetic_field.y = float(my)
-        mag.magnetic_field.z = float(mz)
+        mag.magnetic_field.x = float(mx_ros)
+        mag.magnetic_field.y = float(my_ros)
+        mag.magnetic_field.z = float(mz_ros)
         self.pub_mag.publish(mag)
 
         # vel_raw (feedback)
+        vx_ros, vy_ros, wz_ros = apply_rot90_xyz(vx, vy, wz, rot90=self.rot90, reverse=False)
         twist = Twist()
-        twist.linear.x = float(vx)
-        twist.linear.y = float(vy)
-        twist.angular.z = float(wz)
+        twist.linear.x = float(vx_ros)
+        twist.linear.y = float(vy_ros)
+        twist.angular.z = float(wz_ros)
         self.pub_vel_raw.publish(twist)
 
         # encoders raw (debug)

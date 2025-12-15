@@ -6,10 +6,10 @@ teleop_twist_joy:
     inverted_reverse: false
     publish_stamped_twist: false
     frame: teleop_twist_joy
-    axis_linear.x: 3
-    scale_linear.x: 0.7
-    scale_linear_turbo.x: 1.0
-    axis_linear.y: 4
+    axis_linear.x: 4
+    scale_linear.x: -0.7
+    scale_linear_turbo.x: -1.0
+    axis_linear.y: 3
     scale_linear.y: -0.7
     scale_linear_turbo.y: -1.2
     axis_linear.z: -1

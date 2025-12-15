@@ -43,6 +43,7 @@ def generate_launch_description() -> LaunchDescription:
                 'prefix': '',
                 'port': '/dev/my_ros_board',
                 'debug': False,
+                'rot90': True,
             }],
         )
     )
