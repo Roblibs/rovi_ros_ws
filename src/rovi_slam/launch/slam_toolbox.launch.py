@@ -51,6 +51,11 @@ def generate_launch_description() -> LaunchDescription:
     default_mapping_params = os.path.join(pkg_share, 'config', 'slam_toolbox_mapping.yaml')
     default_localization_params = os.path.join(pkg_share, 'config', 'slam_toolbox_localization.yaml')
 
+    namespace = DeclareLaunchArgument(
+        'namespace',
+        default_value='',
+        description='Namespace for the slam_toolbox lifecycle node.',
+    )
     slam_enabled = DeclareLaunchArgument(
         'slam_enabled',
         default_value='true',
@@ -104,6 +109,7 @@ def generate_launch_description() -> LaunchDescription:
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
         name='slam_toolbox',
+        namespace=LaunchConfiguration('namespace'),
         output='screen',
         parameters=[
             LaunchConfiguration('slam_params_file'),
@@ -123,6 +129,7 @@ def generate_launch_description() -> LaunchDescription:
         package='slam_toolbox',
         executable='localization_slam_toolbox_node',
         name='slam_toolbox',
+        namespace=LaunchConfiguration('namespace'),
         output='screen',
         parameters=[
             LaunchConfiguration('localization_params_file'),
@@ -156,6 +163,7 @@ def generate_launch_description() -> LaunchDescription:
     localization_configure_event, localization_activate_event = _autostart_events(localization_node, localization_autostart_condition)
 
     return LaunchDescription([
+        namespace,
         slam_enabled,
         slam_mode,
         use_sim_time,
