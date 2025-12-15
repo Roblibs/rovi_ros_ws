@@ -146,20 +146,20 @@ flowchart TD
   ODRAW(["/odom_raw<br/>(Odometry)"])
   TF(["/tf<br/>(TF)"])
   RoviBase -->|publish| ODRAW
-  RoviBase -->|"publish (odom->base_footprint, odom_mode=raw)"| TF
+  RoviBase -->|"publish<br/>(odom->base_footprint)"| TF
 
   ImuFilter["imu_filter_madgwick (odom_mode=fusion_wheels_imu)"]
   IMU_RAW -->|subscribe| ImuFilter
-  MAG -.->|"subscribe (mag_enabled)"| ImuFilter
+  MAG -->|subscribe| ImuFilter
   IMU(["/imu/data<br/>(Imu)"])
   ImuFilter -->|publish| IMU
 
-  EKF["robot_localization/ekf_node (odom_mode=filtered|fusion_wheels_imu)"]
+  EKF[ekf_node]
   ODRAW -->|subscribe| EKF
-  IMU -.->|"subscribe (odom_mode=fusion_wheels_imu)"| EKF
+  IMU -->|subscribe| EKF
   ODOMF(["/odometry/filtered<br/>(Odometry)"])
   EKF -->|publish| ODOMF
-  EKF -->|"publish (odom->base_footprint)"| TF
+  EKF -->|"publish<br/>(odom->base_footprint)"| TF
 
 
   RSP["robot_state_publisher"]
@@ -303,6 +303,12 @@ flowchart LR
 ## rosmaster driver
 ![packafe_flow](./docs/rosmaster.drawio.svg)
 
+| Movement | ros axis | rosmaster Axis |
+|----------|----------|----------------|
+| forward/backwards | X | -Y |
+| left/right        | Y | X  |
+| Rotation          | Z | Z  |
+
 ## wheels
 
 - `ROS-Driver-Board\1.Code\Factory STM32 firmware\Rosmaster_V3.5.1\ControlBoard_Rosmaster\Source\APP\app_mecanum.h`
@@ -326,20 +332,20 @@ typedef enum _car_type
 |m4     | Back Right | flip |
 
 
-| Robot Model        | Wheel diameter (mm) | Wheel encoder steps |
-|--------------------|---------------------|---------------------|
-| X3                 | 251.327             | 2464                |
+| Robot Model        | Wheel Diameter (mm) | Wheel circumference (mm) | Wheel encoder steps |
+|--------------------|---------------------|--------------------------|---------------------|
+| X3                 | 80                  | 251.327                  | 2464                |
 
 
 ## Joystick
 | Control           | Axis   | Axis sign | Robot action        | Robot command | command scale sign |
 |-------------------|--------|-----------|---------------------|---------------|---------------|
-| Left stick right  | axis 0  - | -     | turn clockwise      | axis_angular.yaw | + |
-| Left stick left   | axis 0  + | +     | turn anti-clockwise | axis_angular.yaw | + |
-| Right stick left  | axis 3  - | -     | move left           | axis_linear.x +  | + |
-| Right stick right | axis 3  + | +     | move right          | axis_linear.x -  | + |
-| Right stick down  | axis 4  + | +     | move rear           | axis_linear.y -  | - |
-| Right stick up    | axis 4  - | -     | move front          | axis_linear.y +  | - |
+| Left stick right  | axis 0  | +     | turn clockwise      | axis_angular.yaw | + |
+| Left stick left   | axis 0  | -     | turn anti-clockwise | axis_angular.yaw | + |
+| Right stick right | axis 3  | +     | move right          | axis_linear.x    | + |
+| Right stick left  | axis 3  | -     | move left           | axis_linear.x    | + |
+| Right stick down  | axis 4  | +     | move rear           | axis_linear.y    | - |
+| Right stick up    | axis 4  | -     | move front          | axis_linear.y    | - |
 
 
 ![Joystick Control](./docs/joystick_control.drawio.svg)
