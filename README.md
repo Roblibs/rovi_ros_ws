@@ -357,6 +357,24 @@ flowchart LR
 | left/right        | Y | X  |
 | Rotation          | Z | Z  |
 
+MPU Axis
+
+![axis](./docs/MPU9250-axis.png)
+- chip orientation : pin1 pointing to buzzer edge of rosmaster control board
+- buzzer edge of rosmaster control board : is pointing to Robot Front Left corner
+
+| Robot |IMU | ros axis | rosmaster Axis |
+|-----|------|----------|----------------|
+| Right | X  | -Y | -X  |
+| Front | Y  | X | -Y |
+| Up    | Z  | Z | Z  |
+
+Position | axis | value |
+--------|-----|----|
+|up facing up : | z | -9.8 |
+|on left with right facing up : | x  | -9.8 |
+|back with the front facing up | y | -9.8 |
+
 ## wheels
 
 - `ROS-Driver-Board\1.Code\Factory STM32 firmware\Rosmaster_V3.5.1\ControlBoard_Rosmaster\Source\APP\app_mecanum.h`
