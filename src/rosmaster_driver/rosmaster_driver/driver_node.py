@@ -190,8 +190,8 @@ class RosmasterDriverNode(Node):
         self.pub_voltage.publish(voltage)
 
         # IMU corrected for ROS axes
-        ax_imu, ay_imu, az_imu = ax, ay, az
-        gx_imu, gy_imu, gz_imu = gx, gy, gz
+        ax_imu, ay_imu, az_imu = ay, ax, az
+        gx_imu, gy_imu, gz_imu = gy, gx, gz
         imu = Imu()
         imu.header.stamp = now
         imu.header.frame_id = self.imu_link
