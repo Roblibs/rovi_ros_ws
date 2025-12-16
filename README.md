@@ -254,6 +254,54 @@ flowchart TD
   RSP -->|publish| TF
   TF -->|subscribe| RVIZ
 ```
+## Launch wiring
+`rovi_bringup` launches are composition layers: they include smaller "component" launches (teleop, odometry, SLAM). This keeps packages reusable (e.g., you can run SLAM against bag playback as long as `/scan` + TF exist).
+
+```mermaid
+flowchart LR
+  Mapping["rovi_bringup/mapping.launch.py"]
+  Localization["rovi_bringup/localization.launch.py"]
+
+  TeleopLaunch["rovi_bringup/teleop.launch.py"]
+  EkfLaunch["rovi_localization/ekf.launch.py"]
+  SlamLaunch["rovi_slam/slam_toolbox.launch.py"]
+
+  Mapping -->|IncludeLaunchDescription| TeleopLaunch
+  Mapping -->|IncludeLaunchDescription| EkfLaunch
+  Mapping -->|IncludeLaunchDescription| SlamLaunch
+
+  Localization -->|IncludeLaunchDescription| TeleopLaunch
+  Localization -->|IncludeLaunchDescription| EkfLaunch
+  Localization -->|IncludeLaunchDescription| SlamLaunch
+
+  subgraph TeleopStack[Teleop stack]
+    Joy["joy_node"]
+    TeleopTwist["teleop_twist_joy"]
+    Rosmaster["rosmaster_driver_node"]
+    RoviBase["rovi_base_node"]
+    RSP["robot_state_publisher"]
+    Rplidar["rplidar_ros (lidar_enabled)"]
+  end
+  TeleopLaunch --> Joy
+  TeleopLaunch --> TeleopTwist
+  TeleopLaunch --> Rosmaster
+  TeleopLaunch --> RoviBase
+  TeleopLaunch --> RSP
+  TeleopLaunch -.-> Rplidar
+
+  subgraph OdomStack[Odometry pipeline]
+    ImuFilter["imu_filter_madgwick (odom_mode=fusion_wheels_imu)"]
+    EkfNode["robot_localization/ekf_node"]
+  end
+  EkfLaunch --> ImuFilter
+  EkfLaunch --> EkfNode
+
+  subgraph SlamStack[SLAM]
+    SlamTB["slam_toolbox (lifecycle node)"]
+  end
+  SlamLaunch --> SlamTB
+
+```
 
 ## Package dependencies
 ```mermaid
