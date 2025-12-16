@@ -363,11 +363,11 @@ MPU Axis
 - chip orientation : pin1 pointing to buzzer edge of rosmaster control board
 - buzzer edge of rosmaster control board : is pointing to Robot Front Left corner
 
-| Robot |IMU | ros axis | rosmaster Axis |
-|-----|------|----------|----------------|
-| Right | X  | -Y | -X  |
-| Front | Y  | X | -Y |
-| Up    | Z  | Z | Z  |
+| Robot |IMU | ros axis |
+|-----|------|----------|
+| Right | X  | -Y |
+| Front | Y  | X |
+| Up    | Z  | Z |
 
 Position | axis | value |
 --------|-----|----|

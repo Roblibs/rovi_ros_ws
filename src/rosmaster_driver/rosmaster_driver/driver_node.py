@@ -189,29 +189,28 @@ class RosmasterDriverNode(Node):
         voltage.data = float(voltage_val)
         self.pub_voltage.publish(voltage)
 
-        # IMU
-        ax_ros, ay_ros, az_ros = apply_rot90_xyz(ax, ay, az, rot90=self.rot90, reverse=False)
-        gx_ros, gy_ros, gz_ros = apply_rot90_xyz(gx, gy, gz, rot90=self.rot90, reverse=False)
+        # IMU corrected for ROS axes
+        ax_imu, ay_imu, az_imu = ay, ay, az
+        gx_imu, gy_imu, gz_imu = gy, gy, gz
         imu = Imu()
         imu.header.stamp = now
         imu.header.frame_id = self.imu_link
-        imu.linear_acceleration.x = float(ax_ros)
-        imu.linear_acceleration.y = float(ay_ros)
-        imu.linear_acceleration.z = float(az_ros)
-        imu.angular_velocity.x = float(gx_ros)
-        imu.angular_velocity.y = float(gy_ros)
-        imu.angular_velocity.z = float(gz_ros)
+        imu.linear_acceleration.x = float(ax_imu)
+        imu.linear_acceleration.y = float(ay_imu)
+        imu.linear_acceleration.z = float(az_imu)
+        imu.angular_velocity.x = float(gx_imu)
+        imu.angular_velocity.y = float(gy_imu)
+        imu.angular_velocity.z = float(gz_imu)
         # Orientation is unknown; leave default zeros with covariance unset
         self.pub_imu_raw.publish(imu)
 
-        # Magnetometer
-        mx_ros, my_ros, mz_ros = apply_rot90_xyz(mx, my, mz, rot90=self.rot90, reverse=False)
+        # Magnetometer (same axis mapping as accel/gyro)
         mag = MagneticField()
         mag.header.stamp = now
         mag.header.frame_id = self.imu_link
-        mag.magnetic_field.x = float(mx_ros)
-        mag.magnetic_field.y = float(my_ros)
-        mag.magnetic_field.z = float(mz_ros)
+        mag.magnetic_field.x = float(-mx)
+        mag.magnetic_field.y = float(-my)
+        mag.magnetic_field.z = float(mz)
         self.pub_mag.publish(mag)
 
         # vel_raw (feedback)
