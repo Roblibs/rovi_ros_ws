@@ -354,7 +354,7 @@ flowchart LR
 | Movement | ros axis | rosmaster Axis |
 |----------|----------|----------------|
 | forward/backwards | X | -Y |
-| left/right        | Y | X  |
+| left/right        | Y | -X  |
 | Rotation          | Z | Z  |
 
 MPU Axis
