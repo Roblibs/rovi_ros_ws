@@ -193,8 +193,8 @@ class RosmasterDriverNode(Node):
         ax_imu, ay_imu, az_imu = ax, -ay, -az
         gx_imu, gy_imu, gz_imu = gx, -gy, -gz
         # Apply Rosmaster<->ROS 90° XY mapping to IMU vectors (HW -> ROS)
-        ax_ros, ay_ros, az_ros = apply_rot90_xyz(ax_imu, ay_imu, az_imu, rot90=self.rot90, reverse=False)
-        gx_ros, gy_ros, gz_ros = apply_rot90_xyz(gx_imu, gy_imu, gz_imu, rot90=self.rot90, reverse=False)
+        ax_ros, ay_ros, az_ros = apply_rot90_xyz(ax_imu, ay_imu, az_imu, rot90=self.rot90, reverse=True)
+        gx_ros, gy_ros, gz_ros = apply_rot90_xyz(gx_imu, gy_imu, gz_imu, rot90=self.rot90, reverse=True)
 
         imu = Imu()
         imu.header.stamp = now
@@ -210,7 +210,7 @@ class RosmasterDriverNode(Node):
 
         # Prepare magnetometer in ROS axes and apply same 90° XY mapping
         mx_imu, my_imu, mz_imu = mx, -my, mz # mz ends up NOT flipped, because mag had its own Z flip already
-        mx_ros, my_ros, mz_ros = apply_rot90_xyz(mx_imu, my_imu, mz_imu, rot90=self.rot90, reverse=False)
+        mx_ros, my_ros, mz_ros = apply_rot90_xyz(mx_imu, my_imu, mz_imu, rot90=self.rot90, reverse=True)
         # Magnetometer Z axis inverted on datasheet
         mag = MagneticField()
         mag.header.stamp = now
@@ -221,7 +221,7 @@ class RosmasterDriverNode(Node):
         self.pub_mag.publish(mag)
 
         # vel_raw (feedback)
-        vx_ros, vy_ros, wz_ros = apply_rot90_xyz(vx, vy, wz, rot90=self.rot90, reverse=False)
+        vx_ros, vy_ros, wz_ros = apply_rot90_xyz(vx, vy, wz, rot90=self.rot90, reverse=True)
         twist = Twist()
         twist.linear.x = float(vx_ros)
         twist.linear.y = float(vy_ros)
