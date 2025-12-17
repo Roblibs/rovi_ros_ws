@@ -161,7 +161,7 @@ class RosmasterDriverNode(Node):
         vx_ros = float(msg.linear.x)
         vy_ros = float(msg.linear.y)
         wz_ros = float(msg.angular.z)
-        vx_hw, vy_hw, wz_hw = apply_rot90_xyz(vx_ros, vy_ros, wz_ros, rot90=self.rot90, reverse=True)
+        vx_hw, vy_hw, wz_hw = -vy_ros, -vx_ros, wz_ros
         self.hw.set_motion(vx_hw, vy_hw, wz_hw)
 
     def _on_timer(self) -> None:

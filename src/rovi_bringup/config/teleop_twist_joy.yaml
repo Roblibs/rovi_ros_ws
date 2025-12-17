@@ -10,7 +10,7 @@ teleop_twist_joy:
     scale_linear.x: 0.7
     scale_linear_turbo.x: 1.0
     axis_linear.y: 3
-    scale_linear.y: -0.7
+    scale_linear.y: 0.7
     scale_linear_turbo.y: -1.2
     axis_linear.z: -1
     scale_linear.z: 0.0
