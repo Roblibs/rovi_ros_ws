@@ -221,7 +221,7 @@ class RosmasterDriverNode(Node):
         self.pub_mag.publish(mag)
 
         # vel_raw (feedback)
-        vx_ros, vy_ros, wz_ros = apply_rot90_xyz(vx, vy, wz, rot90=self.rot90, reverse=True)
+        vx_ros, vy_ros, wz_ros = apply_rot90_xyz(vx, vy, wz, rot90=self.rot90, reverse=False)
         twist = Twist()
         twist.linear.x = float(vx_ros)
         twist.linear.y = float(vy_ros)
