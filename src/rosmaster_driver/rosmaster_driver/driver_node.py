@@ -189,28 +189,35 @@ class RosmasterDriverNode(Node):
         voltage.data = float(voltage_val)
         self.pub_voltage.publish(voltage)
 
-        # IMU corrected for ROS axes
-        ax_imu, ay_imu, az_imu = ay, ax, az
-        gx_imu, gy_imu, gz_imu = gy, gx, gz
+        # The IMU sensor is flipped on the board (Z axis down), so flip everything (rot X 180°)
+        ax_imu, ay_imu, az_imu = ax, -ay, -az
+        gx_imu, gy_imu, gz_imu = gx, -gy, -gz
+        # Apply Rosmaster<->ROS 90° XY mapping to IMU vectors (HW -> ROS)
+        ax_ros, ay_ros, az_ros = apply_rot90_xyz(ax_imu, ay_imu, az_imu, rot90=self.rot90, reverse=False)
+        gx_ros, gy_ros, gz_ros = apply_rot90_xyz(gx_imu, gy_imu, gz_imu, rot90=self.rot90, reverse=False)
+
         imu = Imu()
         imu.header.stamp = now
         imu.header.frame_id = self.imu_link
-        imu.linear_acceleration.x = float(ax_imu)
-        imu.linear_acceleration.y = float(ay_imu)
-        imu.linear_acceleration.z = float(az_imu)
-        imu.angular_velocity.x = float(gx_imu)
-        imu.angular_velocity.y = float(gy_imu)
-        imu.angular_velocity.z = float(gz_imu)
+        imu.linear_acceleration.x = float(ax_ros)
+        imu.linear_acceleration.y = float(ay_ros)
+        imu.linear_acceleration.z = float(az_ros)
+        imu.angular_velocity.x = float(gx_ros)
+        imu.angular_velocity.y = float(gy_ros)
+        imu.angular_velocity.z = float(gz_ros)
         # Orientation is unknown; leave default zeros with covariance unset
         self.pub_imu_raw.publish(imu)
 
-        # Magnetometer (same axis mapping as accel/gyro)
+        # Prepare magnetometer in ROS axes and apply same 90° XY mapping
+        mx_imu, my_imu, mz_imu = mx, -my, mz # mz ends up NOT flipped, because mag had its own Z flip already
+        mx_ros, my_ros, mz_ros = apply_rot90_xyz(mx_imu, my_imu, mz_imu, rot90=self.rot90, reverse=False)
+        # Magnetometer Z axis inverted on datasheet
         mag = MagneticField()
         mag.header.stamp = now
         mag.header.frame_id = self.imu_link
-        mag.magnetic_field.x = float(-mx)
-        mag.magnetic_field.y = float(-my)
-        mag.magnetic_field.z = float(mz)
+        mag.magnetic_field.x = float(mx_ros)
+        mag.magnetic_field.y = float(my_ros)
+        mag.magnetic_field.z = float(mz_ros)
         self.pub_mag.publish(mag)
 
         # vel_raw (feedback)
