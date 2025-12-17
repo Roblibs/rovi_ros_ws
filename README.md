@@ -363,17 +363,19 @@ MPU Axis
 - chip orientation : pin1 pointing to buzzer edge of rosmaster control board
 - buzzer edge of rosmaster control board : is pointing to Robot Front Left corner
 
+From raw board measurement, the sensor reveals a 180° flip on its X axis 
 | Robot |IMU | ros axis |
 |-----|------|----------|
 | Right | X  | -Y |
-| Front | Y  | X |
-| Up    | Z  | Z |
+| Front | -Y  | X |
+| Up    | -Z  | Z |
 
+This rotation will be compensated in the driver so that output of `/imu/data_raw` imu.linear_acceleration should be as follows
 Position | axis | value |
 --------|-----|----|
-|up facing up : | z | -9.8 |
-|on left with right facing up : | x  | -9.8 |
-|back with the front facing up | y | -9.8 |
+|back with the front facing up | x | 9.8 |
+|on right side left facing up : | y  | 9.8 |
+|up facing up : | z | 9.8 |
 
 ## wheels
 
