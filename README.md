@@ -20,6 +20,8 @@ common launch examples :
 |ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
 |ros2 launch rovi_bringup mapping.launch.py | teleop + slam_toolbox mapping |
 |ros2 launch rovi_bringup localization.launch.py map_file_name:=/path/to/map.posegraph | teleop + slam_toolbox localization on a saved pose-graph |
+|ros2 launch rovi_bringup nav.launch.py | Nav2 navigation with SLAM (`slam_mode:=mapping` by default) |
+|ros2 launch rovi_bringup nav.launch.py slam_mode:=localization map_file_name:=/path/to/map.posegraph | Nav2 navigation with SLAM localization on a saved pose-graph |
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
 |rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
 |rviz2 -d install/share/rovi_description/rviz/rovi_map.rviz| visualization for SLAM (Fixed Frame: `map`, shows `/map`) |
@@ -54,6 +56,9 @@ sudo apt install -y ros-jazzy-rplidar-ros
 # SLAM + localization
 sudo apt install -y ros-jazzy-slam-toolbox ros-jazzy-robot-localization
 
+# Navigation (Nav2)
+sudo apt install -y ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins
+
 # IMU orientation filter (used when odom_mode=fusion_wheels_imu)
 sudo apt install -y ros-jazzy-imu-filter-madgwick
 ```
@@ -78,6 +83,7 @@ Only packages created in this repo are listed here
 | `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom) |
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
+| `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
 
 ## Launches
 | Launch | Package | Description |
@@ -87,9 +93,11 @@ Only packages created in this repo are listed here
 | `offline_view.launch.py` | `rovi_bringup` | Offline Inspection of the robot model : URDF + joint_state_publisher_gui + RViz |
 | `joy.launch.py` | `rovi_bringup` | Debug joystick → `/cmd_vel` only (no hardware required) |
 | `localization.launch.py` | `rovi_bringup` | Bringup + SLAM localization on an existing map (`slam_toolbox` localization mode) |
+| `nav.launch.py` | `rovi_bringup` | Bringup + SLAM (`slam_mode` mapping/localization) + Nav2 navigation stack |
 | `rosmaster_driver.launch.py` | `rosmaster_driver` | Hardware driver only (serial/IMU/joints sanity checks) |
 | `ekf.launch.py` | `rovi_localization` | Component launch: odometry pipeline (`odom_mode` selects raw/filtered/fusion_wheels_imu; useful without SLAM) |
 | `slam_toolbox.launch.py` | `rovi_slam` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
+| `nav.launch.py` | `rovi_nav` | Component launch: Nav2 servers + lifecycle manager |
 
 ## Nodes
 ROS nodes started by the launches above (some are conditional based on params).
@@ -97,7 +105,8 @@ ROS nodes started by the launches above (some are conditional based on params).
 | Node | Package | Description |
 |---|---|---|
 | `joy_node` | `joy` | Reads a joystick device and publishes `/joy` (`sensor_msgs/msg/Joy`). |
-| `teleop_twist_joy` | `teleop_twist_joy` | Converts `/joy` into velocity commands on `/cmd_vel` (`geometry_msgs/msg/Twist`). |
+| `teleop_twist_joy` | `teleop_twist_joy` | Converts `/joy` into velocity commands on `/cmd_vel_joy` (`geometry_msgs/msg/Twist`). |
+| `twist_mux` | `twist_mux` | Selects the active velocity command source (e.g., `/cmd_vel_nav` vs `/cmd_vel_joy`) and publishes `/cmd_vel`. |
 | `rosmaster_driver` | `rosmaster_driver` | Hardware bridge for the Rosmaster base board: subscribes to `/cmd_vel` and publishes feedback like `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, and `/voltage`. |
 | `rovi_base` | `rovi_base` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
@@ -108,6 +117,11 @@ ROS nodes started by the launches above (some are conditional based on params).
 | `odom_to_basefootprint` | `tf2_ros` | Static TF publisher used by `offline_view.launch.py` to provide `odom -> base_footprint` without hardware. |
 | `joint_state_publisher_gui` | `joint_state_publisher_gui` | GUI for publishing `/joint_states` for offline URDF inspection. |
 | `rviz2` | `rviz2` | Visualization client (used by `offline_view.launch.py` and standalone `rviz2 -d ...`). |
+| `bt_navigator` | `nav2_bt_navigator` | Nav2 behavior tree navigator; provides the `/navigate_to_pose` action server. |
+| `planner_server` | `nav2_planner` | Nav2 global planner that produces paths in the `map` frame. |
+| `controller_server` | `nav2_controller` | Nav2 local controller that publishes velocity commands on `/cmd_vel_nav`. |
+| `behavior_server` | `nav2_behaviors` | Nav2 recovery/behavior actions (spin, backup, wait) used by the BT. |
+| `lifecycle_manager_navigation` | `nav2_lifecycle_manager` | Configures and activates the Nav2 lifecycle nodes (autostart). |
 
 ## Params
 Only the parameters toggeling nodes activation are listed here
@@ -117,10 +131,13 @@ Only the parameters toggeling nodes activation are listed here
 | `lidar_enabled` | `rovi_bringup` | `teleop.launch.py` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
 | `slam_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
 | `slam_enabled` | `rovi_slam` | `slam_toolbox.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
+| `slam_mode` | `rovi_slam` | `slam_toolbox.launch.py` | `mapping` | Selects SLAM mode: `mapping` or `localization`. |
+| `slam_mode` | `rovi_bringup` | `nav.launch.py` | `mapping` | Selects SLAM mode when running Nav2. |
 | `odom_mode` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `fusion_wheels_imu` | Selects who publishes TF `odom -> base_footprint` (and whether IMU is used in that odom estimate) |
 | `odom_mode` | `rovi_localization` | `ekf.launch.py` | `fusion_wheels_imu` | Same as above, but for running the odometry pipeline without SLAM |
 | `mag_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
 | `mag_enabled` | `rovi_localization` | `ekf.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
+| `map_file_name` | `rovi_bringup` | `localization.launch.py`, `nav.launch.py` | `~/.ros/rovi/maps/latest.posegraph` | Pose-graph file to load when `slam_mode=localization`. |
 
 ### Odometry Modes (`odom_mode`)
 Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
@@ -149,8 +166,13 @@ flowchart TD
 
   RoviJoy["ros-jazzy-teleop-twist-joy node"]
   JOY -->|subscribe| RoviJoy
+  CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
+  RoviJoy -->|publish| CMD_JOY
+
+  TwistMux["twist_mux node"]
+  CMD_JOY -->|subscribe| TwistMux
   CMD(["/cmd_vel<br/>(Twist)"])
-  RoviJoy -->|publish| CMD
+  TwistMux -->|publish| CMD
 
   CMD -->|subscribe| Rosmaster
   EDT(["/edition<br/>(Float32)"])
@@ -214,7 +236,7 @@ flowchart TD
 ```
 
 ## SLAM
-slam_toolbox produces `map -> odom` so the robot pose is expressed in a stable map frame.
+slam_toolbox produces `map -> odom` so the robot pose is expressed in a stable map frame. `slam_mode` selects `mapping` (build/update the map) or `localization` (load a saved pose-graph from `map_file_name`).
 
 ```mermaid
 flowchart TD
@@ -230,6 +252,57 @@ flowchart TD
   Slam -->|publish| TF
 ```
 
+## Navigation
+Nav2 consumes map + TF + sensors to compute `/cmd_vel` for the base.
+For navigation, SLAM can run in `slam_mode=mapping` (default) or `slam_mode=localization` (requires `map_file_name`).
+
+Lifecycle-managed nodes (configured/activated by `nav2_lifecycle_manager`): `nav2_bt_navigator/bt_navigator`, `nav2_planner/planner_server`, `nav2_controller/controller_server`, `nav2_behaviors/behavior_server`.
+
+```mermaid
+flowchart TD
+  GoalCLI["ros2cli<br/>(ros2 action send_goal)"]
+  GoalRVIZ["nav2_rviz_plugins<br/>(rviz2 'Nav2 Goal' / '2D Goal Pose')"]
+  NAV_ACTION(["/navigate_to_pose<br/>(nav2_msgs/action/NavigateToPose)"])
+  GoalCLI -->|send goal| NAV_ACTION
+  GoalRVIZ -->|send goal| NAV_ACTION
+
+  Btnav["bt_navigator"]
+  NAV_ACTION -->|action server| Btnav
+
+  Planner["planner_server"]
+  Controller["controller_server"]
+  Behaviors["behavior_server"]
+  Btnav -.->|"services/actions"| Planner
+  Btnav -.->|"services/actions"| Controller
+  Btnav -.->|"services/actions"| Behaviors
+
+  MAP(["/map<br/>(OccupancyGrid)"])
+  TF(["/tf<br/>(map->odom + odom->base_footprint + links)"])
+  SCAN(["/scan<br/>(LaserScan)"])
+  ODOMF(["/odometry/filtered<br/>(Odometry)"])
+
+  MAP -->|subscribe| Planner
+  TF -->|subscribe| Planner
+
+  MAP -->|subscribe| Controller
+  TF -->|subscribe| Controller
+  SCAN -->|subscribe| Controller
+  ODOMF -->|subscribe| Controller
+
+  CMD_NAV(["/cmd_vel_nav<br/>(Twist)"])
+  Controller -->|publish| CMD_NAV
+
+  TwistMux["twist_mux"]
+  CMD_NAV -->|subscribe| TwistMux
+  CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
+  CMD_JOY -.->|"subscribe (teleop)"| TwistMux
+  CMD(["/cmd_vel<br/>(Twist)"])
+  TwistMux -->|publish| CMD
+
+  Rosmaster["rosmaster_driver"]
+  CMD -->|subscribe| Rosmaster
+```
+
 ## Visualization
 
 ```mermaid
@@ -241,14 +314,19 @@ flowchart TD
 
   RVIZ_ODOM["rviz2<br/>(rovi.rviz, Fixed Frame: odom)"]
   RVIZ_MAP["rviz2<br/>(rovi_map.rviz, Fixed Frame: map)"]
+  RVIZ_NAV["rviz2<br/>(nav.rviz, Fixed Frame: map)"]
 
   TF -->|subscribe| RVIZ_ODOM
   TF -->|subscribe| RVIZ_MAP
+  TF -->|subscribe| RVIZ_NAV
   ROBOT_DESC -->|subscribe| RVIZ_ODOM
   ROBOT_DESC -->|subscribe| RVIZ_MAP
+  ROBOT_DESC -->|subscribe| RVIZ_NAV
   SCAN -->|subscribe| RVIZ_ODOM
   SCAN -->|subscribe| RVIZ_MAP
+  SCAN -->|subscribe| RVIZ_NAV
   MAP -->|subscribe| RVIZ_MAP
+  MAP -->|subscribe| RVIZ_NAV
 ```
 
 ## Offline model
@@ -289,10 +367,12 @@ flowchart TD
 flowchart LR
   Mapping["rovi_bringup/mapping.launch.py"]
   Localization["rovi_bringup/localization.launch.py"]
+  NavLaunch["rovi_bringup/nav.launch.py"]
 
   TeleopLaunch["rovi_bringup/teleop.launch.py"]
   EkfLaunch["rovi_localization/ekf.launch.py"]
   SlamLaunch["rovi_slam/slam_toolbox.launch.py"]
+  NavStackLaunch["rovi_nav/nav.launch.py"]
 
   Mapping -->|IncludeLaunchDescription| TeleopLaunch
   Mapping -->|IncludeLaunchDescription| EkfLaunch
@@ -301,6 +381,10 @@ flowchart LR
   Localization -->|IncludeLaunchDescription| TeleopLaunch
   Localization -->|IncludeLaunchDescription| EkfLaunch
   Localization -->|IncludeLaunchDescription| SlamLaunch
+
+  NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=mapping)"| Mapping
+  NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=localization)"| Localization
+  NavLaunch -->|IncludeLaunchDescription| NavStackLaunch
 
   subgraph TeleopStack[Teleop stack]
     Joy["joy_node"]
@@ -329,6 +413,19 @@ flowchart LR
   end
   SlamLaunch --> SlamTB
 
+  subgraph NavStack["Navigation (Nav2)"]
+    NavLife["lifecycle_manager_navigation"]
+    NavBT["bt_navigator"]
+    NavPlanner["planner_server"]
+    NavController["controller_server"]
+    NavBehaviors["behavior_server"]
+  end
+  NavStackLaunch --> NavLife
+  NavStackLaunch --> NavBT
+  NavStackLaunch --> NavPlanner
+  NavStackLaunch --> NavController
+  NavStackLaunch --> NavBehaviors
+
 ```
 
 ## Package dependencies
@@ -341,19 +438,21 @@ flowchart LR
     RoviBase[rovi_base]
     RoviLoc[rovi_localization]
     RoviSlam[rovi_slam]
+    RoviNav[rovi_nav]
   end
 
   subgraph External
     Joy[ros-jazzy-joy]
     Teleop[ros-jazzy-teleop-twist-joy]
-  RSP[robot_state_publisher]
-  JSPG[joint_state_publisher_gui]
-  RVIZ[rviz2]
-  Diag[diagnostic_updater]
-  RPLidar[rplidar_ros]
-  EKF[robot_localization]
-  ImuFilter[imu_filter_madgwick]
-  SlamToolbox[slam_toolbox]
+    RSP[robot_state_publisher]
+    JSPG[joint_state_publisher_gui]
+    RVIZ[rviz2]
+    Diag[diagnostic_updater]
+    RPLidar[rplidar_ros]
+    EKF[robot_localization]
+    ImuFilter[imu_filter_madgwick]
+    SlamToolbox[slam_toolbox]
+    Nav2[nav2_bringup]
   end
 
   RoviBringup --> RoviDesc
@@ -361,6 +460,7 @@ flowchart LR
   RoviBringup --> RoviBase
   RoviBringup -.-> RoviLoc
   RoviBringup -.-> RoviSlam
+  RoviBringup -.-> RoviNav
   RoviBringup --> Joy
   RoviBringup --> Teleop
   RoviBringup --> RSP
@@ -373,6 +473,7 @@ flowchart LR
   RoviLoc --> EKF
   RoviLoc -.-> ImuFilter
   RoviSlam --> SlamToolbox
+  RoviNav --> Nav2
 ```
 
 # Nodes details
