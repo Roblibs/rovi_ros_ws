@@ -68,6 +68,8 @@ rviz2 -d install/share/rovi_description/rviz/rovi.rviz
 ```
 # Description
 ## Packages
+Only packages created in this repo are listed here
+
 | Package | Role |
 |---|---|
 | `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
@@ -90,6 +92,8 @@ rviz2 -d install/share/rovi_description/rviz/rovi.rviz
 | `rovi_slam` | `slam_toolbox.launch.py` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
 
 ## Params
+Only the parameters toggeling nodes activation are listed here
+
 | Param | Package | Launch | Default | Explanation |
 |---|---|---|---|---|
 | `lidar_enabled` | `rovi_bringup` | `teleop.launch.py` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
@@ -109,8 +113,13 @@ Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`
 | `filtered` | `false` | `robot_localization/ekf_node` | `robot_localization/ekf_node` | Filters wheel odom (`/odom_raw` → `/odometry/filtered`) |
 | `fusion_wheels_imu` | `false` | `robot_localization/ekf_node` | `imu_filter_madgwick` + `robot_localization/ekf_node` | Adds IMU yaw + yaw rate (`/imu/data_raw` → `/imu/data`); set `mag_enabled:=true` to use `/imu/mag` |
 
+# Diagrams
+Conventions:
+- Square nodes are ROS nodes/packages.
+- Rounded nodes are ROS topics (`/name<br/>(MsgType)`).
+- In connection to topics, arrows only represent publish/subscribe via a topic.
 
-## Data Flow
+## Basic Flow
 
 ```mermaid
 flowchart TD
@@ -144,64 +153,27 @@ flowchart TD
   RoviBase["rovi_base node"]
   VRAW -->|subscribe| RoviBase
   ODRAW(["/odom_raw<br/>(Odometry)"])
-  TF(["/tf<br/>(TF)"])
+
+  subgraph TF["/tf"]
+    TF_ODOM_BASE("odom->base_footprint")
+    TF_LINKS_JOINTS("links/joints")
+  end
+
   RoviBase -->|publish| ODRAW
-  RoviBase -->|"publish<br/>(odom->base_footprint)"| TF
-
-  ImuFilter["imu_filter_madgwick (odom_mode=fusion_wheels_imu)"]
-  IMU_RAW -->|subscribe| ImuFilter
-  MAG -->|subscribe| ImuFilter
-  IMU(["/imu/data<br/>(Imu)"])
-  ImuFilter -->|publish| IMU
-
-  EKF[ekf_node]
-  ODRAW -->|subscribe| EKF
-  IMU -->|subscribe| EKF
-  ODOMF(["/odometry/filtered<br/>(Odometry)"])
-  EKF -->|publish| ODOMF
-  EKF -->|"publish<br/>(odom->base_footprint)"| TF
-
+  RoviBase -->|publish| TF_ODOM_BASE
 
   RSP["robot_state_publisher"]
   JSTATE -->|subscribe| RSP
-  RSP -->|"publish (links/joints)"| TF
+  RSP -->|publish| TF_LINKS_JOINTS
 
   RPLidar["rplidar_ros node"]
   SCAN(["/scan<br/>(LaserScan)"])
   RPLidar -->|publish| SCAN
 
-  Slam["slam_toolbox (slam_enabled)"]
-  SCAN -->|subscribe| Slam
-  TF -->|subscribe| Slam
-  MAP(["/map<br/>(OccupancyGrid)"])
-  Slam -->|publish| MAP
-  Slam -->|"publish (map->odom)"| TF
-
-  RVIZ["rviz2"]
-  TF -->|subscribe| RVIZ
-  ODRAW -->|subscribe| RVIZ
-  ODOMF -->|subscribe| RVIZ
-  IMU_RAW -->|subscribe| RVIZ
-  IMU -->|subscribe| RVIZ
-  MAG -->|subscribe| RVIZ
-  SCAN -->|subscribe| RVIZ
-  MAP -->|subscribe| RVIZ
 ```
 
-## TF Tree (runtime)
-TF frames are not regular ROS topics; this is the chain RViz and SLAM use at runtime.
-
-```mermaid
-flowchart TD
-  MAP[map] -->|slam_toolbox| ODOM[odom]
-  ODOM -->|ekf_node OR rovi_base| BASEF[base_footprint]
-  BASEF -->|robot_state_publisher| BASEL[base_link]
-  BASEL -->|robot_state_publisher| LASER[laser_link]
-  BASEL -->|robot_state_publisher| IMU[imu_link]
-```
-
-## Odometry filtering (odom_mode=fusion_wheels_imu)
-This produces a single authoritative `odom -> base_footprint` transform using EKF + IMU. For `odom_mode=filtered`, omit the IMU branch; magnetometer usage is gated by `mag_enabled`.
+## Odometry filtering
+When odom_mode=fusion_wheels_imu, this produces a single authoritative `odom -> base_footprint` transform using EKF + IMU. For `odom_mode=filtered`, omit the IMU branch; magnetometer usage is gated by `mag_enabled`.
 
 ```mermaid
 flowchart TD
@@ -223,17 +195,42 @@ flowchart TD
   EKF -->|publish| TF(["/tf<br/>odom -> base_footprint"])
 ```
 
-## SLAM (slam_toolbox)
-This produces `map -> odom` so the robot pose is expressed in a stable map frame.
+## SLAM
+slam_toolbox produces `map -> odom` so the robot pose is expressed in a stable map frame.
 
 ```mermaid
 flowchart TD
+  subgraph TF_GROUP["/tf"]
+    TF(["map -> odom"])
+    TFCHAIN(["odom -> base_footprint -> laser_link"])
+  end
   RPLidar[rplidar_ros] -->|publish| SCAN(["/scan<br/>(LaserScan)"])
-  TFCHAIN(["/tf<br/> odom -> base_footprint -> laser_link"]) --> Slam[slam_toolbox]
+  TFCHAIN -->|subscribe| Slam[slam_toolbox]
   SCAN -->|subscribe| Slam
   MAP(["/map<br/>(OccupancyGrid)"])
   Slam -->|publish| MAP
-  Slam -->|publish| TF(["tf<br/>map -> odom"])
+  Slam -->|publish| TF
+```
+
+## Visualization
+
+```mermaid
+flowchart TD
+  TF(["/tf<br/>(TF)"])
+  ROBOT_DESC(["/robot_description<br/>(String)"])
+  SCAN(["/scan<br/>(LaserScan)"])
+  MAP(["/map<br/>(OccupancyGrid)"])
+
+  RVIZ_ODOM["rviz2<br/>(rovi.rviz, Fixed Frame: odom)"]
+  RVIZ_MAP["rviz2<br/>(rovi_map.rviz, Fixed Frame: map)"]
+
+  TF -->|subscribe| RVIZ_ODOM
+  TF -->|subscribe| RVIZ_MAP
+  ROBOT_DESC -->|subscribe| RVIZ_ODOM
+  ROBOT_DESC -->|subscribe| RVIZ_MAP
+  SCAN -->|subscribe| RVIZ_ODOM
+  SCAN -->|subscribe| RVIZ_MAP
+  MAP -->|subscribe| RVIZ_MAP
 ```
 
 ## Offline model
@@ -254,6 +251,19 @@ flowchart TD
   RSP -->|publish| TF
   TF -->|subscribe| RVIZ
 ```
+
+## TF Tree
+TF frames are not regular ROS topics; this is the chain RViz and SLAM use at runtime.
+
+```mermaid
+flowchart TD
+  MAP[map] -->|slam_toolbox| ODOM[odom]
+  ODOM -->|ekf_node OR rovi_base| BASEF[base_footprint]
+  BASEF -->|robot_state_publisher| BASEL[base_link]
+  BASEL -->|robot_state_publisher| LASER[laser_link]
+  BASEL -->|robot_state_publisher| IMU[imu_link]
+```
+
 ## Launch wiring
 `rovi_bringup` launches are composition layers: they include smaller "component" launches (teleop, odometry, SLAM). This keeps packages reusable (e.g., you can run SLAM against bag playback as long as `/scan` + TF exist).
 
