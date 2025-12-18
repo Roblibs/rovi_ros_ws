@@ -12,7 +12,9 @@
 
     <Discovery>
       <!-- Static peer list (2 machines). -->
-      <Peers AddLocalhost="true">
+      <Peers>
+        <!-- Ensure same-host multi-process discovery works even with multicast disabled. -->
+        <Peer Address="127.0.0.1"/>
         <Peer Address="10.0.0.180"/>
         <Peer Address="10.0.0.184"/>
       </Peers>
