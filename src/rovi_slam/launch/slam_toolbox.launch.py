@@ -93,7 +93,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     map_file_name = DeclareLaunchArgument(
         'map_file_name',
-        default_value='',
+        default_value=os.path.expanduser('~/.ros/rovi/maps/latest.posegraph'),
         description='Pose-graph file to load in localization mode (slam_toolbox param map_file_name, typically .posegraph).',
     )
 

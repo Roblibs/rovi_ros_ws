@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bringup joystick + teleop_twist_joy + Rosmaster driver for manual control."""
+"""Bringup joystick + teleop_twist_joy + twist_mux + base stack."""
 
 import os
 import sys
@@ -18,6 +18,7 @@ def generate_launch_description() -> LaunchDescription:
     pkg_share = get_package_share_directory('rovi_bringup')
     default_joy_params = os.path.join(pkg_share, 'config', 'joy.params.yaml')
     default_teleop_params = os.path.join(pkg_share, 'config', 'teleop_twist_joy.yaml')
+    default_twist_mux_params = os.path.join(pkg_share, 'config', 'twist_mux.yaml')
     default_rovi_base_params = os.path.join(pkg_share, 'config', 'rovi_base.yaml')
     default_rosmaster_params = os.path.join(pkg_share, 'config', 'rosmaster_driver.yaml')
     desc_share = get_package_share_directory('rovi_description')
@@ -32,6 +33,11 @@ def generate_launch_description() -> LaunchDescription:
         'teleop_params_file',
         default_value=default_teleop_params,
         description='YAML file with parameters for teleop_twist_joy',
+    )
+    twist_mux_params_arg = DeclareLaunchArgument(
+        'twist_mux_params_file',
+        default_value=default_twist_mux_params,
+        description='YAML file with parameters for twist_mux (cmd_vel muxing).',
     )
     rosmaster_params_arg = DeclareLaunchArgument(
         'rosmaster_params_file',
@@ -51,7 +57,12 @@ def generate_launch_description() -> LaunchDescription:
     cmd_vel_arg = DeclareLaunchArgument(
         'cmd_vel_topic',
         default_value='cmd_vel',
-        description='Twist topic used for manual control',
+        description='Final Twist topic sent to the base (twist_mux output).',
+    )
+    cmd_vel_joy_arg = DeclareLaunchArgument(
+        'cmd_vel_joy_topic',
+        default_value='cmd_vel_joy',
+        description='Twist topic produced by teleop_twist_joy (twist_mux input).',
     )
     rosmaster_port_arg = DeclareLaunchArgument(
         'rosmaster_port',
@@ -147,7 +158,16 @@ def generate_launch_description() -> LaunchDescription:
         executable='teleop_node',
         name='teleop_twist_joy',
         parameters=[LaunchConfiguration('teleop_params_file')],
-        remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_topic'))],
+        remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_joy_topic'))],
+    )
+
+    twist_mux_node = Node(
+        package='twist_mux',
+        executable='twist_mux',
+        name='twist_mux',
+        output='screen',
+        parameters=[LaunchConfiguration('twist_mux_params_file')],
+        remappings=[('cmd_vel_out', LaunchConfiguration('cmd_vel_topic'))],
     )
 
     rosmaster_driver_node = Node(
@@ -187,10 +207,12 @@ def generate_launch_description() -> LaunchDescription:
     actions.extend([
         joy_params_arg,
         teleop_params_arg,
+        twist_mux_params_arg,
         rosmaster_params_arg,
         rovi_base_params_arg,
         joy_dev_arg,
         cmd_vel_arg,
+        cmd_vel_joy_arg,
         rosmaster_port_arg,
         rosmaster_debug_arg,
         rovi_base_tf_arg,
@@ -204,6 +226,7 @@ def generate_launch_description() -> LaunchDescription:
         model_arg,
         joy_node,
         teleop_node,
+        twist_mux_node,
         rosmaster_driver_node,
         rovi_base_node,
         rsp_node,

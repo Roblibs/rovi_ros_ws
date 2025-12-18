@@ -25,6 +25,7 @@ common launch examples :
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
 |rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
 |rviz2 -d install/share/rovi_description/rviz/rovi_map.rviz| visualization for SLAM (Fixed Frame: `map`, shows `/map`) |
+|rviz2 -d install/share/rovi_nav/rviz/nav.rviz| visualization for Navigation (Nav2 panel + goal tool) |
 
 # Install
 
@@ -389,6 +390,7 @@ flowchart LR
   subgraph TeleopStack[Teleop stack]
     Joy["joy_node"]
     TeleopTwist["teleop_twist_joy"]
+    TwistMux["twist_mux"]
     Rosmaster["rosmaster_driver_node"]
     RoviBase["rovi_base_node"]
     RSP["robot_state_publisher"]
@@ -396,6 +398,7 @@ flowchart LR
   end
   TeleopLaunch --> Joy
   TeleopLaunch --> TeleopTwist
+  TeleopLaunch --> TwistMux
   TeleopLaunch --> Rosmaster
   TeleopLaunch --> RoviBase
   TeleopLaunch --> RSP
@@ -444,6 +447,7 @@ flowchart LR
   subgraph External
     Joy[ros-jazzy-joy]
     Teleop[ros-jazzy-teleop-twist-joy]
+    TwistMux[twist_mux]
     RSP[robot_state_publisher]
     JSPG[joint_state_publisher_gui]
     RVIZ[rviz2]
@@ -463,6 +467,7 @@ flowchart LR
   RoviBringup -.-> RoviNav
   RoviBringup --> Joy
   RoviBringup --> Teleop
+  RoviBringup --> TwistMux
   RoviBringup --> RSP
   RoviBringup --> JSPG
   RoviBringup --> RVIZ
@@ -557,9 +562,9 @@ Check joystick → twist without touching the robot hardware:
 ```bash
 ros2 launch rovi_bringup joy.launch.py \
   joy_dev:=0 \
-  cmd_vel_topic:=/cmd_vel
+  cmd_vel_topic:=/cmd_vel_joy
 
-ros2 topic echo /cmd_vel
+ros2 topic echo /cmd_vel_joy
 ```
 
 - `joy_dev` is the SDL device index (0 ≈ `/dev/input/js0`).
