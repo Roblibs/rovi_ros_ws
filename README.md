@@ -13,6 +13,27 @@ source install/setup.bash
 source .venv/bin/activate
 ```
 
+config in `~/.bashrc`
+
+```bash
+source /opt/ros/jazzy/setup.bash
+export ROS_DOMAIN_ID=0
+export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
+unset ROS_LOCALHOST_ONLY
+
+# CycloneDDS static peers (unicast discovery) for robot <-> PC.
+# To go back to default multicast discovery: `unset RMW_IMPLEMENTATION CYCLONEDDS_URI`
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI="file://$HOME/dev/Roblibs/rovi_ros_ws/peers.xml"
+
+alias ws='cd $HOME/dev/Roblibs/rovi_ros_ws && source install/setup.bash && source .venv/bin/activate'
+alias mapping='ros2 launch rovi_bringup mapping.launch.py'
+alias teleop='ros2 launch rovi_bringup teleop.launch.py'
+alias talk='ros2 run demo_nodes_cpp talker'
+alias listen='ros2 run demo_nodes_py listener'
+```
+
+
 common launch examples :
 
 |command | description |
@@ -37,7 +58,7 @@ uv needed by the robot for control board python dependencies
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-* clone this repo and change to the `rovi_ros_ws` directory then run `uv sync`
+* clone this repo under `~/dev/Roblibs/rovi_ros_ws` change it then run `uv sync`
 
 * Install joystick and rplidar ros packages
 
@@ -59,6 +80,9 @@ sudo apt install -y ros-jazzy-slam-toolbox ros-jazzy-robot-localization
 
 # Navigation (Nav2)
 sudo apt install -y ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins
+
+# DDS implementation (CycloneDDS) for static peers / unicast discovery
+sudo apt install -y ros-jazzy-rmw-cyclonedds-cpp
 
 # IMU orientation filter (used when odom_mode=fusion_wheels_imu)
 sudo apt install -y ros-jazzy-imu-filter-madgwick
