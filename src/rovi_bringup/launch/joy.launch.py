@@ -33,7 +33,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     cmd_vel_arg = DeclareLaunchArgument(
         'cmd_vel_topic',
-        default_value='cmd_vel',
+        default_value='cmd_vel_joy',
         description='Twist topic emitted by teleop_twist_joy',
     )
 
