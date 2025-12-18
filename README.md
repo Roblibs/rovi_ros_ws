@@ -20,11 +20,7 @@ source /opt/ros/jazzy/setup.bash
 export ROS_DOMAIN_ID=0
 export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
 unset ROS_LOCALHOST_ONLY
-
-# CycloneDDS static peers (unicast discovery) for robot <-> PC.
-# To go back to default multicast discovery: `unset RMW_IMPLEMENTATION CYCLONEDDS_URI`
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export CYCLONEDDS_URI="file://$HOME/dev/Roblibs/rovi_ros_ws/peers.xml"
+unset RMW_IMPLEMENTATION CYCLONEDDS_URI
 
 alias ws='cd $HOME/dev/Roblibs/rovi_ros_ws && source install/setup.bash && source .venv/bin/activate'
 alias mapping='ros2 launch rovi_bringup mapping.launch.py'
@@ -86,6 +82,15 @@ sudo apt install -y ros-jazzy-rmw-cyclonedds-cpp
 
 # IMU orientation filter (used when odom_mode=fusion_wheels_imu)
 sudo apt install -y ros-jazzy-imu-filter-madgwick
+```
+
+windwos Network: It is only possible to receive traffic (udp,...) if the network is private, not public. Some rules might be needed in addition
+```bash
+Set-NetConnectionProfile -InterfaceAlias "WiFi" -NetworkCategory Private
+
+New-NetFirewallRule -DisplayName "Allow ICMPv4 Echo from robot" -Direction Inbound -Action Allow -Protocol ICMPv4 -IcmpType 8 -RemoteAddress 10.0.0.180 -Profile Private
+
+New-NetFirewallRule -DisplayName "Allow ROS2 DDS UDP from robot" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 7400-7600 -RemoteAddress 10.0.0.180 -Profile Private
 ```
 
 pixi on windows
