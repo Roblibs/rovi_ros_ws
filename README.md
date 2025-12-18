@@ -40,9 +40,11 @@ common launch examples :
 |ros2 launch rovi_bringup nav.launch.py | Nav2 navigation with SLAM (`slam_mode:=mapping` by default) |
 |ros2 launch rovi_bringup nav.launch.py slam_mode:=localization map_file_name:=/path/to/map.posegraph | Nav2 navigation with SLAM localization on a saved pose-graph |
 |ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
-|rviz2 -d install/share/rovi_description/rviz/rovi.rviz| visualization of the real robot (after sourcing ROS + install/setup.bash) |
-|rviz2 -d install/share/rovi_description/rviz/rovi_map.rviz| visualization for SLAM (Fixed Frame: `map`, shows `/map`) |
-|rviz2 -d install/share/rovi_nav/rviz/nav.rviz| visualization for Navigation (Nav2 panel + goal tool) |
+|rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi.rviz"| visualization of the real robot (teleop-friendly; Fixed Frame: `odom`) |
+|rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi_map.rviz"| visualization for SLAM (Fixed Frame: `map`, subscribes to `/map`) |
+|rviz2 -d "$(ros2 pkg prefix rovi_nav)/share/rovi_nav/rviz/nav.rviz"| visualization for Navigation (Nav2 panel + goal tool) |
+
+Note: `install/share/...` paths only work when building with `colcon build --merge-install`.
 
 # Install
 
