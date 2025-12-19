@@ -54,7 +54,10 @@ activate() {
 ws() {
   cd "${ROVI_ROS_WS_DIR}" || return
   setup
-  activate
+  #optioanl activate, silent skip
+  if [ -f "${ROVI_ROS_WS_DIR}/.venv/bin/activate" ]; then
+    source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
+  fi
 }
 
 teleop() {
