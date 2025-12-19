@@ -1,12 +1,33 @@
 #!/usr/bin/env bash
 
 # rovi_ros_ws shell helpers
-#
-# Add to your real ~/.bashrc:
-#   source "$HOME/dev/Roblibs/rovi_ros_ws/rovi_env.sh"
 
-ROVI_ROS_WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export ROVI_ROS_WS_DIR
+if [ -z "${ROVI_ROS_WS_DIR:-}" ]; then
+  echo "[rovi_env] ROVI_ROS_WS_DIR is not set." >&2
+  return 1 2>/dev/null || exit 1
+fi
+
+# System ROS (Jazzy)
+if [ -f /opt/ros/jazzy/setup.bash ]; then
+  # shellcheck disable=SC1091
+  source /opt/ros/jazzy/setup.bash
+fi
+
+# Common ROS settings
+export ROS_DOMAIN_ID=0
+export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
+unset ROS_LOCALHOST_ONLY
+
+rovi_dds_default() {
+  unset RMW_IMPLEMENTATION
+  unset CYCLONEDDS_URI
+  unset ROS_DISCOVERY_SERVER
+}
+
+# Default DDS mode for this workspace:
+rovi_dds_default
+
+
 
 build() {
   cd "${ROVI_ROS_WS_DIR}" || return
@@ -31,34 +52,10 @@ activate() {
   source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
 }
 
-# System ROS (Jazzy)
-if [ -f /opt/ros/jazzy/setup.bash ]; then
-  # shellcheck disable=SC1091
-  source /opt/ros/jazzy/setup.bash
-fi
-
-# Common ROS settings
-export ROS_DOMAIN_ID=0
-export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
-unset ROS_LOCALHOST_ONLY
-
-rovi_dds_default() {
-  unset RMW_IMPLEMENTATION
-  unset CYCLONEDDS_URI
-  unset ROS_DISCOVERY_SERVER
-}
-
-# Default DDS mode for this workspace:
-rovi_dds_default
-
 ws() {
   cd "${ROVI_ROS_WS_DIR}" || return
-  # shellcheck disable=SC1091
-  source install/setup.bash
-  if [ -f .venv/bin/activate ]; then
-    # shellcheck disable=SC1091
-    source .venv/bin/activate
-  fi
+  setup
+  activate
 }
 
 teleop() {

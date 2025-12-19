@@ -4,15 +4,19 @@ ROS2 Jazzy workspace for Room View Bot
 # Usage
 For first time usage, see [install](#install) for details
 
-The following commands can be added by sourcing rovi_env in `~/.bashrc`:
+## Config in `~/.bashrc`
+Add these lines to your real `~/.bashrc`:
 
 ```bash
-source "$HOME/dev/Roblibs/rovi_ros_ws/rovi_env.sh"
+export ROVI_ROS_WS_DIR="$HOME/dev/Roblibs/rovi_ros_ws"
+source "$ROVI_ROS_WS_DIR/rovi_env.sh"
 ```
+
+## Commands
+Commands are provided by `rovi_env.sh` and can be run from any folder.
 
 | Command | Description |
 |---|---|
-| `ws` | switch to ROVI_ROS_WS_DIR and source its ROS setup and venv if available |
 | `build` | Runs `colcon build` in this workspace. This generates/updates the `install/` overlay used by `ros2 launch`. |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
