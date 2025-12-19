@@ -27,7 +27,9 @@ rovi_dds_default() {
 # Default DDS mode for this workspace:
 rovi_dds_default
 
-
+clean() {
+  rm -rf build/ install/ log/
+}
 
 build() {
   colcon build "$@"
@@ -85,7 +87,7 @@ view_teleop() {
 }
 
 view_offline() {
-  ros2 launch rovi_bringup offline_view.launch.py "$@"
+  ROS_LOCALHOST_ONLY=1 ros2 launch rovi_bringup offline_view.launch.py "$@"
 }
 
 talk() {
