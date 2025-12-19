@@ -41,7 +41,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 * clone this repo under `~/dev/Roblibs/rovi_ros_ws` change it then run `uv sync`
 
-* Install all the needed depedencies ros packages by running the `sudo install` command from `rovi_env.sh`
+* Install all the needed depedencies ros packages by running the `install_ros_deps` command from `rovi_env.sh`
 
 ## wsl
 When using Windows Subsystem for Linux, it is necessary to ensure the following :
