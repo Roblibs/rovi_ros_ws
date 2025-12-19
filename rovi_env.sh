@@ -30,7 +30,6 @@ rovi_dds_default
 
 
 build() {
-  cd "${ROVI_ROS_WS_DIR}" || return
   colcon build "$@"
 }
 
@@ -59,31 +58,31 @@ ws() {
 }
 
 teleop() {
-  setup && activate && ros2 launch rovi_bringup teleop.launch.py "$@"
+  ros2 launch rovi_bringup teleop.launch.py "$@"
 }
 
 mapping() {
-  setup && activate && ros2 launch rovi_bringup mapping.launch.py "$@"
+  ros2 launch rovi_bringup mapping.launch.py "$@"
 }
 
 localization() {
-  setup && activate && ros2 launch rovi_bringup localization.launch.py "$@"
+  ros2 launch rovi_bringup localization.launch.py "$@"
 }
 
 nav() {
-  setup && activate && ros2 launch rovi_bringup nav.launch.py "$@"
+  ros2 launch rovi_bringup nav.launch.py "$@"
 }
 
-view_offline() {
-  setup && ros2 launch rovi_bringup offline_view.launch.py "$@"
+view() {
+  rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
 }
 
 view_teleop() {
-  setup && rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi.rviz" "$@"
+  rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_odom.rviz" "$@"
 }
 
-view_map() {
-  setup && rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi_map.rviz" "$@"
+view_offline() {
+  ros2 launch rovi_bringup offline_view.launch.py "$@"
 }
 
 talk() {

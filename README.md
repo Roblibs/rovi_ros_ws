@@ -13,10 +13,11 @@ source "$ROVI_ROS_WS_DIR/rovi_env.sh"
 ```
 
 ## Commands
-Commands are provided by `rovi_env.sh` and can be run from any folder.
+Commands provided by `rovi_env.sh`
 
 | Command | Description |
 |---|---|
+| `ws` | changes to the `$ROVI_ROS_WS_DIR` runs setup,activate |
 | `build` | Runs `colcon build` in this workspace. This generates/updates the `install/` overlay used by `ros2 launch`. |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
@@ -24,8 +25,8 @@ Commands are provided by `rovi_env.sh` and can be run from any folder.
 | `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + odometry filtering + `slam_toolbox` mapping to publish TF `map -> odom` and `/map`. |
 | `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + SLAM localization against a saved pose-graph (pass `map_file_name:=/path/to/map.posegraph`). |
 | `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts SLAM (`slam_mode` mapping/localization) and the Nav2 stack for goal-based navigation. |
-| `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
-| `view_map` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`). |
+| `view` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`), and it also includes the Nav2 panel + goal tool (no-op unless `nav` is running). |
+| `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
 | `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + joint_state_publisher_gui for URDF inspection without robot hardware. |
 
 # Install
@@ -80,7 +81,7 @@ New-NetFirewallRule -DisplayName "Allow ROS2 DDS UDP from robot" -Direction Inbo
 ```
 
 # Description
-## Packages
+## Packages in this repo
 Only packages created in this repo are listed here
 
 | Package | Role |
@@ -92,6 +93,8 @@ Only packages created in this repo are listed here
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
+
+## Packages dependencies
 
 ## Launches
 | Launch | Package | Description |
@@ -320,21 +323,16 @@ flowchart TD
   SCAN(["/scan<br/>(LaserScan)"])
   MAP(["/map<br/>(OccupancyGrid)"])
 
-  RVIZ_ODOM["rviz2<br/>(rovi.rviz, Fixed Frame: odom)"]
+  RVIZ_ODOM["rviz2<br/>(rovi_odom.rviz, Fixed Frame: odom)"]
   RVIZ_MAP["rviz2<br/>(rovi_map.rviz, Fixed Frame: map)"]
-  RVIZ_NAV["rviz2<br/>(nav.rviz, Fixed Frame: map)"]
 
   TF -->|subscribe| RVIZ_ODOM
   TF -->|subscribe| RVIZ_MAP
-  TF -->|subscribe| RVIZ_NAV
   ROBOT_DESC -->|subscribe| RVIZ_ODOM
   ROBOT_DESC -->|subscribe| RVIZ_MAP
-  ROBOT_DESC -->|subscribe| RVIZ_NAV
   SCAN -->|subscribe| RVIZ_ODOM
   SCAN -->|subscribe| RVIZ_MAP
-  SCAN -->|subscribe| RVIZ_NAV
   MAP -->|subscribe| RVIZ_MAP
-  MAP -->|subscribe| RVIZ_NAV
 ```
 
 ## Offline model

@@ -15,7 +15,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description() -> LaunchDescription:
     desc_share = get_package_share_directory('rovi_description')
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
-    default_rviz = os.path.join(desc_share, 'rviz', 'rovi.rviz')
+    default_rviz = os.path.join(desc_share, 'rviz', 'rovi_odom.rviz')
 
     # Use shared memory transport instead of UDP multicast for reliable local DDS discovery
     localhost_only = SetEnvironmentVariable('ROS_LOCALHOST_ONLY', '1')
