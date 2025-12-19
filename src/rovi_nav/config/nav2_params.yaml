@@ -13,8 +13,6 @@ bt_navigator:
       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
     navigate_through_poses:
       plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
-    # Jazzy: built-in BT plugins are loaded automatically; keep this for custom plugins only.
-    plugin_lib_names: []
     error_code_names:
       - compute_path_error_code
       - follow_path_error_code
