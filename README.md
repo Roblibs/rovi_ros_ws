@@ -4,36 +4,25 @@ ROS2 Jazzy workspace for Room View Bot
 # Usage
 For first time usage, see [install](#install) for details
 
+The following commands can be added by sourcing rovi_env in `~/.bashrc`:
 
-Shell commands provided by `rovi_env.sh`:
+```bash
+source "$HOME/dev/Roblibs/rovi_ros_ws/rovi_env.sh"
+```
 
 | Command | Description |
 |---|---|
-| `ws` | Enter workspace and source `install/setup.bash` + `.venv` |
-| `teleop` | Launch joystick teleop stack (+ LiDAR if enabled) |
-| `mapping` | Launch teleop + SLAM mapping (`slam_toolbox`) |
-| `localization` | Launch teleop + SLAM localization (requires `map_file_name:=...`) |
-| `nav` | Launch SLAM (`slam_mode` mapping/localization) + Nav2 |
-| `offline_view` | Launch offline URDF inspection (joint_state_publisher_gui + RViz) |
-| `talk` | DDS sanity check: publish demo `/chatter` |
-| `listen` | DDS sanity check: subscribe to demo `/chatter` |
-
-
-common launch examples :
-
-|command | description |
-|--------|-------------|
-|ros2 launch rovi_bringup teleop.launch.py | joytick teleoperation of the robot|
-|ros2 launch rovi_bringup mapping.launch.py | teleop + slam_toolbox mapping |
-|ros2 launch rovi_bringup localization.launch.py map_file_name:=/path/to/map.posegraph | teleop + slam_toolbox localization on a saved pose-graph |
-|ros2 launch rovi_bringup nav.launch.py | Nav2 navigation with SLAM (`slam_mode:=mapping` by default) |
-|ros2 launch rovi_bringup nav.launch.py slam_mode:=localization map_file_name:=/path/to/map.posegraph | Nav2 navigation with SLAM localization on a saved pose-graph |
-|ros2 launch rovi_bringup offline_view.launch.py | offline robot model visualization (URDF + joint_state_publisher_gui + RViz) |
-|rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi.rviz"| visualization of the real robot (teleop-friendly; Fixed Frame: `odom`) |
-|rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi_map.rviz"| visualization for SLAM (Fixed Frame: `map`, subscribes to `/map`) |
-|rviz2 -d "$(ros2 pkg prefix rovi_nav)/share/rovi_nav/rviz/nav.rviz"| visualization for Navigation (Nav2 panel + goal tool) |
-
-Note: `install/share/...` paths only work when building with `colcon build --merge-install`.
+| `ws` | switch to ROVI_ROS_WS_DIR and source its ROS setup and venv if available |
+| `build` | Runs `colcon build` in this workspace. This generates/updates the `install/` overlay used by `ros2 launch`. |
+| `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
+| `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
+| `teleop` | Runs `rovi_bringup/teleop.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts joystick teleop + the base stack for the real robot. |
+| `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + odometry filtering + `slam_toolbox` mapping to publish TF `map -> odom` and `/map`. |
+| `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + SLAM localization against a saved pose-graph (pass `map_file_name:=/path/to/map.posegraph`). |
+| `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts SLAM (`slam_mode` mapping/localization) and the Nav2 stack for goal-based navigation. |
+| `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
+| `view_map` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`). |
+| `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + joint_state_publisher_gui for URDF inspection without robot hardware. |
 
 # Install
 
@@ -46,13 +35,6 @@ uv needed by the robot for control board python dependencies
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 * clone this repo under `~/dev/Roblibs/rovi_ros_ws` change it then run `uv sync`
-
-
-* For custom rovi config you can source the provided script in your `~/.bashrc`:
-
-```bash
-source "$HOME/dev/Roblibs/rovi_ros_ws/rovi_env.sh"
-```
 
 * Install all the needed depedencies ros packages
 

@@ -8,6 +8,29 @@
 ROVI_ROS_WS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export ROVI_ROS_WS_DIR
 
+build() {
+  cd "${ROVI_ROS_WS_DIR}" || return
+  colcon build "$@"
+}
+
+setup() {
+  if [ ! -f "${ROVI_ROS_WS_DIR}/install/setup.bash" ]; then
+    echo "[rovi_env] Missing ${ROVI_ROS_WS_DIR}/install/setup.bash (run: build)" >&2
+    return 1
+  fi
+  # shellcheck disable=SC1091
+  source "${ROVI_ROS_WS_DIR}/install/setup.bash"
+}
+
+activate() {
+  if [ ! -f "${ROVI_ROS_WS_DIR}/.venv/bin/activate" ]; then
+    echo "[rovi_env] Missing ${ROVI_ROS_WS_DIR}/.venv/bin/activate (run: uv sync)" >&2
+    return 1
+  fi
+  # shellcheck disable=SC1091
+  source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
+}
+
 # System ROS (Jazzy)
 if [ -f /opt/ros/jazzy/setup.bash ]; then
   # shellcheck disable=SC1091
@@ -39,23 +62,31 @@ ws() {
 }
 
 teleop() {
-  ws && ros2 launch rovi_bringup teleop.launch.py "$@"
+  setup && activate && ros2 launch rovi_bringup teleop.launch.py "$@"
 }
 
 mapping() {
-  ws && ros2 launch rovi_bringup mapping.launch.py "$@"
+  setup && activate && ros2 launch rovi_bringup mapping.launch.py "$@"
 }
 
 localization() {
-  ws && ros2 launch rovi_bringup localization.launch.py "$@"
+  setup && activate && ros2 launch rovi_bringup localization.launch.py "$@"
 }
 
 nav() {
-  ws && ros2 launch rovi_bringup nav.launch.py "$@"
+  setup && activate && ros2 launch rovi_bringup nav.launch.py "$@"
 }
 
-offline_view() {
-  ws && ros2 launch rovi_bringup offline_view.launch.py "$@"
+view_offline() {
+  setup && ros2 launch rovi_bringup offline_view.launch.py "$@"
+}
+
+view_teleop() {
+  setup && rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi.rviz" "$@"
+}
+
+view_map() {
+  setup && rviz2 -d "$(ros2 pkg prefix rovi_description)/share/rovi_description/rviz/rovi_map.rviz" "$@"
 }
 
 talk() {
