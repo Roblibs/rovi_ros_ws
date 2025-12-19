@@ -44,26 +44,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 * Install all the needed depedencies ros packages
 
 ```bash
-# Teleop + mux
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux
-
-# Diagnostics (rovi_base depends on it)
-sudo apt install -y ros-jazzy-diagnostic-updater
-
-# Viz + state publisher for offline visualization
-sudo apt install -y ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2
-
-# Lidar
-sudo apt install -y ros-jazzy-rplidar-ros
-
-# SLAM + localization
-sudo apt install -y ros-jazzy-slam-toolbox ros-jazzy-robot-localization
-
-# Navigation (Nav2)
-sudo apt install -y ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins
-
-# IMU orientation filter (used when odom_mode=fusion_wheels_imu)
-sudo apt install -y ros-jazzy-imu-filter-madgwick
+sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick
 ```
 
 ## wsl
@@ -81,8 +62,8 @@ New-NetFirewallRule -DisplayName "Allow ROS2 DDS UDP from robot" -Direction Inbo
 ```
 
 # Description
-## Packages in this repo
-Only packages created in this repo are listed here
+## Packages
+Packages of this repo are listed in this table
 
 | Package | Role |
 |---|---|
@@ -94,7 +75,23 @@ Only packages created in this repo are listed here
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
 
-## Packages dependencies
+External ROS packages installed via apt and how they are used in this workspace:
+
+| Dependency | Description |
+|---|---|
+| `ros-jazzy-joy` | Used by `rovi_bringup/teleop.launch.py` to start `joy_node` and publish `/joy` from the joystick device. |
+| `ros-jazzy-teleop-twist-joy` | Used by `rovi_bringup/teleop.launch.py` to convert `/joy` into `/cmd_vel_joy`, using `rovi_bringup/config/teleop_twist_joy.yaml`. |
+| `ros-jazzy-twist-mux` | Used by `rovi_bringup/teleop.launch.py` and `rovi_bringup/nav.launch.py` to mux joystick `/cmd_vel_joy` and Nav2 `/cmd_vel_nav` into the final `/cmd_vel` sent to `rosmaster_driver`. |
+| `ros-jazzy-diagnostic-updater` | Used by `rovi_base` to publish runtime diagnostics (for example on `/diagnostics`). |
+| `ros-jazzy-robot-state-publisher` | Used by bringup launches and `offline_view.launch.py` to publish the TF tree from the `rovi_description` URDF and provide `/robot_description` to RViz. |
+| `ros-jazzy-joint-state-publisher-gui` | Used by `rovi_bringup/offline_view.launch.py` to publish interactive `/joint_states` for URDF inspection without hardware. |
+| `ros-jazzy-rviz2` | Used by `view` / `view_teleop` and by `rovi_bringup/offline_view.launch.py` for visualization. |
+| `ros-jazzy-rplidar-ros` | Used by `rovi_bringup/teleop.launch.py` (when `lidar_enabled:=true`) to publish `/scan` for SLAM and Nav2. |
+| `ros-jazzy-slam-toolbox` | Used via `rovi_slam/slam_toolbox.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/map` and TF `map -> odom`. |
+| `ros-jazzy-robot-localization` | Used by `rovi_localization/ekf.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/odometry/filtered` and TF `odom -> base_footprint`. |
+| `ros-jazzy-nav2-bringup` | Provides Nav2 servers started by `rovi_nav/launch/nav.launch.py` for goal-based navigation (planner/controller/BT navigator/behaviors). |
+| `ros-jazzy-nav2-rviz-plugins` | Required by `rovi_map.rviz` so RViz can show the Nav2 panel and tools (initial pose + goal) when `nav` is running. |
+| `ros-jazzy-imu-filter-madgwick` | Used when `odom_mode=fusion_wheels_imu` to filter `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` for the EKF. |
 
 ## Launches
 | Launch | Package | Description |
