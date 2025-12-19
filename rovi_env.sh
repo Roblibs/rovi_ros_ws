@@ -100,6 +100,7 @@ listen() {
 
 install_ros_deps() {
   local -a pkgs=(
+    libsdformat14
     ros-jazzy-joy
     ros-jazzy-teleop-twist-joy
     ros-jazzy-twist-mux
@@ -116,8 +117,10 @@ install_ros_deps() {
   )
 
   if [ "$(id -u)" -eq 0 ]; then
+    apt update
     apt install -y "${pkgs[@]}"
   else
+    sudo apt update
     sudo apt install -y "${pkgs[@]}"
   fi
 }
