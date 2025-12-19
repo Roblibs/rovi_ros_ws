@@ -56,6 +56,7 @@ def generate_launch_description() -> LaunchDescription:
         'planner_server',
         'bt_navigator',
         'behavior_server',
+        'waypoint_follower',
     ]
 
     use_sim_time_param = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
@@ -89,6 +90,18 @@ def generate_launch_description() -> LaunchDescription:
         package='nav2_behaviors',
         executable='behavior_server',
         name='behavior_server',
+        namespace=LaunchConfiguration('namespace'),
+        output='screen',
+        parameters=[
+            LaunchConfiguration('params_file'),
+            {'use_sim_time': use_sim_time_param},
+        ],
+    )
+
+    waypoint_follower = LifecycleNode(
+        package='nav2_waypoint_follower',
+        executable='waypoint_follower',
+        name='waypoint_follower',
         namespace=LaunchConfiguration('namespace'),
         output='screen',
         parameters=[
@@ -135,6 +148,7 @@ def generate_launch_description() -> LaunchDescription:
         planner_server,
         controller_server,
         behavior_server,
+        waypoint_follower,
         bt_navigator,
         lifecycle_manager,
     ])
