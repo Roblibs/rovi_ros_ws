@@ -78,8 +78,12 @@ nav() {
   ros2 launch rovi_bringup nav.launch.py "$@"
 }
 
-view() {
+view_mapping() {
   rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
+}
+
+view_nav() {
+  rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_nav.rviz" "$@"
 }
 
 view_teleop() {
