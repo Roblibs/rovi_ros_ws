@@ -41,11 +41,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 * clone this repo under `~/dev/Roblibs/rovi_ros_ws` change it then run `uv sync`
 
-* Install all the needed depedencies ros packages
-
-```bash
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick
-```
+* Install all the needed depedencies ros packages by running the `sudo install` command from `rovi_env.sh`
 
 ## wsl
 When using Windows Subsystem for Linux, it is necessary to ensure the following :

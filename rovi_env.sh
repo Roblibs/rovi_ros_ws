@@ -97,3 +97,27 @@ talk() {
 listen() {
   ros2 run demo_nodes_py listener "$@"
 }
+
+install_ros_deps() {
+  local -a pkgs=(
+    ros-jazzy-joy
+    ros-jazzy-teleop-twist-joy
+    ros-jazzy-twist-mux
+    ros-jazzy-diagnostic-updater
+    ros-jazzy-robot-state-publisher
+    ros-jazzy-joint-state-publisher-gui
+    ros-jazzy-rviz2
+    ros-jazzy-rplidar-ros
+    ros-jazzy-slam-toolbox
+    ros-jazzy-robot-localization
+    ros-jazzy-nav2-bringup
+    ros-jazzy-nav2-rviz-plugins
+    ros-jazzy-imu-filter-madgwick
+  )
+
+  if [ "$(id -u)" -eq 0 ]; then
+    apt install -y "${pkgs[@]}"
+  else
+    sudo apt install -y "${pkgs[@]}"
+  fi
+}
