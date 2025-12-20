@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import signal
 import shlex
 import shutil
 import subprocess
@@ -218,11 +219,34 @@ def _cmd_record(argv: list[str]) -> int:
 
     print(f"[rovi_bag] Recording '{selector.key}' → {out_uri}", file=sys.stderr)
     print(f"[rovi_bag] {_format_cmd(cmd)}", file=sys.stderr)
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        return int(e.returncode) if e.returncode is not None else 1
-    return 0
+
+    proc = subprocess.Popen(cmd)
+    interrupts = 0
+    while True:
+        try:
+            returncode = proc.wait()
+            break
+        except KeyboardInterrupt:
+            interrupts += 1
+            if proc.poll() is not None:
+                continue
+
+            if interrupts == 1:
+                print("[rovi_bag] Ctrl+C received, stopping recording (SIGINT) and waiting…", file=sys.stderr)
+                try:
+                    proc.send_signal(signal.SIGINT)
+                except ProcessLookupError:
+                    pass
+            else:
+                print("[rovi_bag] Ctrl+C received again, stopping recording (SIGTERM) and waiting…", file=sys.stderr)
+                try:
+                    proc.terminate()
+                except ProcessLookupError:
+                    pass
+
+    if returncode < 0:
+        return 128 + (-returncode)
+    return int(returncode)
 
 
 def _find_latest_bag(bags_root: Path, key: str | None) -> Path | None:
