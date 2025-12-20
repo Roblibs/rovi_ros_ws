@@ -25,9 +25,31 @@ Commands provided by `rovi_env.sh`
 | `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + odometry filtering + `slam_toolbox` mapping to publish TF `map -> odom` and `/map`. |
 | `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + SLAM localization against a saved pose-graph (pass `map_file_name:=/path/to/map.posegraph`). |
 | `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts SLAM (`slam_mode` mapping/localization) and the Nav2 stack for goal-based navigation. |
-| `view` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`), and it also includes the Nav2 panel + goal tool (no-op unless `nav` is running). |
+| `view_mapping` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` for mapping. Fixed Frame is `map`, so this requires `mapping` or `nav` (TF `map -> odom`). |
+| `view_nav` | Starts `rviz2` with `rovi_description/rviz/rovi_nav.rviz` for Nav2 navigation. Fixed Frame is `map`, so this requires `nav` (TF `map -> odom`). |
 | `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
 | `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + joint_state_publisher_gui for URDF inspection without robot hardware. |
+| `record` | Records a rosbag with a per-launch topic filter (zstd compression) under `~/.ros/rovi/bags`. |
+| `play` | Plays the latest recorded rosbag from `~/.ros/rovi/bags` (or a selected tag/path). |
+
+## Rosbags (`record` / `play`)
+
+`record` and `play` are lightweight helpers around `ros2 bag`.
+
+- Default bag directory: `~/.ros/rovi/bags/`
+- Current launch is tracked in: `~/.ros/rovi/session/current_launch` (written automatically when running `teleop`, `mapping`, `localization`, `nav`)
+- Topic filters are configured in: `src/rovi_bringup/config/bag_topics.yaml`
+
+`bag_topics.yaml` format: top-level keys are launch *base names* (`teleop`, `nav`, ...), values are the topic list to record.
+
+Examples:
+
+```bash
+record
+record nav
+play
+play nav
+```
 
 # Install
 

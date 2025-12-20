@@ -1,0 +1,58 @@
+teleop:
+  - /joy
+  - /cmd_vel_joy
+  - /cmd_vel
+  - /vel_raw
+  - /odom_raw
+  - /joint_states
+  - /encoders
+  - /edition
+  - /voltage
+  - /imu/data_raw
+  - /imu/mag
+  - /scan
+  - /tf
+  - /tf_static
+
+mapping:
+  - /joy
+  - /cmd_vel_joy
+  - /cmd_vel
+  - /vel_raw
+  - /odom_raw
+  - /odometry/filtered
+  - /imu/data_raw
+  - /imu/mag
+  - /imu/data
+  - /scan
+  - /map
+  - /tf
+  - /tf_static
+
+localization:
+  - /joy
+  - /cmd_vel_joy
+  - /cmd_vel
+  - /vel_raw
+  - /odom_raw
+  - /odometry/filtered
+  - /imu/data_raw
+  - /imu/mag
+  - /imu/data
+  - /scan
+  - /map
+  - /tf
+  - /tf_static
+  - /initialpose
+
+nav:
+  - /joy
+  - /cmd_vel_joy
+  - /cmd_vel_nav
+  - /cmd_vel
+  - /odometry/filtered
+  - /scan
+  - /map
+  - /tf
+  - /tf_static
+  - /initialpose

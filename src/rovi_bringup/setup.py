@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from glob import glob
 import os
 
@@ -7,7 +7,7 @@ package_name = 'rovi_bringup'
 setup(
     name=package_name,
     version='0.1.0',
-    packages=[package_name],
+    packages=find_packages(exclude=('test',)),
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
@@ -21,5 +21,10 @@ setup(
     description='Bringup launch files for Room View Bot teleoperation.',
     license='Apache-2.0',
     tests_require=['pytest'],
-    entry_points={},
+    entry_points={
+        'console_scripts': [
+            'rovi_session = rovi_bringup.cli.session:main',
+            'rovi_bag = rovi_bringup.cli.bag:main',
+        ],
+    },
 )

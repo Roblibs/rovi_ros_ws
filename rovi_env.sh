@@ -62,19 +62,31 @@ ws() {
   fi
 }
 
+record() {
+  ros2 run rovi_bringup rovi_bag record "$@"
+}
+
+play() {
+  ros2 run rovi_bringup rovi_bag play "$@"
+}
+
 teleop() {
+  ros2 run rovi_bringup rovi_session set "rovi_bringup/teleop.launch.py" || return
   ros2 launch rovi_bringup teleop.launch.py "$@"
 }
 
 mapping() {
+  ros2 run rovi_bringup rovi_session set "rovi_bringup/mapping.launch.py" || return
   ros2 launch rovi_bringup mapping.launch.py "$@"
 }
 
 localization() {
+  ros2 run rovi_bringup rovi_session set "rovi_bringup/localization.launch.py" || return
   ros2 launch rovi_bringup localization.launch.py "$@"
 }
 
 nav() {
+  ros2 run rovi_bringup rovi_session set "rovi_bringup/nav.launch.py" || return
   ros2 launch rovi_bringup nav.launch.py "$@"
 }
 
@@ -108,6 +120,8 @@ install_ros_deps() {
     ros-jazzy-joy
     ros-jazzy-teleop-twist-joy
     ros-jazzy-twist-mux
+    ros-jazzy-rosbag2
+    ros-jazzy-rosbag2-compression-zstd
     ros-jazzy-diagnostic-updater
     ros-jazzy-robot-state-publisher
     ros-jazzy-joint-state-publisher-gui
