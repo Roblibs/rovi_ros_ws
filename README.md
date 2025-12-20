@@ -32,25 +32,6 @@ Commands provided by `rovi_env.sh`
 | `record` | Records a rosbag with a per-launch topic filter (zstd compression) under `~/.ros/rovi/bags`. |
 | `play` | Plays the latest recorded rosbag from `~/.ros/rovi/bags` (or a selected tag/path). |
 
-## Rosbags (`record` / `play`)
-
-`record` and `play` are lightweight helpers around `ros2 bag`.
-
-- Default bag directory: `~/.ros/rovi/bags/`
-- Current launch is tracked in: `~/.ros/rovi/session/current_launch` (written automatically when running `teleop`, `mapping`, `localization`, `nav`)
-- Topic filters are configured in: `src/rovi_bringup/config/bag_topics.yaml`
-
-`bag_topics.yaml` format: top-level keys are launch *base names* (`teleop`, `nav`, ...), values are the topic list to record.
-
-Examples:
-
-```bash
-record
-record nav
-play
-play nav
-```
-
 # Install
 
 * Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
@@ -502,6 +483,25 @@ flowchart LR
 ```
 
 # Nodes details
+## Rosbags record play
+
+`record` and `play` are lightweight helpers around `ros2 bag`.
+
+- Default bag directory: `~/.ros/rovi/bags/`
+- Current launch is tracked in: `~/.ros/rovi/session/current_launch` (written automatically when running `teleop`, `mapping`, `localization`, `nav`)
+- Topic filters are configured in: `src/rovi_bringup/config/bag_topics.yaml`
+
+`bag_topics.yaml` format: top-level keys are launch *base names* (`teleop`, `nav`, ...), values are the topic list to record.
+
+Examples:
+
+```bash
+record
+record nav
+play
+play nav
+```
+
 ## rosmaster driver
 ![packafe_flow](./docs/rosmaster.drawio.svg)
 
