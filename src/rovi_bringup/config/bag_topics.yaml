@@ -47,13 +47,81 @@ localization:
   - /initialpose
 
 nav:
-  - /joy
+  - /behavior_server/transition_event
+  - /behavior_tree_log
+  - /bond
+  - /bt_navigator/transition_event
+  - /cmd_vel
   - /cmd_vel_joy
   - /cmd_vel_nav
-  - /cmd_vel
-  - /odometry/filtered
-  - /scan
+  - /controller_selector
+  - /controller_server/transition_event
+  - /cost_cloud
+  - /diagnostics
+  - /edition
+  - /encoders
+  - /evaluation
+  - /global_costmap/costmap
+  - /global_costmap/costmap_raw
+  - /global_costmap/costmap_raw_updates
+  - /global_costmap/costmap_updates
+  - /global_costmap/footprint
+  - /global_costmap/global_costmap/transition_event
+  - /global_costmap/obstacle_layer
+  - /global_costmap/obstacle_layer_raw
+  - /global_costmap/obstacle_layer_raw_updates
+  - /global_costmap/obstacle_layer_updates
+  - /global_costmap/published_footprint
+  - /global_costmap/static_layer
+  - /global_costmap/static_layer_raw
+  - /global_costmap/static_layer_raw_updates
+  - /global_costmap/static_layer_updates
+  - /goal_pose
+  - /imu/data
+  - /imu/data_raw
+  - /imu/mag
+  - /initialpose
+  - /joint_states
+  - /joy
+  - /joy/set_feedback
+  - /local_costmap/costmap
+  - /local_costmap/costmap_raw
+  - /local_costmap/costmap_raw_updates
+  - /local_costmap/costmap_updates
+  - /local_costmap/footprint
+  - /local_costmap/local_costmap/transition_event
+  - /local_costmap/obstacle_layer
+  - /local_costmap/obstacle_layer_raw
+  - /local_costmap/obstacle_layer_raw_updates
+  - /local_costmap/obstacle_layer_updates
+  - /local_costmap/published_footprint
+  - /local_plan
   - /map
+  - /map_metadata
+  - /map_updates
+  - /marker
+  - /odom_raw
+  - /odometry/filtered
+  - /parameter_events
+  - /plan
+  - /planner_selector
+  - /planner_server/transition_event
+  - /pose
+  - /received_global_plan
+  - /robot_description
+  - /rosout
+  - /scan
+  - /set_pose
+  - /slam_toolbox/feedback
+  - /slam_toolbox/graph_visualization
+  - /slam_toolbox/scan_visualization
+  - /slam_toolbox/transition_event
+  - /slam_toolbox/update
+  - /speed_limit
   - /tf
   - /tf_static
-  - /initialpose
+  - /transformed_global_plan
+  - /vel_raw
+  - /voltage
+  - /waypoint_follower/transition_event
+  - /waypoints
