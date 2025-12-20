@@ -1,18 +1,19 @@
 teleop:
-  - /joy
-  - /cmd_vel_joy
   - /cmd_vel
-  - /vel_raw
-  - /odom_raw
-  - /joint_states
-  - /encoders
+  - /cmd_vel_joy
   - /edition
-  - /voltage
+  - /encoders
   - /imu/data_raw
   - /imu/mag
+  - /joint_states
+  - /joy
+  - /odom_raw
+  - /robot_description
   - /scan
   - /tf
   - /tf_static
+  - /vel_raw
+  - /voltage
 
 mapping:
   - /joy
