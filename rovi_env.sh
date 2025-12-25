@@ -26,6 +26,7 @@ rovi_dds_default() {
 
 # Default DDS mode for this workspace:
 rovi_dds_default
+ros2 daemon start >/dev/null 2>&1 || true
 
 clean() {
   rm -rf build/ install/ log/
