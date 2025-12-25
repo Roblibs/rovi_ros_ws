@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""Robot backend selector for rovi.
+
+This launch provides the "robot interface contract" expected by higher-level stacks (SLAM / Nav2):
+- /cmd_vel (Twist) input
+- /scan (LaserScan)
+- /vel_raw (Twist) feedback
+- /odom_raw (Odometry) + TF odom -> base_footprint (depending on odom_mode / publish_tf)
+- /imu/data_raw (Imu) when available
+- /clock when robot_mode=sim (use_sim_time:=true)
+
+robot_mode:
+  - real: hardware drivers (rosmaster_driver + rplidar_ros) + rovi_base + robot_state_publisher
+  - sim:  Gazebo Sim backend (rovi_sim) + rovi_sim_base + rovi_base + robot_state_publisher
+  - offline: model inspection only (robot_state_publisher + joint_state_publisher_gui)
+"""
+
+import os
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler, TimerAction
+from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessStart
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import Command, LaunchConfiguration, PythonExpression
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+
+
+def generate_launch_description() -> LaunchDescription:
+    bringup_share = get_package_share_directory('rovi_bringup')
+    desc_share = get_package_share_directory('rovi_description')
+    sim_share = get_package_share_directory('rovi_sim')
+
+    default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
+    default_rovi_base_params = os.path.join(bringup_share, 'config', 'rovi_base.yaml')
+    default_rosmaster_params = os.path.join(bringup_share, 'config', 'rosmaster_driver.yaml')
+
+    default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
+    sim_backend_launch = os.path.join(sim_share, 'launch', 'gazebo_sim.launch.py')
+
+    robot_mode_arg = DeclareLaunchArgument(
+        'robot_mode',
+        default_value='real',
+        description="Robot backend: 'real', 'sim', or 'offline'.",
+    )
+
+    model_arg = DeclareLaunchArgument(
+        'model',
+        default_value=default_model,
+        description='Absolute path to the robot URDF.',
+    )
+
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value=PythonExpression([
+            "'true' if '",
+            LaunchConfiguration('robot_mode'),
+            "' == 'sim' else 'false'",
+        ]),
+        description='Use /clock time (auto true for robot_mode=sim).',
+    )
+
+    cmd_vel_arg = DeclareLaunchArgument(
+        'cmd_vel_topic',
+        default_value='cmd_vel',
+        description='Final Twist topic sent to the base (e.g. twist_mux output).',
+    )
+
+    # Base / odom integrator
+    rovi_base_params_arg = DeclareLaunchArgument(
+        'rovi_base_params_file',
+        default_value=default_rovi_base_params,
+        description='YAML file with parameters for rovi_base',
+    )
+    rovi_base_tf_arg = DeclareLaunchArgument(
+        'rovi_base_publish_tf',
+        default_value='true',
+        description='Enable TF broadcast from rovi_base (raw odom).',
+    )
+    rovi_base_frame_arg = DeclareLaunchArgument(
+        'rovi_base_frame',
+        default_value='base_footprint',
+        description='Child frame id for rovi_base',
+    )
+    rovi_base_odom_arg = DeclareLaunchArgument(
+        'rovi_base_odom_frame',
+        default_value='odom',
+        description='Odom frame id for rovi_base',
+    )
+
+    # Hardware driver (real)
+    rosmaster_params_arg = DeclareLaunchArgument(
+        'rosmaster_params_file',
+        default_value=default_rosmaster_params,
+        description='YAML file with parameters for rosmaster_driver',
+    )
+    rosmaster_port_arg = DeclareLaunchArgument(
+        'rosmaster_port',
+        default_value='/dev/my_ros_board',
+        description='Serial device exposed by the Rosmaster base board',
+    )
+    rosmaster_debug_arg = DeclareLaunchArgument(
+        'rosmaster_debug',
+        default_value='false',
+        description='Enable verbose hardware driver logging',
+    )
+
+    # LiDAR driver (real)
+    lidar_enable_arg = DeclareLaunchArgument(
+        'lidar_enabled',
+        default_value='true',
+        description='Start rplidar_ros (real robot only).',
+    )
+    lidar_port_arg = DeclareLaunchArgument(
+        'lidar_serial_port',
+        default_value='/dev/ttyUSB0',
+        description='Serial device for RPLIDAR (e.g., /dev/ttyUSB0)',
+    )
+    lidar_frame_arg = DeclareLaunchArgument(
+        'lidar_frame',
+        default_value='laser_link',
+        description='Frame id published on the LaserScan (match URDF link name)',
+    )
+    lidar_baud_arg = DeclareLaunchArgument(
+        'lidar_serial_baudrate',
+        default_value='115200',
+        description='Baudrate for the RPLIDAR serial connection',
+    )
+    lidar_angle_comp_arg = DeclareLaunchArgument(
+        'lidar_angle_compensate',
+        default_value='true',
+        description='Enable angle compensation in rplidar_ros',
+    )
+
+    # Simulation backend (sim)
+    world_arg = DeclareLaunchArgument(
+        'world',
+        default_value=default_world,
+        description='Full path to the Gazebo world SDF file (robot_mode=sim).',
+    )
+    gazebo_gui_arg = DeclareLaunchArgument(
+        'gazebo_gui',
+        default_value='true',
+        description='Start Gazebo GUI client (server always starts) (robot_mode=sim).',
+    )
+
+    is_real = IfCondition(PythonExpression(["'", LaunchConfiguration('robot_mode'), "' == 'real'"]))
+    is_sim = IfCondition(PythonExpression(["'", LaunchConfiguration('robot_mode'), "' == 'sim'"]))
+    is_offline = IfCondition(PythonExpression(["'", LaunchConfiguration('robot_mode'), "' == 'offline'"]))
+    is_not_offline = IfCondition(PythonExpression(["'", LaunchConfiguration('robot_mode'), "' != 'offline'"]))
+
+    use_sim_time_param = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
+
+    robot_description = ParameterValue(
+        Command(['cat ', LaunchConfiguration('model')]),
+        value_type=str,
+    )
+
+    # Always publish the robot TF tree from the shared URDF.
+    rsp_node = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='screen',
+        parameters=[
+            {'robot_description': robot_description},
+            {'use_sim_time': use_sim_time_param},
+        ],
+    )
+
+    # Provide joint_states in modes where hardware isn't publishing them.
+    joint_state_pub_sim = Node(
+        condition=is_sim,
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        output='screen',
+        arguments=[LaunchConfiguration('model')],
+        parameters=[{'use_sim_time': use_sim_time_param}],
+    )
+
+    jsp_gui_node = Node(
+        condition=is_offline,
+        package='joint_state_publisher_gui',
+        executable='joint_state_publisher_gui',
+        parameters=[{'use_sim_time': use_sim_time_param}],
+    )
+
+    # Delay jsp_gui to ensure robot_description topic is available.
+    delayed_jsp_gui = RegisterEventHandler(
+        OnProcessStart(
+            target_action=rsp_node,
+            on_start=[TimerAction(period=0.5, actions=[jsp_gui_node])],
+        )
+    )
+
+    static_odom_tf = Node(
+        condition=is_offline,
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='odom_to_basefootprint',
+        arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_footprint'],
+    )
+
+    rovi_base_node = Node(
+        condition=is_not_offline,
+        package='rovi_base',
+        executable='rovi_base_node',
+        name='rovi_base',
+        output='screen',
+        parameters=[
+            LaunchConfiguration('rovi_base_params_file'),
+            {
+                'publish_tf': ParameterValue(LaunchConfiguration('rovi_base_publish_tf'), value_type=bool),
+                'odom_frame': LaunchConfiguration('rovi_base_odom_frame'),
+                'base_frame': LaunchConfiguration('rovi_base_frame'),
+                'use_sim_time': use_sim_time_param,
+            },
+        ],
+    )
+
+    rosmaster_driver_node = Node(
+        condition=is_real,
+        package='rosmaster_driver',
+        executable='rosmaster_driver_node',
+        name='rosmaster_driver',
+        output='screen',
+        parameters=[
+            LaunchConfiguration('rosmaster_params_file'),
+            {'port': LaunchConfiguration('rosmaster_port')},
+            {'debug': ParameterValue(LaunchConfiguration('rosmaster_debug'), value_type=bool)},
+            {'use_sim_time': use_sim_time_param},
+        ],
+        remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_topic'))],
+    )
+
+    lidar_node = Node(
+        condition=IfCondition(PythonExpression([
+            "'",
+            LaunchConfiguration('robot_mode'),
+            "' == 'real' and '",
+            LaunchConfiguration('lidar_enabled'),
+            "' == 'true'",
+        ])),
+        package='rplidar_ros',
+        executable='rplidar_composition',
+        name='rplidar_composition',
+        output='screen',
+        parameters=[{
+            'serial_port': LaunchConfiguration('lidar_serial_port'),
+            'serial_baudrate': ParameterValue(LaunchConfiguration('lidar_serial_baudrate'), value_type=int),
+            'frame_id': LaunchConfiguration('lidar_frame'),
+            'inverted': False,
+            'angle_compensate': ParameterValue(LaunchConfiguration('lidar_angle_compensate'), value_type=bool),
+            'use_sim_time': use_sim_time_param,
+        }],
+    )
+
+    sim_backend = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(sim_backend_launch),
+        condition=is_sim,
+        launch_arguments={
+            'world': LaunchConfiguration('world'),
+            'gazebo_gui': LaunchConfiguration('gazebo_gui'),
+            'model': LaunchConfiguration('model'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        }.items(),
+    )
+
+    sim_base = Node(
+        condition=is_sim,
+        package='rovi_sim',
+        executable='rovi_sim_base',
+        name='rovi_sim_base',
+        output='screen',
+        parameters=[
+            {
+                'cmd_vel_in': LaunchConfiguration('cmd_vel_topic'),
+                'cmd_vel_out': 'cmd_vel_sim',
+                'vel_raw_out': 'vel_raw',
+            }
+        ],
+    )
+
+    return LaunchDescription([
+        robot_mode_arg,
+        model_arg,
+        use_sim_time_arg,
+        cmd_vel_arg,
+        rovi_base_params_arg,
+        rovi_base_tf_arg,
+        rovi_base_frame_arg,
+        rovi_base_odom_arg,
+        rosmaster_params_arg,
+        rosmaster_port_arg,
+        rosmaster_debug_arg,
+        lidar_enable_arg,
+        lidar_port_arg,
+        lidar_frame_arg,
+        lidar_baud_arg,
+        lidar_angle_comp_arg,
+        world_arg,
+        gazebo_gui_arg,
+        rsp_node,
+        joint_state_pub_sim,
+        static_odom_tf,
+        delayed_jsp_gui,
+        rovi_base_node,
+        rosmaster_driver_node,
+        lidar_node,
+        sim_backend,
+        sim_base,
+    ])

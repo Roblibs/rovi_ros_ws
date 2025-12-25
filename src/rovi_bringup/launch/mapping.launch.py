@@ -13,6 +13,8 @@ from launch.substitutions import LaunchConfiguration, PythonExpression, TextSubs
 def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
     teleop_launch = os.path.join(bringup_share, 'launch', 'teleop.launch.py')
+    sim_share = get_package_share_directory('rovi_sim')
+    default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
 
     loc_share = get_package_share_directory('rovi_localization')
     ekf_launch = os.path.join(loc_share, 'launch', 'ekf.launch.py')
@@ -20,6 +22,11 @@ def generate_launch_description() -> LaunchDescription:
     slam_share = get_package_share_directory('rovi_slam')
     slam_launch = os.path.join(slam_share, 'launch', 'slam_toolbox.launch.py')
 
+    robot_mode = DeclareLaunchArgument(
+        'robot_mode',
+        default_value='real',
+        description="Robot backend: 'real', 'sim', or 'offline'.",
+    )
     slam_enabled = DeclareLaunchArgument(
         'slam_enabled',
         default_value='true',
@@ -37,13 +44,31 @@ def generate_launch_description() -> LaunchDescription:
     )
     use_sim_time = DeclareLaunchArgument(
         'use_sim_time',
-        default_value='false',
+        default_value=PythonExpression([
+            "'true' if '",
+            LaunchConfiguration('robot_mode'),
+            "' == 'sim' else 'false'",
+        ]),
         description='Use /clock time.',
+    )
+    world = DeclareLaunchArgument(
+        'world',
+        default_value=default_world,
+        description='Full path to the Gazebo world SDF file (robot_mode=sim).',
+    )
+    gazebo_gui = DeclareLaunchArgument(
+        'gazebo_gui',
+        default_value='true',
+        description='Start Gazebo GUI client (server always starts) (robot_mode=sim).',
     )
 
     teleop = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(teleop_launch),
         launch_arguments={
+            'robot_mode': LaunchConfiguration('robot_mode'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'world': LaunchConfiguration('world'),
+            'gazebo_gui': LaunchConfiguration('gazebo_gui'),
             'rovi_base_publish_tf': PythonExpression([
                 "'true' if '", LaunchConfiguration('odom_mode'), "' == 'raw' else 'false'",
             ]),
@@ -69,10 +94,13 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
+        robot_mode,
         slam_enabled,
         odom_mode,
         mag_enabled,
         use_sim_time,
+        world,
+        gazebo_gui,
         teleop,
         localization,
         slam,

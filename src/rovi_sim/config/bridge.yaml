@@ -16,6 +16,12 @@
   gz_type_name: "gz.msgs.LaserScan"
   direction: GZ_TO_ROS
 
+- ros_topic_name: "imu/data_raw"
+  gz_topic_name: "/rovi/imu"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  gz_type_name: "gz.msgs.IMU"
+  direction: GZ_TO_ROS
+
 - ros_topic_name: "cmd_vel_sim"
   gz_topic_name: "/model/rovi/cmd_vel"
   ros_type_name: "geometry_msgs/msg/Twist"

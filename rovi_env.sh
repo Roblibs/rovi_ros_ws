@@ -88,6 +88,10 @@ teleop() {
   ros2 launch rovi_bringup teleop.launch.py "$@"
 }
 
+keyboard() {
+  ros2 launch rovi_bringup keyboard_teleop.launch.py "$@"
+}
+
 mapping() {
   ros2 run rovi_bringup rovi_session set "rovi_bringup/mapping.launch.py" || return
   ros2 launch rovi_bringup mapping.launch.py "$@"
@@ -104,7 +108,26 @@ nav() {
 }
 
 sim() {
-  ROS_LOCALHOST_ONLY=1 ros2 launch rovi_sim gazebo_sim.launch.py "$@"
+  local mode="${1:-mapping}"
+  if [ $# -gt 0 ]; then
+    shift
+  fi
+
+  case "${mode}" in
+    keyboard)
+      ROS_LOCALHOST_ONLY=1 ros2 launch rovi_bringup keyboard_teleop.launch.py "$@"
+      ;;
+    teleop|mapping|localization|nav)
+      ROS_LOCALHOST_ONLY=1 ros2 launch rovi_bringup "${mode}.launch.py" robot_mode:=sim "$@"
+      ;;
+    gazebo|backend)
+      ROS_LOCALHOST_ONLY=1 ros2 launch rovi_sim gazebo_sim.launch.py "$@"
+      ;;
+    *)
+      echo "[rovi_env] Usage: sim {teleop|mapping|localization|nav|keyboard|gazebo} [ros2 launch args...]" >&2
+      return 2
+      ;;
+  esac
 }
 
 view() {

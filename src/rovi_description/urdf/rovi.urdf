@@ -223,4 +223,15 @@
       </ray>
     </sensor>
   </gazebo>
+
+  <!-- Simulated IMU publishing on Gazebo Transport topic /rovi/imu -->
+  <gazebo reference="imu_link">
+    <sensor name="rovi_imu" type="imu">
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <update_rate>100</update_rate>
+      <topic>/rovi/imu</topic>
+      <gz_frame_id>imu_link</gz_frame_id>
+    </sensor>
+  </gazebo>
 </robot>

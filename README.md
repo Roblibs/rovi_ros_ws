@@ -22,16 +22,17 @@ Commands provided by `rovi_env.sh`
 | `stop` | Hard-stops ROS/Gazebo/RViz processes for the current user (use when a launch left nodes running). |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
-| `teleop` | Runs `rovi_bringup/teleop.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts joystick teleop + the base stack for the real robot. |
-| `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + odometry filtering + `slam_toolbox` mapping to publish TF `map -> odom` and `/map`. |
-| `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + SLAM localization against a saved pose-graph (pass `map_file_name:=/path/to/map.posegraph`). |
-| `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts SLAM (`slam_mode` mapping/localization) and the Nav2 stack for goal-based navigation. |
-| `sim` | Runs `rovi_sim/gazebo_sim.launch.py` (simulation). Run `ws` first; optional args: `rviz:=false`, `gazebo_gui:=false`, `slam_mode:=localization`. (Planned: use `robot_mode:=sim` on the normal bringup launches and keep `sim` as an alias.) |
+| `teleop` | Runs `rovi_bringup/teleop.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to use Gazebo. |
+| `keyboard` | Runs `rovi_bringup/keyboard_teleop.launch.py` (package `rovi_bringup`). Publishes `/cmd_vel_keyboard` for `twist_mux` (run in its own terminal). |
+| `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to run SLAM mapping in Gazebo. |
+| `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to localize in Gazebo (pass `map_file_name:=/path/to/map.posegraph`). |
+| `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to run Nav2 in Gazebo. |
+| `sim` | Shortcut wrapper: `sim teleop|mapping|localization|nav|keyboard` runs the matching launch for simulation. `sim gazebo` starts only the Gazebo backend (`rovi_sim/gazebo_sim.launch.py`). |
 | `view` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`), and it also includes the Nav2 panel + goal tool (no-op unless `nav` is running). |
 | `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
-| `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + joint_state_publisher_gui for URDF inspection without robot hardware. (Planned: this becomes `robot_mode:=offline`.) |
+| `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + `robot_mode=offline` (URDF inspection without robot hardware). |
 
-## Robot modes: `real` / `sim` / `offline` (design)
+## Robot modes: `real` / `sim` / `offline`
 Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`, RViz) unchanged while selecting *how the robot is provided* via a single `robot_mode` argument.
 
 ### Robot interface contract (what the rest of the stack assumes)
@@ -50,11 +51,11 @@ Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`,
 ### Control inputs (target end-state)
 All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` topic:
 - joystick: `/cmd_vel_joy`
-- keyboard: `/cmd_vel_keyboard` (planned, via `teleop_twist_keyboard`)
+- keyboard: `/cmd_vel_keyboard` (via `teleop_twist_keyboard`)
 - navigation: `/cmd_vel_nav`
 
 ### Status
-Today `sim` is a dedicated launch (`rovi_sim/gazebo_sim.launch.py`) and `view_offline` is a dedicated launch (`rovi_bringup/offline_view.launch.py`). The plan is to make the existing bringup launches accept `robot_mode:=real|sim|offline` so you can run `teleop`, `mapping`, `localization`, `nav` the same way on real or simulated robot.
+`rovi_bringup` launches (`teleop`, `mapping`, `localization`, `nav`) accept `robot_mode:=real|sim` and default `use_sim_time` based on the mode. `view_offline` runs `robot_mode=offline`. The `sim` shell command is just a shortcut.
 
 # Install
 
@@ -133,8 +134,8 @@ External ROS packages installed via apt and how they are used in this workspace:
 | `joy.launch.py` | `rovi_bringup` | Debug joystick → `/cmd_vel` only (no hardware required) |
 | `localization.launch.py` | `rovi_bringup` | Bringup + SLAM localization on an existing map (`slam_toolbox` localization mode) |
 | `nav.launch.py` | `rovi_bringup` | Bringup + SLAM (`slam_mode` mapping/localization) + Nav2 navigation stack |
-| `robot_bringup.launch.py` | `rovi_bringup` | (Planned) Common robot entrypoint with `robot_mode:=real|sim|offline` so higher-level launches don’t need separate sim variants |
-| `gazebo_sim.launch.py` | `rovi_sim` | Simulation bringup: Gazebo Sim world + spawn robot + bridges (+ full stack today). Planned to become the `robot_mode=sim` backend. |
+| `robot_bringup.launch.py` | `rovi_bringup` | Common robot entrypoint with `robot_mode:=real|sim|offline` (higher-level launches include this instead of having separate sim variants) |
+| `gazebo_sim.launch.py` | `rovi_sim` | Gazebo Sim backend: starts Gazebo + bridges + spawns the robot model (used when `robot_mode=sim`) |
 | `rosmaster_driver.launch.py` | `rosmaster_driver` | Hardware driver only (serial/IMU/joints sanity checks) |
 | `ekf.launch.py` | `rovi_localization` | Component launch: odometry pipeline (`odom_mode` selects raw/filtered/fusion_wheels_imu; useful without SLAM) |
 | `slam_toolbox.launch.py` | `rovi_slam` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
@@ -172,7 +173,7 @@ Only the parameters toggeling nodes activation are listed here
 
 | Param | Package | Launch | Default | Explanation |
 |---|---|---|---|---|
-| `robot_mode` | `rovi_bringup` | `teleop.launch.py`, `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `offline_view.launch.py` | `real` | (Planned) Selects the robot backend: `real`, `sim`, or `offline`. |
+| `robot_mode` | `rovi_bringup` | `teleop.launch.py`, `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `offline_view.launch.py` | `real` | Selects the robot backend: `real`, `sim`, or `offline`. |
 | `lidar_enabled` | `rovi_bringup` | `teleop.launch.py` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
 | `slam_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
 | `slam_enabled` | `rovi_slam` | `slam_toolbox.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |

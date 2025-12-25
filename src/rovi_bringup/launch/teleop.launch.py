@@ -6,10 +6,9 @@ import sys
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable, LogInfo, IncludeLaunchDescription
-from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, EnvironmentVariable, TextSubstitution, Command
+from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PythonExpression, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -23,6 +22,33 @@ def generate_launch_description() -> LaunchDescription:
     default_rosmaster_params = os.path.join(pkg_share, 'config', 'rosmaster_driver.yaml')
     desc_share = get_package_share_directory('rovi_description')
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
+    sim_share = get_package_share_directory('rovi_sim')
+    default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
+
+    robot_mode_arg = DeclareLaunchArgument(
+        'robot_mode',
+        default_value='real',
+        description="Robot backend: 'real', 'sim', or 'offline'.",
+    )
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value=PythonExpression([
+            "'true' if '",
+            LaunchConfiguration('robot_mode'),
+            "' == 'sim' else 'false'",
+        ]),
+        description='Use /clock time (auto true for robot_mode=sim).',
+    )
+    world_arg = DeclareLaunchArgument(
+        'world',
+        default_value=default_world,
+        description='Full path to the Gazebo world SDF file (robot_mode=sim).',
+    )
+    gazebo_gui_arg = DeclareLaunchArgument(
+        'gazebo_gui',
+        default_value='true',
+        description='Start Gazebo GUI client (server always starts) (robot_mode=sim).',
+    )
 
     joy_params_arg = DeclareLaunchArgument(
         'joy_params_file',
@@ -120,6 +146,8 @@ def generate_launch_description() -> LaunchDescription:
         description='Absolute path to the robot URDF.',
     )
 
+    use_sim_time_param = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
+
     actions = []
 
     # If user activated a virtual env (uv, venv, etc.), prepend its site-packages so
@@ -150,6 +178,7 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[
             LaunchConfiguration('joy_params_file'),
             {'device_id': ParameterValue(LaunchConfiguration('joy_dev'), value_type=int)},
+            {'use_sim_time': use_sim_time_param},
         ],
     )
 
@@ -157,7 +186,7 @@ def generate_launch_description() -> LaunchDescription:
         package='teleop_twist_joy',
         executable='teleop_node',
         name='teleop_twist_joy',
-        parameters=[LaunchConfiguration('teleop_params_file')],
+        parameters=[LaunchConfiguration('teleop_params_file'), {'use_sim_time': use_sim_time_param}],
         remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_joy_topic'))],
     )
 
@@ -166,45 +195,40 @@ def generate_launch_description() -> LaunchDescription:
         executable='twist_mux',
         name='twist_mux',
         output='screen',
-        parameters=[LaunchConfiguration('twist_mux_params_file')],
+        parameters=[LaunchConfiguration('twist_mux_params_file'), {'use_sim_time': use_sim_time_param}],
         remappings=[('cmd_vel_out', LaunchConfiguration('cmd_vel_topic'))],
     )
 
-    rosmaster_driver_node = Node(
-        package='rosmaster_driver',
-        executable='rosmaster_driver_node',
-        name='rosmaster_driver',
-        parameters=[
-            LaunchConfiguration('rosmaster_params_file'),
-            {'port': LaunchConfiguration('rosmaster_port')},
-            {'debug': ParameterValue(LaunchConfiguration('rosmaster_debug'), value_type=bool)},
-        ],
-        remappings=[('cmd_vel', LaunchConfiguration('cmd_vel_topic'))],
-    )
-
-    rovi_base_node = Node(
-        package='rovi_base',
-        executable='rovi_base_node',
-        name='rovi_base',
-        parameters=[
-            LaunchConfiguration('rovi_base_params_file'),
-            {
-                'publish_tf': ParameterValue(LaunchConfiguration('rovi_base_publish_tf'), value_type=bool),
-                'odom_frame': LaunchConfiguration('rovi_base_odom_frame'),
-                'base_frame': LaunchConfiguration('rovi_base_frame'),
-            },
-        ],
-    )
-
-    rsp_node = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        parameters=[
-            {'robot_description': ParameterValue(Command(['cat ', LaunchConfiguration('model')]), value_type=str)},
-        ],
+    robot_bringup_launch = os.path.join(pkg_share, 'launch', 'robot_bringup.launch.py')
+    robot_bringup = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(robot_bringup_launch),
+        launch_arguments={
+            'robot_mode': LaunchConfiguration('robot_mode'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'model': LaunchConfiguration('model'),
+            'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
+            'rovi_base_params_file': LaunchConfiguration('rovi_base_params_file'),
+            'rovi_base_publish_tf': LaunchConfiguration('rovi_base_publish_tf'),
+            'rovi_base_frame': LaunchConfiguration('rovi_base_frame'),
+            'rovi_base_odom_frame': LaunchConfiguration('rovi_base_odom_frame'),
+            'rosmaster_params_file': LaunchConfiguration('rosmaster_params_file'),
+            'rosmaster_port': LaunchConfiguration('rosmaster_port'),
+            'rosmaster_debug': LaunchConfiguration('rosmaster_debug'),
+            'lidar_enabled': LaunchConfiguration('lidar_enabled'),
+            'lidar_serial_port': LaunchConfiguration('lidar_serial_port'),
+            'lidar_frame': LaunchConfiguration('lidar_frame'),
+            'lidar_serial_baudrate': LaunchConfiguration('lidar_serial_baudrate'),
+            'lidar_angle_compensate': LaunchConfiguration('lidar_angle_compensate'),
+            'world': LaunchConfiguration('world'),
+            'gazebo_gui': LaunchConfiguration('gazebo_gui'),
+        }.items(),
     )
 
     actions.extend([
+        robot_mode_arg,
+        use_sim_time_arg,
+        world_arg,
+        gazebo_gui_arg,
         joy_params_arg,
         teleop_params_arg,
         twist_mux_params_arg,
@@ -227,26 +251,7 @@ def generate_launch_description() -> LaunchDescription:
         joy_node,
         teleop_node,
         twist_mux_node,
-        rosmaster_driver_node,
-        rovi_base_node,
-        rsp_node,
+        robot_bringup,
     ])
-
-    # Stand up rplidar directly so we can enforce frame_id and other params via launch arguments.
-    lidar_node = Node(
-        condition=IfCondition(LaunchConfiguration('lidar_enabled')),
-        package='rplidar_ros',
-        executable='rplidar_composition',
-        name='rplidar_composition',
-        output='screen',
-        parameters=[{
-            'serial_port': LaunchConfiguration('lidar_serial_port'),
-            'serial_baudrate': ParameterValue(LaunchConfiguration('lidar_serial_baudrate'), value_type=int),
-            'frame_id': LaunchConfiguration('lidar_frame'),
-            'inverted': False,
-            'angle_compensate': ParameterValue(LaunchConfiguration('lidar_angle_compensate'), value_type=bool),
-        }],
-    )
-    actions.append(lidar_node)
 
     return LaunchDescription(actions)
