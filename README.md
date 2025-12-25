@@ -17,7 +17,7 @@ Commands provided by `rovi_env.sh`
 
 | Command | Description |
 |---|---|
-| `ws` | changes to the `$ROVI_ROS_WS_DIR` runs setup,activate |
+| `ws` | Changes to `$ROVI_ROS_WS_DIR`, runs `setup`, and (if present) activates `.venv`. |
 | `build` | Runs `colcon build` in this workspace. This generates/updates the `install/` overlay used by `ros2 launch`. |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
@@ -25,7 +25,7 @@ Commands provided by `rovi_env.sh`
 | `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + odometry filtering + `slam_toolbox` mapping to publish TF `map -> odom` and `/map`. |
 | `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + SLAM localization against a saved pose-graph (pass `map_file_name:=/path/to/map.posegraph`). |
 | `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts SLAM (`slam_mode` mapping/localization) and the Nav2 stack for goal-based navigation. |
-| `sim` | Runs `rovi_sim/gazebo_sim.launch.py` (package `rovi_sim`). Starts Gazebo Sim + a holonomic (X/Y/Z) base + LiDAR + twist_mux + SLAM + Nav2 + RViz using sim time. |
+| `sim` | Runs `rovi_sim/gazebo_sim.launch.py` (simulation). Run `ws` first; optional args: `rviz:=false`, `gazebo_gui:=false`, `slam_mode:=localization`. |
 | `view` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`), and it also includes the Nav2 panel + goal tool (no-op unless `nav` is running). |
 | `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
 | `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + joint_state_publisher_gui for URDF inspection without robot hardware. |
@@ -54,7 +54,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 * Install all the needed depedencies ros packages
 
 ```bash
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
+sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 ```
 
 ## wsl
@@ -134,7 +134,7 @@ ROS nodes started by the launches above (some are conditional based on params).
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
 | `rplidar_composition` | `rplidar_ros` | Publishes `/scan` (`sensor_msgs/msg/LaserScan`) from an RPLIDAR (only when `lidar_enabled:=true`). |
 | `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan` + `/clock`). |
-| `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/odom_raw` (holonomic kinematics). |
+| `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_base`). |
 | `imu_filter` | `imu_filter_madgwick` | Filters `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` (only when `odom_mode:=fusion_wheels_imu`). |
 | `ekf_filter_node` | `robot_localization` | EKF that produces `/odometry/filtered` and TF `odom -> base_footprint` from `/odom_raw` (and `/imu/data` in `fusion_wheels_imu`). |
 | `slam_toolbox` | `slam_toolbox` | Lifecycle SLAM node that publishes TF `map -> odom` and (in mapping mode) `/map` (only when `slam_enabled:=true`). |
@@ -383,8 +383,15 @@ flowchart TD
 
   RoviSimBase["rovi_sim_base<br/>(holonomic base + accel limits)"]
   CMD -->|subscribe| RoviSimBase
+  CMD_SIM(["/cmd_vel_sim<br/>(Twist)"])
+  VRAW(["/vel_raw<br/>(Twist)"])
+  RoviSimBase -->|publish| CMD_SIM
+  RoviSimBase -->|publish| VRAW
+
+  RoviBase["rovi_base"]
+  VRAW -->|subscribe| RoviBase
   ODRAW(["/odom_raw<br/>(Odometry)"])
-  RoviSimBase -->|publish| ODRAW
+  RoviBase -->|publish| ODRAW
 
   subgraph GZ["Gazebo Sim (gz sim)"]
     WORLD["room world"]
@@ -392,7 +399,8 @@ flowchart TD
     LIDAR["lidar sensor"]
   end
 
-  RoviSimBase -->|move| ROBOT
+  CMD_SIM --> BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
+  BRIDGE -->|bridge| ROBOT
   LIDAR --> BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
 
   SCAN(["/scan<br/>(LaserScan)"])

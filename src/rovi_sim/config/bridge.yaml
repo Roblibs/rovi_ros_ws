@@ -1,0 +1,24 @@
+# ros_gz_bridge config for rovi_sim
+#
+# This simulation intentionally keeps the ROS-side contract the same as the real robot:
+# - /cmd_vel input (from twist_mux) -> rovi_sim_base -> Gazebo (/model/rovi/cmd_vel)
+# - /scan + /clock bridged from Gazebo to ROS for SLAM / Nav2 and use_sim_time
+
+- ros_topic_name: "clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "scan"
+  gz_topic_name: "/scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "cmd_vel_sim"
+  gz_topic_name: "/model/rovi/cmd_vel"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  gz_type_name: "gz.msgs.Twist"
+  direction: ROS_TO_GZ
+

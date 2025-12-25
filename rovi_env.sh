@@ -24,9 +24,17 @@ rovi_dds_default() {
   unset ROS_DISCOVERY_SERVER
 }
 
+ensure_ros2_daemon() {
+  local daemon_status
+  daemon_status="$(ros2 daemon status 2>/dev/null || true)"
+  if [[ "${daemon_status}" == *"not running"* ]]; then
+    ros2 daemon start >/dev/null 2>&1 || true
+  fi
+}
+
 # Default DDS mode for this workspace:
 rovi_dds_default
-ros2 daemon start >/dev/null 2>&1 || true
+ensure_ros2_daemon
 
 clean() {
   rm -rf build/ install/ log/
@@ -91,7 +99,11 @@ nav() {
   ros2 launch rovi_bringup nav.launch.py "$@"
 }
 
-view_mapping() {
+sim() {
+  ros2 launch rovi_sim gazebo_sim.launch.py "$@"
+}
+
+view() {
   rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
 }
 
