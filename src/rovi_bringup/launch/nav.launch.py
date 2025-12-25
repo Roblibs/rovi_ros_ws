@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Bringup stack for Nav2 navigation with slam_toolbox + rovi base.
+"""Navigation stack: slam_toolbox (mapping or localization) + Nav2.
 
-This wraps existing bringup launches:
-- slam_mode=mapping: include mapping.launch.py (teleop + EKF + slam_toolbox mapping)
-- slam_mode=localization: include localization.launch.py (teleop + EKF + slam_toolbox localization)
-
-Then it starts the Nav2 navigation stack from rovi_nav.
+This launch is backend-agnostic. It assumes the robot backend is already running and provides:
+- /scan
+- /vel_raw
+- /imu/data_raw (when using odom_mode=fusion_wheels_imu)
 """
 
 import os
@@ -22,19 +21,10 @@ def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
     mapping_launch = os.path.join(bringup_share, 'launch', 'mapping.launch.py')
     localization_launch = os.path.join(bringup_share, 'launch', 'localization.launch.py')
-    sim_share = get_package_share_directory('rovi_sim')
-    default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
-    desc_share = get_package_share_directory('rovi_description')
-    default_rviz = os.path.join(desc_share, 'rviz', 'rovi_map.rviz')
 
     nav_share = get_package_share_directory('rovi_nav')
     nav_launch = os.path.join(nav_share, 'launch', 'nav.launch.py')
 
-    robot_mode = DeclareLaunchArgument(
-        'robot_mode',
-        default_value='real',
-        description="Robot backend: 'real', 'sim', or 'offline'.",
-    )
     slam_mode = DeclareLaunchArgument(
         'slam_mode',
         default_value='mapping',
@@ -57,32 +47,8 @@ def generate_launch_description() -> LaunchDescription:
     )
     use_sim_time = DeclareLaunchArgument(
         'use_sim_time',
-        default_value=PythonExpression([
-            "'true' if '",
-            LaunchConfiguration('robot_mode'),
-            "' == 'sim' else 'false'",
-        ]),
+        default_value='false',
         description='Use /clock time.',
-    )
-    world = DeclareLaunchArgument(
-        'world',
-        default_value=default_world,
-        description='Full path to the Gazebo world SDF file (robot_mode=sim).',
-    )
-    gazebo_gui = DeclareLaunchArgument(
-        'gazebo_gui',
-        default_value='true',
-        description='Start Gazebo GUI client (server always starts) (robot_mode=sim).',
-    )
-    rviz = DeclareLaunchArgument(
-        'rviz',
-        default_value='true',
-        description='Start RViz (nav view).',
-    )
-    rviz_config = DeclareLaunchArgument(
-        'rviz_config',
-        default_value=default_rviz,
-        description='Absolute path to an RViz config file.',
     )
 
     mapping_selected = IfCondition(PythonExpression(["'", LaunchConfiguration('slam_mode'), "' == 'mapping'"]))
@@ -92,14 +58,9 @@ def generate_launch_description() -> LaunchDescription:
         PythonLaunchDescriptionSource(mapping_launch),
         condition=mapping_selected,
         launch_arguments={
-            'robot_mode': LaunchConfiguration('robot_mode'),
             'odom_mode': LaunchConfiguration('odom_mode'),
             'mag_enabled': LaunchConfiguration('mag_enabled'),
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'world': LaunchConfiguration('world'),
-            'gazebo_gui': LaunchConfiguration('gazebo_gui'),
-            'rviz': LaunchConfiguration('rviz'),
-            'rviz_config': LaunchConfiguration('rviz_config'),
         }.items(),
     )
 
@@ -107,15 +68,10 @@ def generate_launch_description() -> LaunchDescription:
         PythonLaunchDescriptionSource(localization_launch),
         condition=localization_selected,
         launch_arguments={
-            'robot_mode': LaunchConfiguration('robot_mode'),
             'odom_mode': LaunchConfiguration('odom_mode'),
             'mag_enabled': LaunchConfiguration('mag_enabled'),
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'map_file_name': LaunchConfiguration('map_file_name'),
-            'world': LaunchConfiguration('world'),
-            'gazebo_gui': LaunchConfiguration('gazebo_gui'),
-            'rviz': LaunchConfiguration('rviz'),
-            'rviz_config': LaunchConfiguration('rviz_config'),
         }.items(),
     )
 
@@ -127,16 +83,11 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
-        robot_mode,
         slam_mode,
         map_file_name,
         odom_mode,
         mag_enabled,
         use_sim_time,
-        world,
-        gazebo_gui,
-        rviz,
-        rviz_config,
         mapping,
         localization,
         nav2,

@@ -16,14 +16,22 @@ robot_mode:
 """
 
 import os
+import sys
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+    RegisterEventHandler,
+    SetEnvironmentVariable,
+    TimerAction,
+)
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessStart
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PythonExpression
+from launch.substitutions import Command, EnvironmentVariable, LaunchConfiguration, PythonExpression, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -152,6 +160,30 @@ def generate_launch_description() -> LaunchDescription:
     is_not_offline = IfCondition(PythonExpression(["'", LaunchConfiguration('robot_mode'), "' != 'offline'"]))
 
     use_sim_time_param = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
+
+    # If a virtual environment is active, prepend its site-packages to PYTHONPATH so rosmaster-lib is importable.
+    venv_root = os.environ.get('VIRTUAL_ENV')
+    py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    venv_site = os.path.join(venv_root, 'lib', py_ver, 'site-packages') if venv_root else ''
+
+    if venv_site and os.path.isdir(venv_site):
+        venv_env_actions = [
+            SetEnvironmentVariable(
+                condition=is_real,
+                name='PYTHONPATH',
+                value=[
+                    TextSubstitution(text=venv_site),
+                    TextSubstitution(text=':'),
+                    EnvironmentVariable('PYTHONPATH', default_value=''),
+                ],
+            ),
+            SetEnvironmentVariable(condition=is_real, name='PYTHONUNBUFFERED', value='1'),
+            LogInfo(condition=is_real, msg=f"Using venv site-packages: {venv_site}"),
+        ]
+    else:
+        venv_env_actions = [
+            LogInfo(condition=is_real, msg="VIRTUAL_ENV not set or site-packages not found; using existing PYTHONPATH")
+        ]
 
     robot_description = ParameterValue(
         Command(['cat ', LaunchConfiguration('model')]),
@@ -301,6 +333,7 @@ def generate_launch_description() -> LaunchDescription:
         lidar_angle_comp_arg,
         world_arg,
         gazebo_gui_arg,
+        *venv_env_actions,
         rsp_node,
         joint_state_pub_sim,
         static_odom_tf,
