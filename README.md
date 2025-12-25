@@ -26,21 +26,35 @@ Commands provided by `rovi_env.sh`
 | `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + odometry filtering + `slam_toolbox` mapping to publish TF `map -> odom` and `/map`. |
 | `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts teleop + SLAM localization against a saved pose-graph (pass `map_file_name:=/path/to/map.posegraph`). |
 | `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts SLAM (`slam_mode` mapping/localization) and the Nav2 stack for goal-based navigation. |
-| `sim` | Runs `rovi_sim/gazebo_sim.launch.py` (simulation). Run `ws` first; optional args: `rviz:=false`, `gazebo_gui:=false`, `slam_mode:=localization`. |
+| `sim` | Runs `rovi_sim/gazebo_sim.launch.py` (simulation). Run `ws` first; optional args: `rviz:=false`, `gazebo_gui:=false`, `slam_mode:=localization`. (Planned: use `robot_mode:=sim` on the normal bringup launches and keep `sim` as an alias.) |
 | `view` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`), and it also includes the Nav2 panel + goal tool (no-op unless `nav` is running). |
 | `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
-| `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + joint_state_publisher_gui for URDF inspection without robot hardware. |
-| `record` | Records a rosbag with a per-launch topic filter (zstd compression) under `~/.ros/rovi/bags`. |
-| `play` | Plays the latest recorded rosbag from `~/.ros/rovi/bags` (or a selected tag/path). |
+| `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + joint_state_publisher_gui for URDF inspection without robot hardware. (Planned: this becomes `robot_mode:=offline`.) |
 
-## Simulation (Gazebo Sim)
-The simulation goal is to reuse the existing localization/SLAM/Nav2 stack unchanged by providing the same core interfaces as the real robot:
-- `/cmd_vel` input (holonomic X/Y + yaw)
-- `/scan` (LiDAR)
-- `/odom_raw` → `/odometry/filtered` (via existing EKF)
-- `/clock` (`use_sim_time:=true`)
+## Robot modes: `real` / `sim` / `offline` (design)
+Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`, RViz) unchanged while selecting *how the robot is provided* via a single `robot_mode` argument.
 
-For motion testing without a joystick, you can publish directly to `/cmd_vel` (or run Nav2 goals from RViz).
+### Robot interface contract (what the rest of the stack assumes)
+- `/cmd_vel` (`geometry_msgs/msg/Twist`) holonomic X/Y + yaw
+- `/scan` (`sensor_msgs/msg/LaserScan`)
+- `/vel_raw` (`geometry_msgs/msg/Twist`) base feedback (used by `rovi_base`)
+- `/odom_raw` (`nav_msgs/msg/Odometry`) and TF `odom -> base_footprint` (raw or filtered depending on `odom_mode`)
+- `/imu/data_raw` (`sensor_msgs/msg/Imu`) (needed for `odom_mode=fusion_wheels_imu`)
+- `/clock` (sim only, with `use_sim_time:=true`)
+
+### Modes (target end-state)
+- `robot_mode=real`: starts real drivers (`rosmaster_driver`, `rplidar_ros`, etc.).
+- `robot_mode=sim`: starts Gazebo Sim + `ros_gz_bridge`, and provides the same ROS topics (`/scan`, `/imu/data_raw`, `/clock`) as the real robot.
+- `robot_mode=offline`: starts only URDF visualization nodes (no hardware, no simulation) for model inspection.
+
+### Control inputs (target end-state)
+All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` topic:
+- joystick: `/cmd_vel_joy`
+- keyboard: `/cmd_vel_keyboard` (planned, via `teleop_twist_keyboard`)
+- navigation: `/cmd_vel_nav`
+
+### Status
+Today `sim` is a dedicated launch (`rovi_sim/gazebo_sim.launch.py`) and `view_offline` is a dedicated launch (`rovi_bringup/offline_view.launch.py`). The plan is to make the existing bringup launches accept `robot_mode:=real|sim|offline` so you can run `teleop`, `mapping`, `localization`, `nav` the same way on real or simulated robot.
 
 # Install
 
@@ -57,7 +71,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 * Install all the needed depedencies ros packages
 
 ```bash
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
+sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-teleop-twist-keyboard ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 ```
 
 ## wsl
@@ -81,7 +95,7 @@ Packages of this repo are listed in this table
 | Package | Role |
 |---|---|
 | `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
-| `rovi_sim` | Gazebo Sim integration: world + sim robot model + bridges; launches a full simulation stack (teleop + SLAM + Nav2) |
+| `rovi_sim` | Gazebo Sim backend: worlds + bridges + `rovi_sim_base`; spawns the shared robot model from `rovi_description` into Gazebo Sim |
 | `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
 | `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
 | `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom) |
@@ -95,6 +109,7 @@ External ROS packages installed via apt and how they are used in this workspace:
 |---|---|
 | `ros-jazzy-joy` | Used by `rovi_bringup/teleop.launch.py` to start `joy_node` and publish `/joy` from the joystick device. |
 | `ros-jazzy-teleop-twist-joy` | Used by `rovi_bringup/teleop.launch.py` to convert `/joy` into `/cmd_vel_joy`, using `rovi_bringup/config/teleop_twist_joy.yaml`. |
+| `ros-jazzy-teleop-twist-keyboard` | (Planned) Keyboard teleop that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) and is muxed via `twist_mux` like joystick and Nav2. |
 | `ros-jazzy-twist-mux` | Used by `rovi_bringup/teleop.launch.py` and `rovi_bringup/nav.launch.py` to mux joystick `/cmd_vel_joy` and Nav2 `/cmd_vel_nav` into the final `/cmd_vel` sent to `rosmaster_driver`. |
 | `ros-jazzy-diagnostic-updater` | Used by `rovi_base` to publish runtime diagnostics (for example on `/diagnostics`). |
 | `ros-jazzy-robot-state-publisher` | Used by bringup launches and `offline_view.launch.py` to publish the TF tree from the `rovi_description` URDF and provide `/robot_description` to RViz. |
@@ -118,7 +133,8 @@ External ROS packages installed via apt and how they are used in this workspace:
 | `joy.launch.py` | `rovi_bringup` | Debug joystick → `/cmd_vel` only (no hardware required) |
 | `localization.launch.py` | `rovi_bringup` | Bringup + SLAM localization on an existing map (`slam_toolbox` localization mode) |
 | `nav.launch.py` | `rovi_bringup` | Bringup + SLAM (`slam_mode` mapping/localization) + Nav2 navigation stack |
-| `gazebo_sim.launch.py` | `rovi_sim` | Full simulation bringup: Gazebo Sim world + spawn robot + LiDAR + holonomic base + SLAM + Nav2 + RViz |
+| `robot_bringup.launch.py` | `rovi_bringup` | (Planned) Common robot entrypoint with `robot_mode:=real|sim|offline` so higher-level launches don’t need separate sim variants |
+| `gazebo_sim.launch.py` | `rovi_sim` | Simulation bringup: Gazebo Sim world + spawn robot + bridges (+ full stack today). Planned to become the `robot_mode=sim` backend. |
 | `rosmaster_driver.launch.py` | `rosmaster_driver` | Hardware driver only (serial/IMU/joints sanity checks) |
 | `ekf.launch.py` | `rovi_localization` | Component launch: odometry pipeline (`odom_mode` selects raw/filtered/fusion_wheels_imu; useful without SLAM) |
 | `slam_toolbox.launch.py` | `rovi_slam` | Component launch: `slam_toolbox` (mapping/localization selected by params) |
@@ -131,12 +147,13 @@ ROS nodes started by the launches above (some are conditional based on params).
 |---|---|---|
 | `joy_node` | `joy` | Reads a joystick device and publishes `/joy` (`sensor_msgs/msg/Joy`). |
 | `teleop_twist_joy` | `teleop_twist_joy` | Converts `/joy` into velocity commands on `/cmd_vel_joy` (`geometry_msgs/msg/Twist`). |
+| `teleop_twist_keyboard` | `teleop_twist_keyboard` | (Planned) Keyboard teleop that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`). |
 | `twist_mux` | `twist_mux` | Selects the active velocity command source (e.g., `/cmd_vel_nav` vs `/cmd_vel_joy`) and publishes `/cmd_vel`. |
 | `rosmaster_driver` | `rosmaster_driver` | Hardware bridge for the Rosmaster base board: subscribes to `/cmd_vel` and publishes feedback like `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, and `/voltage`. |
 | `rovi_base` | `rovi_base` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
 | `rplidar_composition` | `rplidar_ros` | Publishes `/scan` (`sensor_msgs/msg/LaserScan`) from an RPLIDAR (only when `lidar_enabled:=true`). |
-| `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan` + `/clock`). |
+| `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan` + `/clock`, and planned `/imu/data_raw`). |
 | `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_base`). |
 | `imu_filter` | `imu_filter_madgwick` | Filters `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` (only when `odom_mode:=fusion_wheels_imu`). |
 | `ekf_filter_node` | `robot_localization` | EKF that produces `/odometry/filtered` and TF `odom -> base_footprint` from `/odom_raw` (and `/imu/data` in `fusion_wheels_imu`). |
@@ -155,6 +172,7 @@ Only the parameters toggeling nodes activation are listed here
 
 | Param | Package | Launch | Default | Explanation |
 |---|---|---|---|---|
+| `robot_mode` | `rovi_bringup` | `teleop.launch.py`, `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `offline_view.launch.py` | `real` | (Planned) Selects the robot backend: `real`, `sim`, or `offline`. |
 | `lidar_enabled` | `rovi_bringup` | `teleop.launch.py` | `true` | Starts LiDAR driver (`rplidar_ros`); without it there is no `/scan` |
 | `slam_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
 | `slam_enabled` | `rovi_slam` | `slam_toolbox.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
@@ -181,6 +199,40 @@ Conventions:
 - Rounded nodes are ROS topics (`/name<br/>(MsgType)`).
 - In connection to topics, arrows only represent publish/subscribe via a topic.
 
+## Robot Modes (target)
+This diagram shows the *intended* unification: higher-level launches stay the same, and `robot_mode` selects the backend that provides the robot interface.
+
+```mermaid
+flowchart TD
+  Bringup["rovi_bringup (target)\nrobot_mode: real | sim | offline"]
+
+  subgraph Contract["Robot interface contract (stable)"]
+    CMD(["/cmd_vel<br/>(Twist)"])
+    SCAN(["/scan<br/>(LaserScan)"])
+    IMU_RAW(["/imu/data_raw<br/>(Imu)"])
+    VRAW(["/vel_raw<br/>(Twist)"])
+    ODRAW(["/odom_raw<br/>(Odometry)"])
+    CLOCK(["/clock<br/>(Clock, sim only)"])
+  end
+
+  subgraph Backends["Backend selected by robot_mode"]
+    Real["real: rosmaster_driver + sensors"]
+    Sim["sim: Gazebo Sim + ros_gz_bridge + rovi_sim_base"]
+    Offline["offline: model inspection only"]
+  end
+
+  subgraph Consumers["Mode-agnostic consumers (unchanged)"]
+    EKF["rovi_localization"]
+    SLAM["rovi_slam"]
+    NAV["rovi_nav"]
+    RVIZ["rviz2"]
+  end
+
+  Bringup -->|select| Backends
+  Backends -->|provide| Contract
+  Contract -->|consume| Consumers
+```
+
 ## Basic Flow
 
 ```mermaid
@@ -196,8 +248,13 @@ flowchart TD
   CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
   RoviJoy -->|publish| CMD_JOY
 
+  Keyboard["teleop_twist_keyboard node<br/>(planned)"]
+  CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
+  Keyboard -.->|publish| CMD_KEY
+
   TwistMux["twist_mux node"]
   CMD_JOY -->|subscribe| TwistMux
+  CMD_KEY -.->|subscribe| TwistMux
   CMD(["/cmd_vel<br/>(Twist)"])
   TwistMux -->|publish| CMD
 
@@ -323,6 +380,8 @@ flowchart TD
   CMD_NAV -->|subscribe| TwistMux
   CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
   CMD_JOY -.->|"subscribe (teleop)"| TwistMux
+  CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
+  CMD_KEY -.->|"subscribe (planned)"| TwistMux
   CMD(["/cmd_vel<br/>(Twist)"])
   TwistMux -->|publish| CMD
 
@@ -351,8 +410,8 @@ flowchart TD
   MAP -->|subscribe| RVIZ_MAP
 ```
 
-## Offline model
-This launch from rovi_bringup helps to visualize the robot model without needing the actual robot hardware
+## Offline model (robot_mode=offline)
+This launch from `rovi_bringup` helps to visualize the robot model without needing the actual robot hardware. In the target `robot_mode` design, this corresponds to `robot_mode=offline`.
 
 ```mermaid
 flowchart TD
@@ -370,8 +429,8 @@ flowchart TD
   TF -->|subscribe| RVIZ
 ```
 
-## Simulation (Gazebo Sim)
-This is the additional wiring introduced by simulation (it plugs into the existing SLAM + Nav2 stack via the same topics).
+## Simulation (Gazebo Sim backend, robot_mode=sim)
+This is the additional wiring introduced by simulation. In the target `robot_mode` design this becomes the `robot_mode=sim` backend, while `rovi_localization` / `rovi_slam` / `rovi_nav` remain unchanged.
 
 ```mermaid
 flowchart TD
@@ -398,18 +457,24 @@ flowchart TD
 
   subgraph GZ["Gazebo Sim (gz sim)"]
     WORLD["room world"]
-    ROBOT["rovi_sim robot model (~2kg)"]
+    ROBOT["rovi robot model (URDF from rovi_description)"]
     LIDAR["lidar sensor"]
+    IMU_GZ["imu sensor<br/>(planned)"]
   end
 
-  CMD_SIM --> BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
+  BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
+
+  CMD_SIM --> BRIDGE
   BRIDGE -->|bridge| ROBOT
-  LIDAR --> BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
+  LIDAR --> BRIDGE
+  IMU_GZ -.-> BRIDGE
 
   SCAN(["/scan<br/>(LaserScan)"])
   CLOCK(["/clock"])
+  IMU_RAW(["/imu/data_raw<br/>(Imu)"])
   BRIDGE -->|bridge| SCAN
   BRIDGE -->|bridge| CLOCK
+  BRIDGE -.->|"bridge (planned)"| IMU_RAW
 
   EXISTING["Existing stack (unchanged): rovi_localization + rovi_slam + rovi_nav"]
   ODRAW --> EXISTING
@@ -429,7 +494,7 @@ flowchart TD
   BASEL -->|robot_state_publisher| IMU[imu_link]
 ```
 
-## Launch wiring
+## Launch wiring (current)
 `rovi_bringup` launches are composition layers: they include smaller "component" launches (teleop, odometry, SLAM). This keeps packages reusable (e.g., you can run SLAM against bag playback as long as `/scan` + TF exist).
 
 ```mermaid
@@ -499,11 +564,39 @@ flowchart LR
 
 ```
 
+## Launch wiring (target with `robot_mode`)
+The intended direction is to introduce a single `rovi_bringup/robot_bringup.launch.py` that selects the backend (`robot_mode:=real|sim|offline`). Higher-level launches then include it instead of having separate sim variants.
+
+```mermaid
+flowchart LR
+  RobotBringup["rovi_bringup/robot_bringup.launch.py<br/>(robot_mode)"]
+
+  Teleop["rovi_bringup/teleop.launch.py"] --> RobotBringup
+  Mapping["rovi_bringup/mapping.launch.py"] --> RobotBringup
+  Localization["rovi_bringup/localization.launch.py"] --> RobotBringup
+  Offline["rovi_bringup/offline_view.launch.py"] -->|"robot_mode=offline"| RobotBringup
+
+  EkfLaunch["rovi_localization/ekf.launch.py"]
+  SlamLaunch["rovi_slam/slam_toolbox.launch.py"]
+  NavStackLaunch["rovi_nav/nav.launch.py"]
+
+  Mapping -->|IncludeLaunchDescription| EkfLaunch
+  Mapping -->|IncludeLaunchDescription| SlamLaunch
+
+  Localization -->|IncludeLaunchDescription| EkfLaunch
+  Localization -->|IncludeLaunchDescription| SlamLaunch
+
+  NavLaunch["rovi_bringup/nav.launch.py"] -->|IncludeLaunchDescription| NavStackLaunch
+  NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=mapping)"| Mapping
+  NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=localization)"| Localization
+```
+
 ## Package dependencies
 ```mermaid
 flowchart LR
   subgraph Internal
     RoviBringup[rovi_bringup]
+    RoviSim[rovi_sim]
     RoviDesc[rovi_description]
     Rosmaster[rosmaster_driver]
     RoviBase[rovi_base]
@@ -515,12 +608,15 @@ flowchart LR
   subgraph External
     Joy[ros-jazzy-joy]
     Teleop[ros-jazzy-teleop-twist-joy]
+    TeleopKey[ros-jazzy-teleop-twist-keyboard]
     TwistMux[twist_mux]
     RSP[robot_state_publisher]
     JSPG[joint_state_publisher_gui]
     RVIZ[rviz2]
     Diag[diagnostic_updater]
     RPLidar[rplidar_ros]
+    RosGzSim[ros_gz_sim]
+    RosGzBridge[ros_gz_bridge]
     EKF[robot_localization]
     ImuFilter[imu_filter_madgwick]
     SlamToolbox[slam_toolbox]
@@ -533,8 +629,10 @@ flowchart LR
   RoviBringup -.-> RoviLoc
   RoviBringup -.-> RoviSlam
   RoviBringup -.-> RoviNav
+  RoviBringup -.-> RoviSim
   RoviBringup --> Joy
   RoviBringup --> Teleop
+  RoviBringup -.-> TeleopKey
   RoviBringup --> TwistMux
   RoviBringup --> RSP
   RoviBringup --> JSPG
@@ -547,6 +645,10 @@ flowchart LR
   RoviLoc -.-> ImuFilter
   RoviSlam --> SlamToolbox
   RoviNav --> Nav2
+
+  RoviSim --> RoviDesc
+  RoviSim --> RosGzSim
+  RoviSim --> RosGzBridge
 ```
 
 # Nodes details
