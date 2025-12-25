@@ -22,12 +22,12 @@ Commands provided by `rovi_env.sh`
 | `stop` | Hard-stops ROS/Gazebo/RViz processes for the current user (use when a launch left nodes running). |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
-| `teleop` | Runs `rovi_bringup/teleop.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to use Gazebo. |
-| `keyboard` | Runs `rovi_bringup/keyboard_teleop.launch.py` (package `rovi_bringup`). Publishes `/cmd_vel_keyboard` for `twist_mux` (run in its own terminal). |
-| `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to run SLAM mapping in Gazebo. |
-| `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to localize in Gazebo (pass `map_file_name:=/path/to/map.posegraph`). |
-| `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to run Nav2 in Gazebo. |
-| `sim` | Shortcut wrapper: `sim teleop|mapping|localization|nav|keyboard` runs the matching launch for simulation. `sim gazebo` starts only the Gazebo backend (`rovi_sim/gazebo_sim.launch.py`). |
+| `teleop` | Runs `rovi_bringup/teleop.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to use Gazebo. Starts RViz by default (`rviz:=false` to disable). |
+| `keyboard` | Runs `teleop_twist_keyboard` in the current terminal and publishes `/cmd_vel_keyboard` for `twist_mux` (run in its own terminal). |
+| `mapping` | Runs `rovi_bringup/mapping.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to run SLAM mapping in Gazebo. Starts RViz by default (`rviz:=false` to disable). |
+| `localization` | Runs `rovi_bringup/localization.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to localize in Gazebo (pass `map_file_name:=/path/to/map.posegraph`). Starts RViz by default (`rviz:=false` to disable). |
+| `nav` | Runs `rovi_bringup/nav.launch.py` (package `rovi_bringup`). Default `robot_mode:=real`; set `robot_mode:=sim` to run Nav2 in Gazebo. Starts RViz by default (`rviz:=false` to disable). |
+| `sim` | Shortcut wrapper: `sim teleop|mapping|localization|nav` runs the matching bringup launch with `robot_mode:=sim`. `sim keyboard` starts keyboard teleop. `sim gazebo` starts only the Gazebo backend (`rovi_sim/gazebo_sim.launch.py`). |
 | `view` | Starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (package `rovi_description`). Fixed Frame is `map`, so this requires `mapping` or `nav` (something must publish TF `map -> odom`), and it also includes the Nav2 panel + goal tool (no-op unless `nav` is running). |
 | `view_teleop` | Starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (package `rovi_description`). Fixed Frame is `odom`, so this works with `teleop` without SLAM. |
 | `view_offline` | Runs `rovi_bringup/offline_view.launch.py` (package `rovi_bringup`). This launches RViz + `robot_mode=offline` (URDF inspection without robot hardware). |
@@ -110,7 +110,7 @@ External ROS packages installed via apt and how they are used in this workspace:
 |---|---|
 | `ros-jazzy-joy` | Used by `rovi_bringup/teleop.launch.py` to start `joy_node` and publish `/joy` from the joystick device. |
 | `ros-jazzy-teleop-twist-joy` | Used by `rovi_bringup/teleop.launch.py` to convert `/joy` into `/cmd_vel_joy`, using `rovi_bringup/config/teleop_twist_joy.yaml`. |
-| `ros-jazzy-teleop-twist-keyboard` | (Planned) Keyboard teleop that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) and is muxed via `twist_mux` like joystick and Nav2. |
+| `ros-jazzy-teleop-twist-keyboard` | Keyboard teleop (`keyboard` command) that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) and is muxed via `twist_mux` like joystick and Nav2. |
 | `ros-jazzy-twist-mux` | Used by `rovi_bringup/teleop.launch.py` and `rovi_bringup/nav.launch.py` to mux joystick `/cmd_vel_joy` and Nav2 `/cmd_vel_nav` into the final `/cmd_vel` sent to `rosmaster_driver`. |
 | `ros-jazzy-diagnostic-updater` | Used by `rovi_base` to publish runtime diagnostics (for example on `/diagnostics`). |
 | `ros-jazzy-robot-state-publisher` | Used by bringup launches and `offline_view.launch.py` to publish the TF tree from the `rovi_description` URDF and provide `/robot_description` to RViz. |
@@ -148,13 +148,13 @@ ROS nodes started by the launches above (some are conditional based on params).
 |---|---|---|
 | `joy_node` | `joy` | Reads a joystick device and publishes `/joy` (`sensor_msgs/msg/Joy`). |
 | `teleop_twist_joy` | `teleop_twist_joy` | Converts `/joy` into velocity commands on `/cmd_vel_joy` (`geometry_msgs/msg/Twist`). |
-| `teleop_twist_keyboard` | `teleop_twist_keyboard` | (Planned) Keyboard teleop that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`). |
+| `teleop_twist_keyboard` | `teleop_twist_keyboard` | Keyboard teleop that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) (run via the `keyboard` command in its own terminal). |
 | `twist_mux` | `twist_mux` | Selects the active velocity command source (e.g., `/cmd_vel_nav` vs `/cmd_vel_joy`) and publishes `/cmd_vel`. |
 | `rosmaster_driver` | `rosmaster_driver` | Hardware bridge for the Rosmaster base board: subscribes to `/cmd_vel` and publishes feedback like `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, and `/voltage`. |
 | `rovi_base` | `rovi_base` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
 | `rplidar_composition` | `rplidar_ros` | Publishes `/scan` (`sensor_msgs/msg/LaserScan`) from an RPLIDAR (only when `lidar_enabled:=true`). |
-| `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan` + `/clock`, and planned `/imu/data_raw`). |
+| `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan`, `/clock`, and `/imu/data_raw`). |
 | `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_base`). |
 | `imu_filter` | `imu_filter_madgwick` | Filters `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` (only when `odom_mode:=fusion_wheels_imu`). |
 | `ekf_filter_node` | `robot_localization` | EKF that produces `/odometry/filtered` and TF `odom -> base_footprint` from `/odom_raw` (and `/imu/data` in `fusion_wheels_imu`). |
@@ -184,6 +184,7 @@ Only the parameters toggeling nodes activation are listed here
 | `mag_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
 | `mag_enabled` | `rovi_localization` | `ekf.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
 | `map_file_name` | `rovi_bringup` | `localization.launch.py`, `nav.launch.py` | `~/.ros/rovi/maps/latest.posegraph` | Pose-graph file to load when `slam_mode=localization`. |
+| `rviz` | `rovi_bringup` | `teleop.launch.py`, `mapping.launch.py`, `localization.launch.py`, `nav.launch.py` | `true` | Starts RViz automatically; set `rviz:=false` for headless runs. |
 
 ### Odometry Modes (`odom_mode`)
 Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
@@ -249,13 +250,13 @@ flowchart TD
   CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
   RoviJoy -->|publish| CMD_JOY
 
-  Keyboard["teleop_twist_keyboard node<br/>(planned)"]
+  Keyboard["teleop_twist_keyboard node"]
   CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
-  Keyboard -.->|publish| CMD_KEY
+  Keyboard -->|publish| CMD_KEY
 
   TwistMux["twist_mux node"]
   CMD_JOY -->|subscribe| TwistMux
-  CMD_KEY -.->|subscribe| TwistMux
+  CMD_KEY -->|subscribe| TwistMux
   CMD(["/cmd_vel<br/>(Twist)"])
   TwistMux -->|publish| CMD
 
@@ -382,7 +383,7 @@ flowchart TD
   CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
   CMD_JOY -.->|"subscribe (teleop)"| TwistMux
   CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
-  CMD_KEY -.->|"subscribe (planned)"| TwistMux
+  CMD_KEY -.->|"subscribe (keyboard)"| TwistMux
   CMD(["/cmd_vel<br/>(Twist)"])
   TwistMux -->|publish| CMD
 
@@ -460,7 +461,7 @@ flowchart TD
     WORLD["room world"]
     ROBOT["rovi robot model (URDF from rovi_description)"]
     LIDAR["lidar sensor"]
-    IMU_GZ["imu sensor<br/>(planned)"]
+    IMU_GZ["imu sensor"]
   end
 
   BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
@@ -468,14 +469,14 @@ flowchart TD
   CMD_SIM --> BRIDGE
   BRIDGE -->|bridge| ROBOT
   LIDAR --> BRIDGE
-  IMU_GZ -.-> BRIDGE
+  IMU_GZ --> BRIDGE
 
   SCAN(["/scan<br/>(LaserScan)"])
   CLOCK(["/clock"])
   IMU_RAW(["/imu/data_raw<br/>(Imu)"])
   BRIDGE -->|bridge| SCAN
   BRIDGE -->|bridge| CLOCK
-  BRIDGE -.->|"bridge (planned)"| IMU_RAW
+  BRIDGE -->|bridge| IMU_RAW
 
   EXISTING["Existing stack (unchanged): rovi_localization + rovi_slam + rovi_nav"]
   ODRAW --> EXISTING

@@ -7,6 +7,7 @@ import sys
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, SetEnvironmentVariable
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PythonExpression, TextSubstitution
 from launch_ros.actions import Node
@@ -22,6 +23,7 @@ def generate_launch_description() -> LaunchDescription:
     default_rosmaster_params = os.path.join(pkg_share, 'config', 'rosmaster_driver.yaml')
     desc_share = get_package_share_directory('rovi_description')
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
+    default_rviz = os.path.join(desc_share, 'rviz', 'rovi_odom.rviz')
     sim_share = get_package_share_directory('rovi_sim')
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
 
@@ -48,6 +50,16 @@ def generate_launch_description() -> LaunchDescription:
         'gazebo_gui',
         default_value='true',
         description='Start Gazebo GUI client (server always starts) (robot_mode=sim).',
+    )
+    rviz_arg = DeclareLaunchArgument(
+        'rviz',
+        default_value='true',
+        description='Start RViz (teleop view).',
+    )
+    rviz_config_arg = DeclareLaunchArgument(
+        'rviz_config',
+        default_value=default_rviz,
+        description='Absolute path to an RViz config file.',
     )
 
     joy_params_arg = DeclareLaunchArgument(
@@ -199,6 +211,15 @@ def generate_launch_description() -> LaunchDescription:
         remappings=[('cmd_vel_out', LaunchConfiguration('cmd_vel_topic'))],
     )
 
+    rviz_node = Node(
+        condition=IfCondition(LaunchConfiguration('rviz')),
+        package='rviz2',
+        executable='rviz2',
+        arguments=['-d', LaunchConfiguration('rviz_config')],
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time_param}],
+    )
+
     robot_bringup_launch = os.path.join(pkg_share, 'launch', 'robot_bringup.launch.py')
     robot_bringup = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(robot_bringup_launch),
@@ -229,6 +250,8 @@ def generate_launch_description() -> LaunchDescription:
         use_sim_time_arg,
         world_arg,
         gazebo_gui_arg,
+        rviz_arg,
+        rviz_config_arg,
         joy_params_arg,
         teleop_params_arg,
         twist_mux_params_arg,
@@ -251,6 +274,7 @@ def generate_launch_description() -> LaunchDescription:
         joy_node,
         teleop_node,
         twist_mux_node,
+        rviz_node,
         robot_bringup,
     ])
 

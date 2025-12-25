@@ -24,6 +24,8 @@ def generate_launch_description() -> LaunchDescription:
     localization_launch = os.path.join(bringup_share, 'launch', 'localization.launch.py')
     sim_share = get_package_share_directory('rovi_sim')
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
+    desc_share = get_package_share_directory('rovi_description')
+    default_rviz = os.path.join(desc_share, 'rviz', 'rovi_map.rviz')
 
     nav_share = get_package_share_directory('rovi_nav')
     nav_launch = os.path.join(nav_share, 'launch', 'nav.launch.py')
@@ -72,6 +74,16 @@ def generate_launch_description() -> LaunchDescription:
         default_value='true',
         description='Start Gazebo GUI client (server always starts) (robot_mode=sim).',
     )
+    rviz = DeclareLaunchArgument(
+        'rviz',
+        default_value='true',
+        description='Start RViz (nav view).',
+    )
+    rviz_config = DeclareLaunchArgument(
+        'rviz_config',
+        default_value=default_rviz,
+        description='Absolute path to an RViz config file.',
+    )
 
     mapping_selected = IfCondition(PythonExpression(["'", LaunchConfiguration('slam_mode'), "' == 'mapping'"]))
     localization_selected = IfCondition(PythonExpression(["'", LaunchConfiguration('slam_mode'), "' == 'localization'"]))
@@ -86,6 +98,8 @@ def generate_launch_description() -> LaunchDescription:
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'world': LaunchConfiguration('world'),
             'gazebo_gui': LaunchConfiguration('gazebo_gui'),
+            'rviz': LaunchConfiguration('rviz'),
+            'rviz_config': LaunchConfiguration('rviz_config'),
         }.items(),
     )
 
@@ -100,6 +114,8 @@ def generate_launch_description() -> LaunchDescription:
             'map_file_name': LaunchConfiguration('map_file_name'),
             'world': LaunchConfiguration('world'),
             'gazebo_gui': LaunchConfiguration('gazebo_gui'),
+            'rviz': LaunchConfiguration('rviz'),
+            'rviz_config': LaunchConfiguration('rviz_config'),
         }.items(),
     )
 
@@ -119,6 +135,8 @@ def generate_launch_description() -> LaunchDescription:
         use_sim_time,
         world,
         gazebo_gui,
+        rviz,
+        rviz_config,
         mapping,
         localization,
         nav2,

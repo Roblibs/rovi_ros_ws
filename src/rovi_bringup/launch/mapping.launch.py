@@ -6,8 +6,11 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression, TextSubstitution
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -15,6 +18,8 @@ def generate_launch_description() -> LaunchDescription:
     teleop_launch = os.path.join(bringup_share, 'launch', 'teleop.launch.py')
     sim_share = get_package_share_directory('rovi_sim')
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
+    desc_share = get_package_share_directory('rovi_description')
+    default_rviz = os.path.join(desc_share, 'rviz', 'rovi_map.rviz')
 
     loc_share = get_package_share_directory('rovi_localization')
     ekf_launch = os.path.join(loc_share, 'launch', 'ekf.launch.py')
@@ -61,6 +66,16 @@ def generate_launch_description() -> LaunchDescription:
         default_value='true',
         description='Start Gazebo GUI client (server always starts) (robot_mode=sim).',
     )
+    rviz = DeclareLaunchArgument(
+        'rviz',
+        default_value='true',
+        description='Start RViz (mapping view).',
+    )
+    rviz_config = DeclareLaunchArgument(
+        'rviz_config',
+        default_value=default_rviz,
+        description='Absolute path to an RViz config file.',
+    )
 
     teleop = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(teleop_launch),
@@ -69,6 +84,7 @@ def generate_launch_description() -> LaunchDescription:
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'world': LaunchConfiguration('world'),
             'gazebo_gui': LaunchConfiguration('gazebo_gui'),
+            'rviz': TextSubstitution(text='false'),
             'rovi_base_publish_tf': PythonExpression([
                 "'true' if '", LaunchConfiguration('odom_mode'), "' == 'raw' else 'false'",
             ]),
@@ -93,6 +109,15 @@ def generate_launch_description() -> LaunchDescription:
         }.items(),
     )
 
+    rviz_node = Node(
+        condition=IfCondition(LaunchConfiguration('rviz')),
+        package='rviz2',
+        executable='rviz2',
+        arguments=['-d', LaunchConfiguration('rviz_config')],
+        output='screen',
+        parameters=[{'use_sim_time': ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)}],
+    )
+
     return LaunchDescription([
         robot_mode,
         slam_enabled,
@@ -101,7 +126,10 @@ def generate_launch_description() -> LaunchDescription:
         use_sim_time,
         world,
         gazebo_gui,
+        rviz,
+        rviz_config,
         teleop,
         localization,
         slam,
+        rviz_node,
     ])

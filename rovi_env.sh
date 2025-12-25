@@ -89,7 +89,7 @@ teleop() {
 }
 
 keyboard() {
-  ros2 launch rovi_bringup keyboard_teleop.launch.py "$@"
+  python3 "${ROVI_ROS_WS_DIR}/tools/rovi_keyboard.py" "$@"
 }
 
 mapping() {
@@ -115,7 +115,7 @@ sim() {
 
   case "${mode}" in
     keyboard)
-      ROS_LOCALHOST_ONLY=1 ros2 launch rovi_bringup keyboard_teleop.launch.py "$@"
+      ROS_LOCALHOST_ONLY=1 python3 "${ROVI_ROS_WS_DIR}/tools/rovi_keyboard.py" "$@"
       ;;
     teleop|mapping|localization|nav)
       ROS_LOCALHOST_ONLY=1 ros2 launch rovi_bringup "${mode}.launch.py" robot_mode:=sim "$@"
