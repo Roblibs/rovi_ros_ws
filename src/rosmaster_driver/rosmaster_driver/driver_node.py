@@ -253,18 +253,9 @@ class RosmasterDriverNode(Node):
         ]
         self.pub_joint_states.publish(joint_state)
 
-def main() -> None:
-    rclpy.init()
+def main(args=None) -> None:
+    rclpy.init(args=args)
     node = RosmasterDriverNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        # Guard against double-shutdown in some launch/SIGINT sequences
-        try:
-            if rclpy.ok():
-                rclpy.shutdown()
-        except Exception:
-            pass
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()

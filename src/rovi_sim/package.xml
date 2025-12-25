@@ -23,7 +23,6 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>teleop_twist_joy</exec_depend>
   <exec_depend>twist_mux</exec_depend>
-  <exec_depend>xacro</exec_depend>
 
   <exec_depend>rovi_base</exec_depend>
   <exec_depend>rovi_bringup</exec_depend>

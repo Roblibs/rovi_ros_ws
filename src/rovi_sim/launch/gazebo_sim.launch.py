@@ -20,8 +20,7 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, Command, TextSubstitution
-from launch.substitutions.find_executable import FindExecutable
+from launch.substitutions import LaunchConfiguration, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -32,7 +31,6 @@ def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
 
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
-    default_robot_sdf = os.path.join(sim_share, 'urdf', 'rovi_sim.sdf.xacro')
     default_bridge_cfg = os.path.join(sim_share, 'config', 'bridge.yaml')
 
     default_urdf = os.path.join(desc_share, 'urdf', 'rovi.urdf')
@@ -87,13 +85,19 @@ def generate_launch_description() -> LaunchDescription:
 
     gazebo_server = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(gz_launch),
-        launch_arguments={'gz_args': [TextSubstitution(text='-r -s '), LaunchConfiguration('world')]}.items(),
+        launch_arguments={
+            'gz_args': [TextSubstitution(text='-r -s '), LaunchConfiguration('world')],
+            'on_exit_shutdown': TextSubstitution(text='true'),
+        }.items(),
     )
 
     gazebo_client = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(gz_launch),
         condition=IfCondition(LaunchConfiguration('gazebo_gui')),
-        launch_arguments={'gz_args': [TextSubstitution(text='-g')]}.items(),
+        launch_arguments={
+            'gz_args': [TextSubstitution(text='-g ')],
+            'on_exit_shutdown': TextSubstitution(text='true'),
+        }.items(),
     )
 
     bridge = Node(
@@ -115,18 +119,7 @@ def generate_launch_description() -> LaunchDescription:
         output='screen',
         arguments=[
             '-name', 'rovi',
-            '-string',
-            Command([
-                FindExecutable(name='xacro'),
-                ' ',
-                default_robot_sdf,
-                ' ',
-                'namespace:=',
-                TextSubstitution(text=''),
-                ' ',
-                'robot_name:=',
-                TextSubstitution(text='rovi'),
-            ]),
+            '-file', default_urdf,
             '-x', TextSubstitution(text='0.0'),
             '-y', TextSubstitution(text='0.0'),
             '-z', TextSubstitution(text='0.05'),
@@ -195,7 +188,9 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # Publish robot_description + TF tree for RViz (reuses the real URDF)
-    robot_description = ParameterValue(Command(['cat ', default_urdf]), value_type=str)
+    with open(default_urdf, 'r', encoding='utf-8') as f:
+        robot_description_content = f.read()
+    robot_description = ParameterValue(robot_description_content, value_type=str)
     rsp_node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',

@@ -40,6 +40,10 @@ clean() {
   rm -rf build/ install/ log/
 }
 
+stop() {
+  python3 "${ROVI_ROS_WS_DIR}/tools/rovi_stop.py" "$@"
+}
+
 build() {
   colcon build "$@"
 }
@@ -100,7 +104,7 @@ nav() {
 }
 
 sim() {
-  ros2 launch rovi_sim gazebo_sim.launch.py "$@"
+  ROS_LOCALHOST_ONLY=1 ros2 launch rovi_sim gazebo_sim.launch.py "$@"
 }
 
 view() {

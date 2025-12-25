@@ -19,6 +19,7 @@ Commands provided by `rovi_env.sh`
 |---|---|
 | `ws` | Changes to `$ROVI_ROS_WS_DIR`, runs `setup`, and (if present) activates `.venv`. |
 | `build` | Runs `colcon build` in this workspace. This generates/updates the `install/` overlay used by `ros2 launch`. |
+| `stop` | Hard-stops ROS/Gazebo/RViz processes for the current user (use when a launch left nodes running). |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
 | `teleop` | Runs `rovi_bringup/teleop.launch.py` (package `rovi_bringup`). It automatically calls `setup` + `activate`, then starts joystick teleop + the base stack for the real robot. |
@@ -38,6 +39,8 @@ The simulation goal is to reuse the existing localization/SLAM/Nav2 stack unchan
 - `/scan` (LiDAR)
 - `/odom_raw` → `/odometry/filtered` (via existing EKF)
 - `/clock` (`use_sim_time:=true`)
+
+For motion testing without a joystick, you can publish directly to `/cmd_vel` (or run Nav2 goals from RViz).
 
 # Install
 
