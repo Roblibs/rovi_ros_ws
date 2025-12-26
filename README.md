@@ -192,8 +192,47 @@ Conventions:
 - Rounded nodes are ROS topics (`/name<br/>(MsgType)`).
 - In connection to topics, arrows only represent publish/subscribe via a topic.
 
-## Robot Modes (target)
-This diagram shows the *intended* unification: higher-level launches stay the same, and `robot_mode` selects the backend that provides the robot interface.
+## Robot Modes
+This diagram shows the unification: higher-level launches stay the same, and `robot_mode` selects the backend that provides the robot interface.
+
+```plantuml
+@startuml
+left to right direction
+
+package "Bringup" {
+  Bringup : rovi_bringup/rovi.launch.py\nrobot_mode: real | sim | offline
+}
+
+package "Robot interface contract (stable)" {
+  left to right direction
+  CMD : /cmd_vel (Twist)
+  SCAN : /scan (LaserScan)
+  IMU_RAW : /imu/data_raw (Imu)
+  VRAW : /vel_raw (Twist)
+  ODRAW : /odom_raw (Odometry)
+  CLOCK : /clock (Clock, sim only)
+}
+
+package "Backend selected by robot_mode" {
+  left to right direction
+  Real : real: rosmaster_driver + sensors
+  Sim : sim: Gazebo Sim + ros_gz_bridge + rovi_sim_base
+  Offline : offline: model inspection only
+}
+
+package "Mode-agnostic consumers (unchanged)" {
+  left to right direction
+  EKF : rovi_localization
+  SLAM : rovi_slam
+  NAV : rovi_nav
+  RVIZ : rviz2
+}
+
+Bringup --> Backends : select
+Backends --> Contract : provide
+Contract --> Consumers : consume
+@enduml
+```
 
 ```mermaid
 flowchart TD

@@ -61,7 +61,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RL_FR.stl"/>
+        <cylinder radius="0.04" length="0.037"/>
       </geometry>
     </collision>
   </link>
@@ -92,7 +92,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RR_FL.stl"/>
+        <cylinder radius="0.04" length="0.037"/>
       </geometry>
     </collision>
   </link>
@@ -123,7 +123,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RR_FL.stl"/>
+        <cylinder radius="0.04" length="0.037"/>
       </geometry>
     </collision>
   </link>
@@ -154,7 +154,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://rovi_description/meshes/mecanum/wheel_RL_FR.stl"/>
+        <cylinder radius="0.04" length="0.037"/>
       </geometry>
     </collision>
   </link>
