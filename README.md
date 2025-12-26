@@ -19,7 +19,7 @@ Commands provided by `rovi_env.sh`
 |---|---|
 | `ws` | Changes to `$ROVI_ROS_WS_DIR`, runs `setup`, and (if present) activates `.venv`. |
 | `build` | Runs `colcon build` in this workspace. This generates/updates the `install/` overlay used by `ros2 launch`. |
-| `stop` | Hard-stops ROS/Gazebo/RViz processes for the current user (use when a launch left nodes running). |
+| `stop` | Stops ROS/Gazebo/RViz processes that belong to this workspace (use `stop --all` for an aggressive full user hard-stop). |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
