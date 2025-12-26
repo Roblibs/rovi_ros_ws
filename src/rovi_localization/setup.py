@@ -21,9 +21,4 @@ setup(
     description='Localization (EKF + IMU filter) launch and configuration for Room View Bot.',
     license='Apache-2.0',
     tests_require=['pytest'],
-    entry_points={
-        'console_scripts': [
-            'rovi_imu_marker = rovi_localization.imu_marker_node:main',
-        ],
-    },
 )

@@ -172,7 +172,6 @@ install_ros_deps() {
     ros-jazzy-nav2-bringup
     ros-jazzy-nav2-rviz-plugins
     ros-jazzy-imu-filter-madgwick
-    ros-jazzy-rviz-imu-plugin
   )
 
   if [ "$(id -u)" -eq 0 ]; then
