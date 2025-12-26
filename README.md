@@ -76,10 +76,10 @@ Packages of this repo are listed in this table
 | Package | Role |
 |---|---|
 | `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
-| `rovi_sim` | Gazebo Sim backend: worlds + bridges + `rovi_sim_base`; spawns the shared robot model from `rovi_description` into Gazebo Sim |
+| `rovi_sim` | Gazebo Sim backend: worlds + bridges + `rovi_sim_base` + `rovi_gz_odom`; spawns the shared robot model from `rovi_description` into Gazebo Sim |
 | `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
 | `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
-| `rovi_base` | Odometry integrator: `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom) |
+| `rovi_base` | Odometry integrator (real robot): `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom). In simulation, `/odom_raw` comes from Gazebo ground truth. |
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
@@ -173,7 +173,7 @@ Only the parameters toggeling nodes activation are listed here
 | `robot_mode` | Intended machine | Backend (started by `robot_bringup.launch.py`) | `use_sim_time` | RViz default |
 |---|---|---|---|---|
 | `real` | robot (Pi) | real drivers + sensors | `false` | `off` |
-| `sim` | PC | Gazebo Sim backend | `true` | `on` |
+| `sim` | PC | Gazebo Sim backend (+ ground-truth odom) | `true` | `on` |
 | `offline` | PC | URDF inspection only | `false` | `on` |
 
 ### Odometry Modes
@@ -181,7 +181,7 @@ Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`
 
 | `odom_mode` | `rovi_base_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
 |---|---|---|---|---|
-| `raw` | `true` | `rovi_base` | (none) | Fastest/simplest; wheel odom only (`/odom_raw`), no `/odometry/filtered` |
+| `raw` | `true` | `rovi_base` (real) / `rovi_gz_odom` (sim) | (none) | Fastest/simplest; no `/odometry/filtered` |
 | `filtered` | `false` | `robot_localization/ekf_node` | `robot_localization/ekf_node` | Filters wheel odom (`/odom_raw` → `/odometry/filtered`) |
 | `fusion_wheels_imu` | `false` | `robot_localization/ekf_node` | `imu_filter_madgwick` + `robot_localization/ekf_node` | Adds IMU yaw + yaw rate (`/imu/data_raw` → `/imu/data`); set `mag_enabled:=true` to use `/imu/mag` |
 
@@ -442,16 +442,14 @@ flowchart TD
   RoviSimBase -->|publish| CMD_SIM
   RoviSimBase -->|publish| VRAW
 
-  RoviBase["rovi_base"]
-  VRAW -->|subscribe| RoviBase
   ODRAW(["/odom_raw<br/>(Odometry)"])
-  RoviBase -->|publish| ODRAW
 
   subgraph GZ["Gazebo Sim (gz sim)"]
     WORLD["room world"]
     ROBOT["rovi robot model (URDF from rovi_description)"]
     LIDAR["lidar sensor"]
     IMU_GZ["imu sensor"]
+    ODOM_GZ(["/model/rovi/odometry<br/>(gz.msgs.Odometry)"])
   end
 
   BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
@@ -460,13 +458,21 @@ flowchart TD
   BRIDGE -->|bridge| ROBOT
   LIDAR --> BRIDGE
   IMU_GZ --> BRIDGE
+  ODOM_GZ --> BRIDGE
 
   SCAN(["/scan<br/>(LaserScan)"])
   CLOCK(["/clock"])
   IMU_RAW(["/imu/data_raw<br/>(Imu)"])
+  ODOM_BRIDGED(["/odom_gz<br/>(Odometry)"])
   BRIDGE -->|bridge| SCAN
   BRIDGE -->|bridge| CLOCK
   BRIDGE -->|bridge| IMU_RAW
+  BRIDGE -->|bridge| ODOM_BRIDGED
+
+  RoviGzOdom["rovi_gz_odom<br/>(Gazebo odom → /odom_raw)"]
+  ODOM_BRIDGED -->|subscribe| RoviGzOdom
+  RoviGzOdom -->|publish| ODRAW
+  RoviGzOdom -.->|"publish TF (odom_mode=raw/teleop)"| TF_ODOM_BASE("odom->base_footprint")
 
   EXISTING["Existing stack (unchanged): rovi_localization + rovi_slam + rovi_nav"]
   ODRAW --> EXISTING
@@ -480,7 +486,7 @@ TF frames are not regular ROS topics; this is the chain RViz and SLAM use at run
 ```mermaid
 flowchart TD
   MAP[map] -->|slam_toolbox| ODOM[odom]
-  ODOM -->|ekf_node OR rovi_base| BASEF[base_footprint]
+  ODOM -->|"ekf_node OR rovi_base (real) OR rovi_gz_odom (sim)"| BASEF[base_footprint]
   BASEF -->|robot_state_publisher| BASEL[base_link]
   BASEL -->|robot_state_publisher| LASER[laser_link]
   BASEL -->|robot_state_publisher| IMU[imu_link]

@@ -3,7 +3,7 @@
 
 This launch is intentionally *not* a full stack bringup. It only starts:
 - Gazebo Sim (server + optional GUI)
-- ros_gz_bridge (parameter_bridge) to bridge /clock, /scan, /imu/data_raw and cmd_vel
+- ros_gz_bridge (parameter_bridge) to bridge /clock, /scan, /imu/data_raw, /odom_gz and cmd_vel
 - Robot spawn from the shared URDF (rovi_description)
 
 Higher-level bringup (teleop / mapping / nav) is expected to run separately and remain unchanged.

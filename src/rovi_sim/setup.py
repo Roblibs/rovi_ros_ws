@@ -26,6 +26,7 @@ setup(
     entry_points={
         'console_scripts': [
             'rovi_sim_base = rovi_sim.sim_base_node:main',
+            'rovi_gz_odom = rovi_sim.gz_odom_node:main',
         ],
     },
 )

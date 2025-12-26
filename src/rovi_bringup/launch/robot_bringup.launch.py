@@ -5,13 +5,13 @@ This launch provides the "robot interface contract" expected by higher-level sta
 - /cmd_vel (Twist) input
 - /scan (LaserScan)
 - /vel_raw (Twist) feedback
-- /odom_raw (Odometry) + TF odom -> base_footprint (depending on odom_mode / publish_tf)
+- /odom_raw (Odometry) + TF odom -> base_footprint (source depends on robot_mode / odom_mode)
 - /imu/data_raw (Imu) when available
 - /clock when robot_mode=sim (use_sim_time:=true)
 
 robot_mode:
   - real: hardware drivers (rosmaster_driver + rplidar_ros) + rovi_base + robot_state_publisher
-  - sim:  Gazebo Sim backend (rovi_sim) + rovi_sim_base + rovi_base + robot_state_publisher
+  - sim:  Gazebo Sim backend (rovi_sim) + rovi_sim_base + rovi_gz_odom + robot_state_publisher
   - offline: model inspection only (robot_state_publisher + joint_state_publisher_gui)
 """
 
@@ -235,7 +235,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     rovi_base_node = Node(
-        condition=is_not_offline,
+        condition=is_real,
         package='rovi_base',
         executable='rovi_base_node',
         name='rovi_base',
@@ -314,6 +314,25 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    sim_odom = Node(
+        condition=is_sim,
+        package='rovi_sim',
+        executable='rovi_gz_odom',
+        name='rovi_gz_odom',
+        output='screen',
+        parameters=[
+            {
+                'input_topic': 'odom_gz',
+                'output_topic': 'odom_raw',
+                'odom_frame': LaunchConfiguration('rovi_base_odom_frame'),
+                'base_frame': LaunchConfiguration('rovi_base_frame'),
+                'publish_tf': ParameterValue(LaunchConfiguration('rovi_base_publish_tf'), value_type=bool),
+                'two_d_mode': True,
+                'use_sim_time': use_sim_time_param,
+            }
+        ],
+    )
+
     return LaunchDescription([
         robot_mode_arg,
         model_arg,
@@ -343,4 +362,5 @@ def generate_launch_description() -> LaunchDescription:
         lidar_node,
         sim_backend,
         sim_base,
+        sim_odom,
     ])
