@@ -265,32 +265,15 @@ flowchart TD
   Contract -->|consume| Consumers
 ```
 
-## Basic Flow
+## Real robot
+control board + sensors
 
 ```mermaid
 flowchart TD
-  Rosmaster[rosmaster_driver node]
-
-  Joystick["ros-jazzy-joy node"]
-  JOY(["/joy<br/>(Joy)"])
-  Joystick -->|publish| JOY
-
-  RoviJoy["ros-jazzy-teleop-twist-joy node"]
-  JOY -->|subscribe| RoviJoy
-  CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
-  RoviJoy -->|publish| CMD_JOY
-
-  Keyboard["rovi_keyboard (tools/rovi_keyboard.py)"]
-  CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
-  Keyboard -->|publish| CMD_KEY
-
-  TwistMux["twist_mux node"]
-  CMD_JOY -->|subscribe| TwistMux
-  CMD_KEY -->|subscribe| TwistMux
   CMD(["/cmd_vel<br/>(Twist)"])
-  TwistMux -->|publish| CMD
-
+  Rosmaster["rosmaster_driver<br>(control board)"]
   CMD -->|subscribe| Rosmaster
+
   EDT(["/edition<br/>(Float32)"])
   VOL(["/voltage<br/>(Float32)"])
   VRAW(["/vel_raw<br/>(Twist)"])
@@ -306,7 +289,7 @@ flowchart TD
   Rosmaster -->|publish| IMU_RAW
   Rosmaster -->|publish| MAG
 
-  RoviBase["rovi_base node"]
+  RoviBase["rovi_base"]
   VRAW -->|subscribe| RoviBase
   ODRAW(["/odom_raw<br/>(Odometry)"])
 
@@ -322,10 +305,43 @@ flowchart TD
   JSTATE -->|subscribe| RSP
   RSP -->|publish| TF_LINKS_JOINTS
 
-  RPLidar["rplidar_ros node"]
+  RPLidar["rplidar_ros (LiDAR device)"]
   SCAN(["/scan<br/>(LaserScan)"])
   RPLidar -->|publish| SCAN
 
+```
+
+## Manual control
+joystick + keyboard
+
+```mermaid
+flowchart TD
+  Joystick["joy_node (Bluetooth joystick)"]
+  JOY(["/joy<br/>(Joy)"])
+  Joystick -->|publish| JOY
+
+  TeleopJoy["teleop_twist_joy"]
+  JOY -->|subscribe| TeleopJoy
+  CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
+  TeleopJoy -->|publish| CMD_JOY
+
+  Keyboard["rovi_keyboard (tools/rovi_keyboard.py)"]
+  CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
+  Keyboard -->|publish| CMD_KEY
+
+  Nav2["nav2 controller (optional)"]
+  CMD_NAV(["/cmd_vel_nav<br/>(Twist)"])
+  Nav2 -->|publish| CMD_NAV
+
+  TwistMux["twist_mux"]
+  CMD_JOY -->|subscribe| TwistMux
+  CMD_KEY -->|subscribe| TwistMux
+  CMD_NAV -->|subscribe| TwistMux
+  CMD(["/cmd_vel<br/>(Twist)"])
+  TwistMux -->|publish| CMD
+
+  Rosmaster["rosmaster_driver"]
+  CMD -->|subscribe| Rosmaster
 ```
 
 ## Odometry filtering
