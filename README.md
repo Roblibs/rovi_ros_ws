@@ -23,7 +23,7 @@ Commands provided by `rovi_env.sh`
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
-| `keyboard` | Runs `teleop_twist_keyboard` in the current terminal and publishes `/cmd_vel_keyboard` for `twist_mux` (run in its own terminal). |
+| `keyboard` | Runs `tools/rovi_keyboard.py` in the current terminal and publishes `/cmd_vel_keyboard` for `twist_mux` (run in its own terminal). |
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
@@ -52,7 +52,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 * Install all the needed depedencies ros packages
 
 ```bash
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-teleop-twist-keyboard ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
+sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
 ```
 
 ## wsl
@@ -84,13 +84,13 @@ Packages of this repo are listed in this table
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
 
-External ROS packages installed via apt and how they are used in this workspace:
+External ROS packages installed via apt (and a couple of local tools) and how they are used in this workspace:
 
 | Dependency | Description |
 |---|---|
 | `ros-jazzy-joy` | Used by `rovi_bringup/teleop.launch.py` to start `joy_node` and publish `/joy` from the joystick device. |
 | `ros-jazzy-teleop-twist-joy` | Used by `rovi_bringup/teleop.launch.py` to convert `/joy` into `/cmd_vel_joy`, using `rovi_bringup/config/teleop_twist_joy.yaml`. |
-| `ros-jazzy-teleop-twist-keyboard` | Keyboard teleop (`keyboard` command) that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) and is muxed via `twist_mux` like joystick and Nav2. |
+| `tools/rovi_keyboard.py` | Keyboard teleop (`keyboard` command) that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) and is muxed via `twist_mux` like joystick and Nav2. |
 | `ros-jazzy-twist-mux` | Used by `rovi_bringup/teleop.launch.py` to mux joystick `/cmd_vel_joy`, keyboard `/cmd_vel_keyboard`, and Nav2 `/cmd_vel_nav` into the final `/cmd_vel` topic consumed by the robot backend. |
 | `ros-jazzy-diagnostic-updater` | Used by `rovi_base` to publish runtime diagnostics (for example on `/diagnostics`). |
 | `ros-jazzy-robot-state-publisher` | Used by `rovi_bringup/robot_bringup.launch.py` (all modes) to publish the TF tree from the `rovi_description` URDF and provide `/robot_description` to RViz. |
@@ -129,7 +129,7 @@ ROS nodes started by the launches above (some are conditional based on params).
 |---|---|---|
 | `joy_node` | `joy` | Reads a joystick device and publishes `/joy` (`sensor_msgs/msg/Joy`). |
 | `teleop_twist_joy` | `teleop_twist_joy` | Converts `/joy` into velocity commands on `/cmd_vel_joy` (`geometry_msgs/msg/Twist`). |
-| `teleop_twist_keyboard` | `teleop_twist_keyboard` | Keyboard teleop that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) (run via the `keyboard` command in its own terminal). |
+| `rovi_keyboard` | `tools/rovi_keyboard.py` | Keyboard teleop tool that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) (run via the `keyboard` command in its own terminal). |
 | `twist_mux` | `twist_mux` | Selects the active velocity command source (e.g., `/cmd_vel_nav` vs `/cmd_vel_joy`) and publishes `/cmd_vel`. |
 | `rosmaster_driver` | `rosmaster_driver` | Hardware bridge for the Rosmaster base board: subscribes to `/cmd_vel` and publishes feedback like `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, and `/voltage`. |
 | `rovi_base` | `rovi_base` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
@@ -169,37 +169,14 @@ Only the parameters toggeling nodes activation are listed here
 | `mag_enabled` | `rovi_localization` | `ekf.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
 | `map_file_name` | `rovi_bringup` | `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `~/.ros/rovi/maps/latest.posegraph` | Pose-graph file to load when `slam_mode=localization`. |
 
-## Robot modes
-`robot_mode` :=  `real` / `sim` / `offline`
+### Robot modes
+| `robot_mode` | Intended machine | Backend (started by `robot_bringup.launch.py`) | `use_sim_time` | RViz default |
+|---|---|---|---|---|
+| `real` | robot (Pi) | real drivers + sensors | `false` | `off` |
+| `sim` | PC | Gazebo Sim backend | `true` | `on` |
+| `offline` | PC | URDF inspection only | `false` | `on` |
 
-Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`, RViz) unchanged while selecting *how the robot is provided* via a single `robot_mode` argument.
-
-### Robot interface contract (what the rest of the stack assumes)
-- `/cmd_vel` (`geometry_msgs/msg/Twist`) holonomic X/Y + yaw
-- `/scan` (`sensor_msgs/msg/LaserScan`)
-- `/vel_raw` (`geometry_msgs/msg/Twist`) base feedback (used by `rovi_base`)
-- `/odom_raw` (`nav_msgs/msg/Odometry`) and TF `odom -> base_footprint` (raw or filtered depending on `odom_mode`)
-- `/imu/data_raw` (`sensor_msgs/msg/Imu`) (needed for `odom_mode=fusion_wheels_imu`)
-- `/clock` (sim only, with `use_sim_time:=true`)
-
-### Modes (target end-state)
-- `robot_mode=real`: starts real drivers (`rosmaster_driver`, `rplidar_ros`, etc.).
-- `robot_mode=sim`: starts Gazebo Sim + `ros_gz_bridge`, and provides the same ROS topics (`/scan`, `/imu/data_raw`, `/clock`) as the real robot.
-- `robot_mode=offline`: starts only URDF visualization nodes (no hardware, no simulation) for model inspection.
-
-### Control inputs (target end-state)
-All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` topic:
-- joystick: `/cmd_vel_joy`
-- keyboard: `/cmd_vel_keyboard` (via `teleop_twist_keyboard`)
-- navigation: `/cmd_vel_nav`
-
-### Status
-`rovi_bringup/rovi.launch.py` is the single entrypoint that selects `robot_mode` and owns RViz startup policy:
-- `robot_mode=real`: intended for the robot (headless; RViz default off)
-- `robot_mode=sim`: Gazebo backend + stacks (RViz default on)
-- `robot_mode=offline`: URDF inspection (RViz default on)
-
-## Odometry Modes
+### Odometry Modes
 Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
 
 | `odom_mode` | `rovi_base_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
@@ -263,7 +240,7 @@ flowchart TD
   CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
   RoviJoy -->|publish| CMD_JOY
 
-  Keyboard["teleop_twist_keyboard node"]
+  Keyboard["rovi_keyboard (tools/rovi_keyboard.py)"]
   CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
   Keyboard -->|publish| CMD_KEY
 
@@ -625,19 +602,19 @@ flowchart LR
 flowchart LR
   subgraph Internal
     RoviBringup[rovi_bringup]
-    RoviSim[rovi_sim]
     RoviDesc[rovi_description]
     Rosmaster[rosmaster_driver]
     RoviBase[rovi_base]
     RoviLoc[rovi_localization]
     RoviSlam[rovi_slam]
     RoviNav[rovi_nav]
+    RoviSim[rovi_sim]
   end
 
   subgraph External
     Joy[ros-jazzy-joy]
     Teleop[ros-jazzy-teleop-twist-joy]
-    TeleopKey[ros-jazzy-teleop-twist-keyboard]
+    TeleopKey[tools/rovi_keyboard.py]
     TwistMux[twist_mux]
     RSP[robot_state_publisher]
     JSPG[joint_state_publisher_gui]
@@ -658,7 +635,6 @@ flowchart LR
   RoviBringup -.-> RoviLoc
   RoviBringup -.-> RoviSlam
   RoviBringup -.-> RoviNav
-  RoviBringup -.-> RoviSim
   RoviBringup --> Joy
   RoviBringup --> Teleop
   RoviBringup -.-> TeleopKey
@@ -667,6 +643,7 @@ flowchart LR
   RoviBringup --> JSPG
   RoviBringup --> RVIZ
   RoviBringup --> RPLidar
+  RoviBringup -.-> RoviSim
 
   RoviBase --> Diag
 
@@ -675,9 +652,9 @@ flowchart LR
   RoviSlam --> SlamToolbox
   RoviNav --> Nav2
 
-  RoviSim --> RoviDesc
   RoviSim --> RosGzSim
   RoviSim --> RosGzBridge
+  RoviSim --> RoviDesc
 ```
 
 # Nodes details
@@ -699,6 +676,34 @@ record nav
 play
 play nav
 ```
+
+## Robot backend contract
+Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`, RViz) unchanged while selecting *how the robot is provided* via a single `robot_mode` argument.
+
+### Robot interface contract (what the rest of the stack assumes)
+- `/cmd_vel` (`geometry_msgs/msg/Twist`) holonomic X/Y + yaw
+- `/scan` (`sensor_msgs/msg/LaserScan`)
+- `/vel_raw` (`geometry_msgs/msg/Twist`) base feedback (used by `rovi_base`)
+- `/odom_raw` (`nav_msgs/msg/Odometry`) and TF `odom -> base_footprint` (raw or filtered depending on `odom_mode`)
+- `/imu/data_raw` (`sensor_msgs/msg/Imu`) (needed for `odom_mode=fusion_wheels_imu`)
+- `/clock` (sim only, with `use_sim_time:=true`)
+
+### Modes (overview)
+- `robot_mode=real`: starts real drivers (`rosmaster_driver`, `rplidar_ros`, etc.).
+- `robot_mode=sim`: starts Gazebo Sim + `ros_gz_bridge`, and provides the same ROS topics (`/scan`, `/imu/data_raw`, `/clock`) as the real robot.
+- `robot_mode=offline`: starts only URDF visualization nodes (no hardware, no simulation) for model inspection.
+
+### Control inputs
+All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` topic:
+- joystick: `/cmd_vel_joy`
+- keyboard: `/cmd_vel_keyboard` (via `tools/rovi_keyboard.py`)
+- navigation: `/cmd_vel_nav`
+
+### Status
+`rovi_bringup/rovi.launch.py` is the single entrypoint that selects `robot_mode` and owns RViz startup policy:
+- `robot_mode=real`: intended for the robot (headless; RViz default off)
+- `robot_mode=sim`: Gazebo backend + stacks (RViz default on)
+- `robot_mode=offline`: URDF inspection (RViz default on)
 
 ## rosmaster driver
 ![packafe_flow](./docs/rosmaster.drawio.svg)
