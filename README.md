@@ -37,34 +37,6 @@ Commands provided by `rovi_env.sh`
 - **PC (optional):** `view` / `view_teleop` (pure visualization; no robot nodes).
 - **Simulation (PC):** `sim` (starts Gazebo + stack + RViz together).
 
-## Robot modes: `real` / `sim` / `offline`
-Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`, RViz) unchanged while selecting *how the robot is provided* via a single `robot_mode` argument.
-
-### Robot interface contract (what the rest of the stack assumes)
-- `/cmd_vel` (`geometry_msgs/msg/Twist`) holonomic X/Y + yaw
-- `/scan` (`sensor_msgs/msg/LaserScan`)
-- `/vel_raw` (`geometry_msgs/msg/Twist`) base feedback (used by `rovi_base`)
-- `/odom_raw` (`nav_msgs/msg/Odometry`) and TF `odom -> base_footprint` (raw or filtered depending on `odom_mode`)
-- `/imu/data_raw` (`sensor_msgs/msg/Imu`) (needed for `odom_mode=fusion_wheels_imu`)
-- `/clock` (sim only, with `use_sim_time:=true`)
-
-### Modes (target end-state)
-- `robot_mode=real`: starts real drivers (`rosmaster_driver`, `rplidar_ros`, etc.).
-- `robot_mode=sim`: starts Gazebo Sim + `ros_gz_bridge`, and provides the same ROS topics (`/scan`, `/imu/data_raw`, `/clock`) as the real robot.
-- `robot_mode=offline`: starts only URDF visualization nodes (no hardware, no simulation) for model inspection.
-
-### Control inputs (target end-state)
-All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` topic:
-- joystick: `/cmd_vel_joy`
-- keyboard: `/cmd_vel_keyboard` (via `teleop_twist_keyboard`)
-- navigation: `/cmd_vel_nav`
-
-### Status
-`rovi_bringup/rovi.launch.py` is the single entrypoint that selects `robot_mode` and owns RViz startup policy:
-- `robot_mode=real`: intended for the robot (headless; RViz default off)
-- `robot_mode=sim`: Gazebo backend + stacks (RViz default on)
-- `robot_mode=offline`: URDF inspection (RViz default on)
-
 # Install
 
 * Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
@@ -197,7 +169,37 @@ Only the parameters toggeling nodes activation are listed here
 | `mag_enabled` | `rovi_localization` | `ekf.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
 | `map_file_name` | `rovi_bringup` | `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `~/.ros/rovi/maps/latest.posegraph` | Pose-graph file to load when `slam_mode=localization`. |
 
-### Odometry Modes (`odom_mode`)
+## Robot modes
+`robot_mode` :=  `real` / `sim` / `offline`
+
+Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`, RViz) unchanged while selecting *how the robot is provided* via a single `robot_mode` argument.
+
+### Robot interface contract (what the rest of the stack assumes)
+- `/cmd_vel` (`geometry_msgs/msg/Twist`) holonomic X/Y + yaw
+- `/scan` (`sensor_msgs/msg/LaserScan`)
+- `/vel_raw` (`geometry_msgs/msg/Twist`) base feedback (used by `rovi_base`)
+- `/odom_raw` (`nav_msgs/msg/Odometry`) and TF `odom -> base_footprint` (raw or filtered depending on `odom_mode`)
+- `/imu/data_raw` (`sensor_msgs/msg/Imu`) (needed for `odom_mode=fusion_wheels_imu`)
+- `/clock` (sim only, with `use_sim_time:=true`)
+
+### Modes (target end-state)
+- `robot_mode=real`: starts real drivers (`rosmaster_driver`, `rplidar_ros`, etc.).
+- `robot_mode=sim`: starts Gazebo Sim + `ros_gz_bridge`, and provides the same ROS topics (`/scan`, `/imu/data_raw`, `/clock`) as the real robot.
+- `robot_mode=offline`: starts only URDF visualization nodes (no hardware, no simulation) for model inspection.
+
+### Control inputs (target end-state)
+All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` topic:
+- joystick: `/cmd_vel_joy`
+- keyboard: `/cmd_vel_keyboard` (via `teleop_twist_keyboard`)
+- navigation: `/cmd_vel_nav`
+
+### Status
+`rovi_bringup/rovi.launch.py` is the single entrypoint that selects `robot_mode` and owns RViz startup policy:
+- `robot_mode=real`: intended for the robot (headless; RViz default off)
+- `robot_mode=sim`: Gazebo backend + stacks (RViz default on)
+- `robot_mode=offline`: URDF inspection (RViz default on)
+
+## Odometry Modes
 Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
 
 | `odom_mode` | `rovi_base_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
