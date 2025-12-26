@@ -211,7 +211,53 @@ Conventions:
 ## Robot Modes
 This diagram shows the unification: higher-level launches stay the same, and `robot_mode` selects the backend that provides the robot interface.
 
-![robot modes](./docs/robot_modes.svg)
+```mermaid
+flowchart TB
+  subgraph L1["1) Control / autonomy"]
+    direction TB
+    TELEOP["Teleop (joystick/keyboard)"]
+    NAV2["Nav2 (optional)"]
+  end
+
+  subgraph L2["2) Command interface"]
+    direction TB
+    CMD(["/cmd_vel<br/>(Twist)"])
+  end
+
+  subgraph L3["3) Robot backend"]
+    direction TB
+    BACKEND["real | sim | offline"]
+  end
+
+  subgraph L4["4) Feedback  interface"]
+    direction TB
+    SCAN(["/scan<br/>(LaserScan)"])
+    IMU_RAW(["/imu/data_raw<br/>(Imu)"])
+    VRAW(["/vel_raw<br/>(Twist)"])
+    ODRAW(["/odom_raw<br/>(Odometry)"])
+    CLOCK(["/clock<br/>(Clock, sim only)"])
+
+  end
+
+  STACKS["Localization / SLAM / RViz / (Nav2)"]
+
+  TELEOP --> CMD
+  NAV2 --> CMD
+
+  CMD --> BACKEND
+
+  BACKEND --> SCAN
+  BACKEND --> IMU_RAW
+  BACKEND --> VRAW
+  BACKEND --> ODRAW
+  BACKEND --> CLOCK
+
+  SCAN --> STACKS
+  IMU_RAW --> STACKS
+  VRAW --> STACKS
+  ODRAW --> STACKS
+  CLOCK --> STACKS
+```
 
 ## Real robot
 control board + sensors
