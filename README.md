@@ -28,13 +28,14 @@ Commands provided by `rovi_env.sh`
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
 | `sim` | Simulation shortcut: `sim` (default mapping) or `sim teleop|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
-| `view` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (Fixed Frame: `map`). Use with `mapping` or `nav` running on the robot. |
+| `view` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (Fixed Frame: `map`). Use with `mapping` or `localization` running on the robot. |
+| `view_nav` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_nav.rviz` (Nav2 panel; Fixed Frame: `map`). Use with `nav` running on the robot. |
 | `view_teleop` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (Fixed Frame: `odom`). Use with `teleop` running on the robot. |
 | `view_offline` | Local only: runs `rovi_bringup/rovi.launch.py robot_mode:=offline stack:=offline` (URDF inspection without robot hardware). |
 
 ## Where to run what
 - **Robot (Pi):** `teleop`, `mapping`, `localization`, `nav` (RViz is always off on the robot).
-- **PC (optional):** `view` / `view_teleop` (pure visualization; no robot nodes).
+- **PC (optional):** `view` / `view_nav` / `view_teleop` (pure visualization; no robot nodes).
 - **Simulation (PC):** `sim` (starts Gazebo + stack + RViz together).
 
 # Install
@@ -52,8 +53,23 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 * Install all the needed depedencies ros packages
 
 ```bash
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-rviz-imu-plugin
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
+sudo apt install -y \
+  ros-jazzy-joy \
+  ros-jazzy-teleop-twist-joy \
+  ros-jazzy-twist-mux \
+  ros-jazzy-diagnostic-updater \
+  ros-jazzy-robot-state-publisher \
+  ros-jazzy-joint-state-publisher \
+  ros-jazzy-joint-state-publisher-gui \
+  ros-jazzy-rviz2 \
+  ros-jazzy-rplidar-ros \
+  ros-jazzy-slam-toolbox \
+  ros-jazzy-robot-localization \
+  ros-jazzy-nav2-bringup \
+  ros-jazzy-nav2-rviz-plugins \
+  ros-jazzy-imu-filter-madgwick \
+  ros-jazzy-ros-gz-sim \
+  ros-jazzy-ros-gz-bridge
 ```
 
 ## wsl
@@ -103,7 +119,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-slam-toolbox` | Used via `rovi_slam/slam_toolbox.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/map` and TF `map -> odom`. |
 | `ros-jazzy-robot-localization` | Used by `rovi_localization/ekf.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/odometry/filtered` and TF `odom -> base_footprint`. |
 | `ros-jazzy-nav2-bringup` | Provides Nav2 servers started by `rovi_nav/launch/nav.launch.py` for goal-based navigation (planner/controller/BT navigator/behaviors). |
-| `ros-jazzy-nav2-rviz-plugins` | Required by `rovi_map.rviz` so RViz can show the Nav2 panel and tools (initial pose + goal) when `nav` is running. |
+| `ros-jazzy-nav2-rviz-plugins` | Required by `rovi_nav.rviz` so RViz can show the Nav2 panel and tools (initial pose + goal) when `nav` is running. |
 | `ros-jazzy-imu-filter-madgwick` | Used when `odom_mode=fusion_wheels_imu` to filter `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` for the EKF. |
 
 ## Launches
@@ -195,75 +211,7 @@ Conventions:
 ## Robot Modes
 This diagram shows the unification: higher-level launches stay the same, and `robot_mode` selects the backend that provides the robot interface.
 
-```plantuml
-@startuml
-left to right direction
-
-package "Bringup" {
-  Bringup : rovi_bringup/rovi.launch.py\nrobot_mode: real | sim | offline
-}
-
-package "Robot interface contract (stable)" {
-  left to right direction
-  CMD : /cmd_vel (Twist)
-  SCAN : /scan (LaserScan)
-  IMU_RAW : /imu/data_raw (Imu)
-  VRAW : /vel_raw (Twist)
-  ODRAW : /odom_raw (Odometry)
-  CLOCK : /clock (Clock, sim only)
-}
-
-package "Backend selected by robot_mode" {
-  left to right direction
-  Real : real: rosmaster_driver + sensors
-  Sim : sim: Gazebo Sim + ros_gz_bridge + rovi_sim_base
-  Offline : offline: model inspection only
-}
-
-package "Mode-agnostic consumers (unchanged)" {
-  left to right direction
-  EKF : rovi_localization
-  SLAM : rovi_slam
-  NAV : rovi_nav
-  RVIZ : rviz2
-}
-
-Bringup --> Backends : select
-Backends --> Contract : provide
-Contract --> Consumers : consume
-@enduml
-```
-
-```mermaid
-flowchart TD
-  Bringup["rovi_bringup/rovi.launch.py\nrobot_mode: real | sim | offline"]
-
-  subgraph Contract["Robot interface contract (stable)"]
-    CMD(["/cmd_vel<br/>(Twist)"])
-    SCAN(["/scan<br/>(LaserScan)"])
-    IMU_RAW(["/imu/data_raw<br/>(Imu)"])
-    VRAW(["/vel_raw<br/>(Twist)"])
-    ODRAW(["/odom_raw<br/>(Odometry)"])
-    CLOCK(["/clock<br/>(Clock, sim only)"])
-  end
-
-  subgraph Backends["Backend selected by robot_mode"]
-    Real["real: rosmaster_driver + sensors"]
-    Sim["sim: Gazebo Sim + ros_gz_bridge + rovi_sim_base"]
-    Offline["offline: model inspection only"]
-  end
-
-  subgraph Consumers["Mode-agnostic consumers (unchanged)"]
-    EKF["rovi_localization"]
-    SLAM["rovi_slam"]
-    NAV["rovi_nav"]
-    RVIZ["rviz2"]
-  end
-
-  Bringup -->|select| Backends
-  Backends -->|provide| Contract
-  Contract -->|consume| Consumers
-```
+![robot modes](./docs/robot_modes.svg)
 
 ## Real robot
 control board + sensors
@@ -448,14 +396,19 @@ flowchart TD
 
   RVIZ_ODOM["rviz2<br/>(rovi_odom.rviz, Fixed Frame: odom)"]
   RVIZ_MAP["rviz2<br/>(rovi_map.rviz, Fixed Frame: map)"]
+  RVIZ_NAV["rviz2<br/>(rovi_nav.rviz, Fixed Frame: map)"]
 
   TF -->|subscribe| RVIZ_ODOM
   TF -->|subscribe| RVIZ_MAP
+  TF -->|subscribe| RVIZ_NAV
   ROBOT_DESC -->|subscribe| RVIZ_ODOM
   ROBOT_DESC -->|subscribe| RVIZ_MAP
+  ROBOT_DESC -->|subscribe| RVIZ_NAV
   SCAN -->|subscribe| RVIZ_ODOM
   SCAN -->|subscribe| RVIZ_MAP
+  SCAN -->|subscribe| RVIZ_NAV
   MAP -->|subscribe| RVIZ_MAP
+  MAP -->|subscribe| RVIZ_NAV
 ```
 
 ## Offline model (robot_mode=offline)
