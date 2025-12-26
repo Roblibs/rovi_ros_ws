@@ -208,28 +208,24 @@ Conventions:
 - Rounded nodes are ROS topics (`/name<br/>(MsgType)`).
 - In connection to topics, arrows only represent publish/subscribe via a topic.
 
-## Robot Modes
-This diagram shows the unification: higher-level launches stay the same, and `robot_mode` selects the backend that provides the robot interface.
+## Unified Robot Interface
+This diagram shows the unification: higher-level launches stay the same for the real robot and the simulation.
 
 ```mermaid
 flowchart TB
-  subgraph L1["1) Control / autonomy"]
-    direction TB
+
     TELEOP["Teleop (joystick/keyboard)"]
     NAV2["Nav2 (optional)"]
-  end
 
-  subgraph L2["2) Command interface"]
+  subgraph L2["Command interface"]
     direction TB
     CMD(["/cmd_vel<br/>(Twist)"])
   end
 
-  subgraph L3["3) Robot backend"]
-    direction TB
-    BACKEND["real | sim | offline"]
-  end
+  BACKEND["real | sim | offline"]
 
-  subgraph L4["4) Feedback  interface"]
+
+  subgraph L4["Feedback  interface"]
     direction TB
     SCAN(["/scan<br/>(LaserScan)"])
     IMU_RAW(["/imu/data_raw<br/>(Imu)"])
