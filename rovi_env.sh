@@ -110,9 +110,6 @@ sim() {
   fi
 
   case "${mode}" in
-    keyboard)
-      ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST python3 "${ROVI_ROS_WS_DIR}/tools/rovi_keyboard.py" "$@"
-      ;;
     teleop|mapping|localization|nav)
       ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_bringup rovi.launch.py \
         robot_mode:=sim \
@@ -124,7 +121,7 @@ sim() {
       ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_sim gazebo_sim.launch.py "$@"
       ;;
     *)
-      echo "[rovi_env] Usage: sim {teleop|mapping|localization|nav|keyboard|gazebo} [ros2 launch args...]" >&2
+      echo "[rovi_env] Usage: sim {teleop|mapping|localization|nav|gazebo} [ros2 launch args...]" >&2
       return 2
       ;;
   esac
@@ -175,6 +172,7 @@ install_ros_deps() {
     ros-jazzy-nav2-bringup
     ros-jazzy-nav2-rviz-plugins
     ros-jazzy-imu-filter-madgwick
+    ros-jazzy-rviz-imu-plugin
   )
 
   if [ "$(id -u)" -eq 0 ]; then

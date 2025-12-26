@@ -63,6 +63,12 @@ Visualization Manager:
       Name: TF
       Show Axes: false
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: IMU Accel
+      Topic:
+        Value: /imu/accel_marker
+      Value: true
   Global Options:
     Fixed Frame: map
     Frame Rate: 30

@@ -70,6 +70,19 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[ekf_odom_imu_params, {'use_sim_time': ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)}],
     )
 
+    imu_marker_node = Node(
+        condition=ekf_condition_imu,
+        package='rovi_localization',
+        executable='rovi_imu_marker',
+        name='rovi_imu_marker',
+        output='screen',
+        parameters=[{
+            'use_sim_time': ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool),
+            'imu_topic': 'imu/data_raw',
+            'marker_topic': 'imu/accel_marker',
+        }],
+    )
+
     return LaunchDescription([
         odom_mode,
         mag_enabled,
@@ -77,4 +90,5 @@ def generate_launch_description() -> LaunchDescription:
         imu_filter_node,
         ekf_node_odom,
         ekf_node_odom_imu,
+        imu_marker_node,
     ])

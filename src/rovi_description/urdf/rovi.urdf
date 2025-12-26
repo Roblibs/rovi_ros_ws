@@ -71,6 +71,7 @@
     <child link="front_right_wheel"/>
     <origin xyz="0.13902 -0.10414 0.010269" rpy="-1.57079632679 0 3.14159265359"/>
     <axis xyz="0 0 1"/>
+    <dynamics damping="0.1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>
 
@@ -101,6 +102,7 @@
     <child link="front_left_wheel"/>
     <origin xyz="0.139 0.10406 0.0139" rpy="1.57079632679 0 0"/>
     <axis xyz="0 0 1"/>
+    <dynamics damping="0.1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>
 
@@ -131,6 +133,7 @@
     <child link="back_right_wheel"/>
     <origin xyz="-0.080231 -0.1041 0.0135" rpy="-1.57079632679 0 3.14159265359"/>
     <axis xyz="0 0 1"/>
+    <dynamics damping="0.1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>
 
@@ -161,6 +164,7 @@
     <child link="back_left_wheel"/>
     <origin xyz="-0.08231 0.1041 0.0135" rpy="1.57079632679 0 0"/>
     <axis xyz="0 0 1"/>
+    <dynamics damping="0.1"/>
     <limit lower="-3.14159265359" upper="3.14159265359" effort="100" velocity="1"/>
   </joint>
 

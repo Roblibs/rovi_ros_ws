@@ -27,7 +27,7 @@ Commands provided by `rovi_env.sh`
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
-| `sim` | Simulation shortcut: `sim` (default mapping) or `sim teleop|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). `sim keyboard` runs keyboard teleop on localhost. |
+| `sim` | Simulation shortcut: `sim` (default mapping) or `sim teleop|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
 | `view` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (Fixed Frame: `map`). Use with `mapping` or `nav` running on the robot. |
 | `view_teleop` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (Fixed Frame: `odom`). Use with `teleop` running on the robot. |
 | `view_offline` | Local only: runs `rovi_bringup/rovi.launch.py robot_mode:=offline stack:=offline` (URDF inspection without robot hardware). |
@@ -52,7 +52,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 * Install all the needed depedencies ros packages
 
 ```bash
-sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge
+sudo apt install -y ros-jazzy-joy ros-jazzy-teleop-twist-joy ros-jazzy-twist-mux ros-jazzy-diagnostic-updater ros-jazzy-robot-state-publisher ros-jazzy-joint-state-publisher ros-jazzy-joint-state-publisher-gui ros-jazzy-rviz2 ros-jazzy-rplidar-ros ros-jazzy-slam-toolbox ros-jazzy-robot-localization ros-jazzy-nav2-bringup ros-jazzy-nav2-rviz-plugins ros-jazzy-imu-filter-madgwick ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-rviz-imu-plugin
 ```
 
 ## wsl
