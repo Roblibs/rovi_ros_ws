@@ -37,6 +37,7 @@ def generate_launch_description() -> LaunchDescription:
 
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
     default_rviz_map = os.path.join(desc_share, 'rviz', 'rovi_map.rviz')
+    default_rviz_nav = os.path.join(desc_share, 'rviz', 'rovi_nav.rviz')
     default_rviz_odom = os.path.join(desc_share, 'rviz', 'rovi_odom.rviz')
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
 
@@ -138,12 +139,16 @@ def generate_launch_description() -> LaunchDescription:
         "' if '",
         LaunchConfiguration('rviz_config'),
         "' != '' else ('",
+        default_rviz_nav,
+        "' if '",
+        LaunchConfiguration('stack'),
+        "' == 'nav' else ('",
         default_rviz_map,
         "' if '",
         LaunchConfiguration('stack'),
-        "' in ['mapping','localization','nav'] else '",
+        "' in ['mapping','localization'] else '",
         default_rviz_odom,
-        "')",
+        "'))",
     ])
 
     # Backend: always start, even for offline (robot_bringup handles robot_mode=offline).
