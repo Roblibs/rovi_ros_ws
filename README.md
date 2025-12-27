@@ -209,21 +209,24 @@ Conventions:
 - In connection to topics, arrows only represent publish/subscribe via a topic.
 
 ## Unified Robot Interface
-This diagram shows the unification: higher-level launches stay the same for the real robot and the simulation.
+Higher-level launches stay the same for different robot modes.
 
 ```mermaid
 flowchart TB
 
     TELEOP["Teleop (joystick/keyboard)"]
-    NAV2["Nav2 (optional)"]
+    NAV2["Nav2"]
+    GUI["State Gui"]
 
   subgraph L2["Command interface"]
     direction TB
     CMD(["/cmd_vel<br/>(Twist)"])
   end
 
-  BACKEND["real | sim | offline"]
-
+  subgraph L3["robot_mode"]
+    BACKEND["real | sim"]
+    OFFLINE[offline]
+  end
 
   subgraph L4["Feedback  interface"]
     direction TB
@@ -232,13 +235,13 @@ flowchart TB
     VRAW(["/vel_raw<br/>(Twist)"])
     ODRAW(["/odom_raw<br/>(Odometry)"])
     CLOCK(["/clock<br/>(Clock, sim only)"])
-
+    TF(["/tf"])
   end
-
-  STACKS["Localization / SLAM / RViz / (Nav2)"]
 
   TELEOP --> CMD
   NAV2 --> CMD
+
+  GUI --> OFFLINE
 
   CMD --> BACKEND
 
@@ -248,15 +251,13 @@ flowchart TB
   BACKEND --> ODRAW
   BACKEND --> CLOCK
 
-  SCAN --> STACKS
-  IMU_RAW --> STACKS
-  VRAW --> STACKS
-  ODRAW --> STACKS
-  CLOCK --> STACKS
+  BACKEND --> TF
+  OFFLINE --> TF
+
 ```
 
 ## Real robot
-control board + sensors
+`robot_mode=real`
 
 ```mermaid
 flowchart TD
@@ -301,12 +302,94 @@ flowchart TD
 
 ```
 
-## Manual control
-joystick + keyboard
+## Gazebo Simulation
+`robot_mode=sim`
+
+In this mode, the real robot is replaced by a gazebo simulaiton while `rovi_localization` / `rovi_slam` / `rovi_nav` remain unchanged.
 
 ```mermaid
 flowchart TD
-  Joystick["joy_node (Bluetooth joystick)"]
+  CMD_NAV(["/cmd_vel_nav<br/>(Twist)"])
+  CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
+  CMD(["/cmd_vel<br/>(Twist)"])
+
+  TwistMux["twist_mux"]
+  CMD_NAV -->|subscribe| TwistMux
+  CMD_JOY -.->|"subscribe (teleop)"| TwistMux
+  TwistMux -->|publish| CMD
+
+  RoviSimBase["rovi_sim_base<br/>(holonomic base + accel limits)"]
+  CMD -->|subscribe| RoviSimBase
+  CMD_SIM(["/cmd_vel_sim<br/>(Twist)"])
+  VRAW(["/vel_raw<br/>(Twist)"])
+  RoviSimBase -->|publish| CMD_SIM
+  RoviSimBase -->|publish| VRAW
+
+  ODRAW(["/odom_raw<br/>(Odometry)"])
+
+  subgraph GZ["Gazebo Sim (gz sim)"]
+    WORLD["room world"]
+    ROBOT["rovi robot model (URDF from rovi_description)"]
+    LIDAR["lidar sensor"]
+    IMU_GZ["imu sensor"]
+    ODOM_GZ(["/model/rovi/odometry<br/>(gz.msgs.Odometry)"])
+  end
+
+  BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
+
+  CMD_SIM --> BRIDGE
+  BRIDGE -->|bridge| ROBOT
+  LIDAR --> BRIDGE
+  IMU_GZ --> BRIDGE
+  ODOM_GZ --> BRIDGE
+
+  SCAN(["/scan<br/>(LaserScan)"])
+  CLOCK(["/clock"])
+  IMU_RAW(["/imu/data_raw<br/>(Imu)"])
+  ODOM_BRIDGED(["/odom_gz<br/>(Odometry)"])
+  BRIDGE -->|bridge| SCAN
+  BRIDGE -->|bridge| CLOCK
+  BRIDGE -->|bridge| IMU_RAW
+  BRIDGE -->|bridge| ODOM_BRIDGED
+
+  RoviGzOdom["rovi_gz_odom<br/>(Gazebo odom → /odom_raw)"]
+  ODOM_BRIDGED -->|subscribe| RoviGzOdom
+  RoviGzOdom -->|publish| ODRAW
+  RoviGzOdom -.->|"publish TF (odom_mode=raw/teleop)"| TF_ODOM_BASE("odom->base_footprint")
+
+  EXISTING["Existing stack (unchanged): rovi_localization + rovi_slam + rovi_nav"]
+  ODRAW --> EXISTING
+  SCAN --> EXISTING
+  CLOCK --> EXISTING
+```
+
+## Offline model
+`robot_mode=offline`
+
+This launch helps to visualize the robot to inspect its 3D model without other dependencies.
+
+```mermaid
+flowchart TD
+  RoviDesc["rovi_description package"]
+  RSP["robot_state_publisher"]
+  JSPG["joint_state_publisher_gui"]
+  JSTATE(["/joint_states<br/>(JointState)"])
+  TF(["/tf<br/>(TF)"])
+  RVIZ["rviz2"]
+
+  RoviDesc -->|provides URDF| RSP
+  JSPG -->|publish| JSTATE
+  JSTATE -->|subscribe| RSP
+  RSP -->|publish| TF
+  TF -->|subscribe| RVIZ
+```
+
+
+## Robot Control
+
+```mermaid
+flowchart TD
+  Joystick["joy_node <br> (joystick)"]
   JOY(["/joy<br/>(Joy)"])
   Joystick -->|publish| JOY
 
@@ -319,7 +402,7 @@ flowchart TD
   CMD_KEY(["/cmd_vel_keyboard<br/>(Twist)"])
   Keyboard -->|publish| CMD_KEY
 
-  Nav2["nav2 controller (optional)"]
+  Nav2["nav2 controller"]
   CMD_NAV(["/cmd_vel_nav<br/>(Twist)"])
   Nav2 -->|publish| CMD_NAV
 
@@ -330,12 +413,10 @@ flowchart TD
   CMD(["/cmd_vel<br/>(Twist)"])
   TwistMux -->|publish| CMD
 
-  Rosmaster["rosmaster_driver"]
-  CMD -->|subscribe| Rosmaster
 ```
 
 ## Odometry filtering
-When odom_mode=fusion_wheels_imu, this produces a single authoritative `odom -> base_footprint` transform using EKF + IMU. For `odom_mode=filtered`, omit the IMU branch; magnetometer usage is gated by `mag_enabled`.
+Odometry filtering is only applicable for the real robot. When odom_mode=fusion_wheels_imu, this produces a single authoritative `odom -> base_footprint` transform using EKF + IMU. For `odom_mode=filtered`, omit the IMU branch; magnetometer usage is gated by `mag_enabled`.
 
 ```mermaid
 flowchart TD
@@ -453,83 +534,6 @@ flowchart TD
   MAP -->|subscribe| RVIZ_NAV
 ```
 
-## Offline model (robot_mode=offline)
-This launch from `rovi_bringup` helps to visualize the robot model without needing the actual robot hardware. In the target `robot_mode` design, this corresponds to `robot_mode=offline`.
-
-```mermaid
-flowchart TD
-  RoviDesc["rovi_description package"]
-  RSP["robot_state_publisher"]
-  JSPG["joint_state_publisher_gui"]
-  JSTATE(["/joint_states<br/>(JointState)"])
-  TF(["/tf<br/>(TF)"])
-  RVIZ["rviz2"]
-
-  RoviDesc -->|provides URDF| RSP
-  JSPG -->|publish| JSTATE
-  JSTATE -->|subscribe| RSP
-  RSP -->|publish| TF
-  TF -->|subscribe| RVIZ
-```
-
-## Simulation (Gazebo Sim backend, robot_mode=sim)
-This is the additional wiring introduced by simulation. In the target `robot_mode` design this becomes the `robot_mode=sim` backend, while `rovi_localization` / `rovi_slam` / `rovi_nav` remain unchanged.
-
-```mermaid
-flowchart TD
-  CMD_NAV(["/cmd_vel_nav<br/>(Twist)"])
-  CMD_JOY(["/cmd_vel_joy<br/>(Twist)"])
-  CMD(["/cmd_vel<br/>(Twist)"])
-
-  TwistMux["twist_mux"]
-  CMD_NAV -->|subscribe| TwistMux
-  CMD_JOY -.->|"subscribe (teleop)"| TwistMux
-  TwistMux -->|publish| CMD
-
-  RoviSimBase["rovi_sim_base<br/>(holonomic base + accel limits)"]
-  CMD -->|subscribe| RoviSimBase
-  CMD_SIM(["/cmd_vel_sim<br/>(Twist)"])
-  VRAW(["/vel_raw<br/>(Twist)"])
-  RoviSimBase -->|publish| CMD_SIM
-  RoviSimBase -->|publish| VRAW
-
-  ODRAW(["/odom_raw<br/>(Odometry)"])
-
-  subgraph GZ["Gazebo Sim (gz sim)"]
-    WORLD["room world"]
-    ROBOT["rovi robot model (URDF from rovi_description)"]
-    LIDAR["lidar sensor"]
-    IMU_GZ["imu sensor"]
-    ODOM_GZ(["/model/rovi/odometry<br/>(gz.msgs.Odometry)"])
-  end
-
-  BRIDGE["ros_gz_bridge<br/>(parameter_bridge)"]
-
-  CMD_SIM --> BRIDGE
-  BRIDGE -->|bridge| ROBOT
-  LIDAR --> BRIDGE
-  IMU_GZ --> BRIDGE
-  ODOM_GZ --> BRIDGE
-
-  SCAN(["/scan<br/>(LaserScan)"])
-  CLOCK(["/clock"])
-  IMU_RAW(["/imu/data_raw<br/>(Imu)"])
-  ODOM_BRIDGED(["/odom_gz<br/>(Odometry)"])
-  BRIDGE -->|bridge| SCAN
-  BRIDGE -->|bridge| CLOCK
-  BRIDGE -->|bridge| IMU_RAW
-  BRIDGE -->|bridge| ODOM_BRIDGED
-
-  RoviGzOdom["rovi_gz_odom<br/>(Gazebo odom → /odom_raw)"]
-  ODOM_BRIDGED -->|subscribe| RoviGzOdom
-  RoviGzOdom -->|publish| ODRAW
-  RoviGzOdom -.->|"publish TF (odom_mode=raw/teleop)"| TF_ODOM_BASE("odom->base_footprint")
-
-  EXISTING["Existing stack (unchanged): rovi_localization + rovi_slam + rovi_nav"]
-  ODRAW --> EXISTING
-  SCAN --> EXISTING
-  CLOCK --> EXISTING
-```
 
 ## TF Tree
 TF frames are not regular ROS topics; this is the chain RViz and SLAM use at runtime.
