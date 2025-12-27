@@ -547,95 +547,13 @@ flowchart TD
   BASEL -->|robot_state_publisher| IMU[imu_link]
 ```
 
-## Launch wiring (current)
-`rovi_bringup` launches are composition layers: they include smaller "component" launches (teleop, odometry, SLAM). This keeps packages reusable (e.g., you can run SLAM against bag playback as long as `/scan` + TF exist).
+## Launch wiring
+`rovi_bringup/robot_bringup.launch.py` selects the backend (`robot_mode:=real|sim|offline`), and `rovi_bringup/rovi.launch.py` is the single high-level entrypoint that chooses the stack and owns RViz startup policy.
 
 ```mermaid
 flowchart LR
   Rovi["rovi_bringup/rovi.launch.py"]
   RobotBringup["rovi_bringup/robot_bringup.launch.py"]
-
-  TeleopLaunch["rovi_bringup/teleop.launch.py"]
-  EkfLaunch["rovi_localization/ekf.launch.py"]
-  SlamLaunch["rovi_slam/slam_toolbox.launch.py"]
-  NavStackLaunch["rovi_nav/nav.launch.py"]
-
-  Mapping["rovi_bringup/mapping.launch.py"]
-  Localization["rovi_bringup/localization.launch.py"]
-  NavLaunch["rovi_bringup/nav.launch.py"]
-
-  Rovi -->|IncludeLaunchDescription| RobotBringup
-  Rovi -->|IncludeLaunchDescription| TeleopLaunch
-  Rovi -->|IncludeLaunchDescription| Mapping
-  Rovi -->|IncludeLaunchDescription| Localization
-  Rovi -->|IncludeLaunchDescription| NavLaunch
-
-  Mapping -->|IncludeLaunchDescription| EkfLaunch
-  Mapping -->|IncludeLaunchDescription| SlamLaunch
-
-  Localization -->|IncludeLaunchDescription| EkfLaunch
-  Localization -->|IncludeLaunchDescription| SlamLaunch
-
-  NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=mapping)"| Mapping
-  NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=localization)"| Localization
-  NavLaunch -->|IncludeLaunchDescription| NavStackLaunch
-
-  subgraph TeleopStack[Teleop stack]
-    Joy["joy_node"]
-    TeleopTwist["teleop_twist_joy"]
-    TwistMux["twist_mux"]
-  end
-
-  subgraph Backend["Robot backend (robot_mode)"]
-    Rosmaster["rosmaster_driver_node (real)"]
-    RoviSimBase["rovi_sim_base (sim)"]
-    RoviBase["rovi_base_node"]
-    RSP["robot_state_publisher"]
-    Rplidar["rplidar_ros (real, lidar_enabled)"]
-  end
-  TeleopLaunch --> Joy
-  TeleopLaunch --> TeleopTwist
-  TeleopLaunch --> TwistMux
-  RobotBringup --> Rosmaster
-  RobotBringup --> RoviSimBase
-  RobotBringup --> RoviBase
-  RobotBringup --> RSP
-  RobotBringup -.-> Rplidar
-
-  subgraph OdomStack[Odometry pipeline]
-    ImuFilter["imu_filter_madgwick (odom_mode=fusion_wheels_imu)"]
-    EkfNode["robot_localization/ekf_node"]
-  end
-  EkfLaunch --> ImuFilter
-  EkfLaunch --> EkfNode
-
-  subgraph SlamStack[SLAM]
-    SlamTB["slam_toolbox (lifecycle node)"]
-  end
-  SlamLaunch --> SlamTB
-
-  subgraph NavStack["Navigation (Nav2)"]
-    NavLife["lifecycle_manager_navigation"]
-    NavBT["bt_navigator"]
-    NavPlanner["planner_server"]
-    NavController["controller_server"]
-    NavBehaviors["behavior_server"]
-  end
-  NavStackLaunch --> NavLife
-  NavStackLaunch --> NavBT
-  NavStackLaunch --> NavPlanner
-  NavStackLaunch --> NavController
-  NavStackLaunch --> NavBehaviors
-
-```
-
-## Launch wiring (target with `robot_mode`)
-`rovi_bringup/robot_bringup.launch.py` selects the backend (`robot_mode:=real|sim|offline`), and `rovi_bringup/rovi.launch.py` is the single high-level entrypoint that chooses the stack and owns RViz startup policy.
-
-```mermaid
-flowchart LR
-  Rovi["rovi_bringup/rovi.launch.py<br/>(stack + robot_mode + rviz)"]
-  RobotBringup["rovi_bringup/robot_bringup.launch.py<br/>(robot_mode)"]
 
   Rovi --> RobotBringup
   Rovi --> Teleop["rovi_bringup/teleop.launch.py"]
@@ -643,9 +561,9 @@ flowchart LR
   Rovi --> Localization["rovi_bringup/localization.launch.py"]
   Rovi --> NavLaunch["rovi_bringup/nav.launch.py"]
 
-  EkfLaunch["rovi_localization/ekf.launch.py"]
-  SlamLaunch["rovi_slam/slam_toolbox.launch.py"]
-  NavStackLaunch["rovi_nav/nav.launch.py"]
+  EkfLaunch["rovi_localization/launch/ekf.launch.py"]
+  SlamLaunch["rovi_slam/launch/slam_toolbox.launch.py"]
+  NavStackLaunch["rovi_nav/launch/nav.launch.py"]
 
   Mapping -->|IncludeLaunchDescription| EkfLaunch
   Mapping -->|IncludeLaunchDescription| SlamLaunch
@@ -656,6 +574,8 @@ flowchart LR
   NavLaunch -->|IncludeLaunchDescription| NavStackLaunch
   NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=mapping)"| Mapping
   NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=localization)"| Localization
+
+  RobotBringup -->|"IncludeLaunchDescription<br/>(robot_mode=sim)"| GazeboSim["rovi_sim/launch/gazebo_sim.launch.py"]
 ```
 
 ## Package dependencies
