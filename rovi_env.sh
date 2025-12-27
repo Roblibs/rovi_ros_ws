@@ -146,6 +146,10 @@ view_offline() {
     "$@"
 }
 
+bridge() {
+  ros2 launch foxglove_bridge foxglove_bridge_launch.xml "$@"
+}
+
 talk() {
   ros2 run demo_nodes_cpp talker "$@"
 }
@@ -166,6 +170,7 @@ install_ros_deps() {
     ros-jazzy-robot-state-publisher
     ros-jazzy-joint-state-publisher-gui
     ros-jazzy-rviz2
+    ros-jazzy-foxglove-bridge
     ros-jazzy-rplidar-ros
     ros-jazzy-slam-toolbox
     ros-jazzy-robot-localization

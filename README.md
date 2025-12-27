@@ -32,10 +32,11 @@ Commands provided by `rovi_env.sh`
 | `view_nav` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_nav.rviz` (Nav2 panel; Fixed Frame: `map`). Use with `nav` running on the robot. |
 | `view_teleop` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (Fixed Frame: `odom`). Use with `teleop` running on the robot. |
 | `view_offline` | Local only: runs `rovi_bringup/rovi.launch.py robot_mode:=offline stack:=offline` (URDF inspection without robot hardware). |
+| `bridge` | PC only: runs `ros2 launch foxglove_bridge foxglove_bridge_launch.xml` (Foxglove WebSocket bridge). |
 
 ## Where to run what
 - **Robot (Pi):** `teleop`, `mapping`, `localization`, `nav` (RViz is always off on the robot).
-- **PC (optional):** `view` / `view_nav` / `view_teleop` (pure visualization; no robot nodes).
+- **PC (optional):** `view` / `view_nav` / `view_teleop` / `bridge` (pure visualization/tools; no robot nodes).
 - **Simulation (PC):** `sim` (starts Gazebo + stack + RViz together).
 
 # Install
@@ -62,6 +63,7 @@ sudo apt install -y \
   ros-jazzy-joint-state-publisher \
   ros-jazzy-joint-state-publisher-gui \
   ros-jazzy-rviz2 \
+  ros-jazzy-foxglove-bridge \
   ros-jazzy-rplidar-ros \
   ros-jazzy-slam-toolbox \
   ros-jazzy-robot-localization \
@@ -116,6 +118,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-rplidar-ros` | Used by `rovi_bringup/robot_bringup.launch.py` (robot_mode=real, `lidar_enabled:=true`) to publish `/scan` for SLAM and Nav2. |
 | `ros-jazzy-ros-gz-sim` | Used by `rovi_sim/gazebo_sim.launch.py` to start Gazebo Sim and spawn the simulated robot + world. |
 | `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo topics (e.g., LiDAR + `/clock`) into ROS 2 topics like `/scan` and `/clock`. |
+| `ros-jazzy-foxglove-bridge` | Optional WebSocket bridge for Foxglove Studio (run via the `bridge` command). |
 | `ros-jazzy-slam-toolbox` | Used via `rovi_slam/slam_toolbox.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/map` and TF `map -> odom`. |
 | `ros-jazzy-robot-localization` | Used by `rovi_localization/ekf.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/odometry/filtered` and TF `odom -> base_footprint`. |
 | `ros-jazzy-nav2-bringup` | Provides Nav2 servers started by `rovi_nav/launch/nav.launch.py` for goal-based navigation (planner/controller/BT navigator/behaviors). |
