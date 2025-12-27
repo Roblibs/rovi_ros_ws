@@ -128,15 +128,26 @@ sim() {
 }
 
 view() {
-  rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
-}
+  local mode="${1:-nav}"
+  if [ $# -gt 0 ]; then
+    shift
+  fi
 
-view_nav() {
-  rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_nav.rviz" "$@"
-}
-
-view_teleop() {
-  rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_odom.rviz" "$@"
+  case "${mode}" in
+    nav)
+      rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_nav.rviz" "$@"
+      ;;
+    mapping)
+      rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
+      ;;
+    teleop)
+      rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_odom.rviz" "$@"
+      ;;
+    *)
+      echo "[rovi_env] Usage: view {nav|mapping|teleop} [rviz args...]" >&2
+      return 2
+      ;;
+  esac
 }
 
 view_offline() {

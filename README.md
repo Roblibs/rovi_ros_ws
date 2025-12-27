@@ -28,15 +28,13 @@ Commands provided by `rovi_env.sh`
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
 | `sim` | Simulation shortcut: `sim` (default mapping) or `sim teleop|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
-| `view` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_map.rviz` (Fixed Frame: `map`). Use with `mapping` or `localization` running on the robot. |
-| `view_nav` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_nav.rviz` (Nav2 panel; Fixed Frame: `map`). Use with `nav` running on the robot. |
-| `view_teleop` | PC only: starts `rviz2` with `rovi_description/rviz/rovi_odom.rviz` (Fixed Frame: `odom`). Use with `teleop` running on the robot. |
+| `view` | PC only: starts `rviz2` (default: `view nav`). Use `view teleop|mapping|nav` to pick the RViz layout. |
 | `view_offline` | Local only: runs `rovi_bringup/rovi.launch.py robot_mode:=offline stack:=offline` (URDF inspection without robot hardware). |
 | `bridge` | PC only: runs `ros2 launch foxglove_bridge foxglove_bridge_launch.xml` (Foxglove WebSocket bridge). |
 
 ## Where to run what
 - **Robot (Pi):** `teleop`, `mapping`, `localization`, `nav` (RViz is always off on the robot).
-- **PC (optional):** `view` / `view_nav` / `view_teleop` / `bridge` (pure visualization/tools; no robot nodes).
+- **PC (optional):** `view` / `bridge` (pure visualization/tools; no robot nodes).
 - **Simulation (PC):** `sim` (starts Gazebo + stack + RViz together).
 
 # Install
@@ -114,7 +112,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-diagnostic-updater` | Used by `rovi_base` to publish runtime diagnostics (for example on `/diagnostics`). |
 | `ros-jazzy-robot-state-publisher` | Used by `rovi_bringup/robot_bringup.launch.py` (all modes) to publish the TF tree from the `rovi_description` URDF and provide `/robot_description` to RViz. |
 | `ros-jazzy-joint-state-publisher-gui` | Used by `rovi_bringup/robot_bringup.launch.py` in `robot_mode=offline` for interactive URDF inspection. |
-| `ros-jazzy-rviz2` | Used by `view` / `view_teleop` (PC viewer commands) and by `rovi_bringup/rovi.launch.py` in `robot_mode=sim|offline` (optional auto-start). |
+| `ros-jazzy-rviz2` | Used by `view` (PC viewer command) and by `rovi_bringup/rovi.launch.py` in `robot_mode=sim|offline` (optional auto-start). |
 | `ros-jazzy-rplidar-ros` | Used by `rovi_bringup/robot_bringup.launch.py` (robot_mode=real, `lidar_enabled:=true`) to publish `/scan` for SLAM and Nav2. |
 | `ros-jazzy-ros-gz-sim` | Used by `rovi_sim/gazebo_sim.launch.py` to start Gazebo Sim and spawn the simulated robot + world. |
 | `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo topics (e.g., LiDAR + `/clock`) into ROS 2 topics like `/scan` and `/clock`. |

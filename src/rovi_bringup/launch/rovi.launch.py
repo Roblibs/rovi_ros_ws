@@ -8,7 +8,7 @@ This launch owns the high-level choices:
 
 Intended usage:
 - On the robot (Pi): run stacks headless (default rviz:=false)
-- On a PC: use `view` / `view_teleop` to connect and visualize
+- On a PC: use `view` (e.g., `view teleop|mapping|nav`) to connect and visualize
 - In simulation: one command starts Gazebo + stack + RViz (default rviz:=true)
 """
 
