@@ -143,18 +143,17 @@ view() {
     teleop)
       rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_odom.rviz" "$@"
       ;;
+    offline)
+      ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_bringup rovi.launch.py \
+        robot_mode:=offline \
+        stack:=offline \
+        "$@"
+      ;;
     *)
-      echo "[rovi_env] Usage: view {nav|mapping|teleop} [rviz args...]" >&2
+      echo "[rovi_env] Usage: view {nav|mapping|teleop|offline} [...args]" >&2
       return 2
       ;;
   esac
-}
-
-view_offline() {
-  ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_bringup rovi.launch.py \
-    robot_mode:=offline \
-    stack:=offline \
-    "$@"
 }
 
 bridge() {
