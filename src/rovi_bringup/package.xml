@@ -28,6 +28,7 @@
   <exec_depend>twist_mux</exec_depend>
   <exec_depend>rovi_nav</exec_depend>
   <exec_depend>rovi_sim</exec_depend>
+  <exec_depend>rovi_display_monitor</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

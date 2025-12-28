@@ -5,6 +5,7 @@ description = "ROS 2 Jazzy workspace Python dependencies for Room View Bot"
 requires-python = ">=3.12"
 dependencies = [
     "pyserial>=3.5",
+    "psutil>=5.9",
     "rosmaster-lib",
 ]
 

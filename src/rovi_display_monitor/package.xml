@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rovi_display_monitor</name>
+  <version>0.1.0</version>
+  <description>Serial display monitor for Rovi: aggregates voltage + CPU and sends JSON lines to an ESP32-S3 display.</description>
+  <maintainer email="wassim.filali@gmail.com">wassfila</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-serial</exec_depend>
+  <exec_depend>python3-psutil</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

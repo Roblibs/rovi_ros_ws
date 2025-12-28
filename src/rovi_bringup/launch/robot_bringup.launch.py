@@ -142,6 +142,38 @@ def generate_launch_description() -> LaunchDescription:
         description='Enable angle compensation in rplidar_ros',
     )
 
+    # Serial display monitor (all modes, can be disabled).
+    display_enable_arg = DeclareLaunchArgument(
+        'display_enabled',
+        default_value='true',
+        description='Enable serial display monitor (voltage + CPU).',
+    )
+    display_port_arg = DeclareLaunchArgument(
+        'display_port',
+        default_value='',
+        description='Explicit serial port for the display (defaults to auto-detect by VID/PID).',
+    )
+    display_vid_arg = DeclareLaunchArgument(
+        'display_usb_vid',
+        default_value='0x303a',
+        description='USB VID to match for the display (hex or decimal).',
+    )
+    display_pid_arg = DeclareLaunchArgument(
+        'display_usb_pid',
+        default_value='0x1001',
+        description='USB PID to match for the display (hex or decimal).',
+    )
+    display_baud_arg = DeclareLaunchArgument(
+        'display_baudrate',
+        default_value='256000',
+        description='Serial baudrate for the display connection.',
+    )
+    display_period_arg = DeclareLaunchArgument(
+        'display_publish_period',
+        default_value='3.0',
+        description='Seconds between display updates.',
+    )
+
     # Simulation backend (sim)
     world_arg = DeclareLaunchArgument(
         'world',
@@ -333,6 +365,24 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    display_monitor_node = Node(
+        condition=IfCondition(LaunchConfiguration('display_enabled')),
+        package='rovi_display_monitor',
+        executable='display_monitor',
+        name='rovi_display_monitor',
+        output='screen',
+        parameters=[
+            {
+                'port': LaunchConfiguration('display_port'),
+                'usb_vid': LaunchConfiguration('display_usb_vid'),
+                'usb_pid': LaunchConfiguration('display_usb_pid'),
+                'baudrate': LaunchConfiguration('display_baudrate'),
+                'publish_period': LaunchConfiguration('display_publish_period'),
+                'voltage_topic': 'voltage',
+            }
+        ],
+    )
+
     return LaunchDescription([
         robot_mode_arg,
         model_arg,
@@ -350,6 +400,12 @@ def generate_launch_description() -> LaunchDescription:
         lidar_frame_arg,
         lidar_baud_arg,
         lidar_angle_comp_arg,
+        display_enable_arg,
+        display_port_arg,
+        display_vid_arg,
+        display_pid_arg,
+        display_baud_arg,
+        display_period_arg,
         world_arg,
         gazebo_gui_arg,
         *venv_env_actions,
@@ -360,6 +416,7 @@ def generate_launch_description() -> LaunchDescription:
         rovi_base_node,
         rosmaster_driver_node,
         lidar_node,
+        display_monitor_node,
         sim_backend,
         sim_base,
         sim_odom,

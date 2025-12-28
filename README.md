@@ -462,6 +462,7 @@ sudo apt install -y \
   ros-jazzy-teleop-twist-joy \
   ros-jazzy-twist-mux \
   ros-jazzy-diagnostic-updater \
+  python3-psutil \
   ros-jazzy-robot-state-publisher \
   ros-jazzy-joint-state-publisher \
   ros-jazzy-joint-state-publisher-gui \
@@ -499,6 +500,16 @@ New-NetFirewallRule -DisplayName "Allow ICMPv4 Echo from robot" -Direction Inbou
 New-NetFirewallRule -DisplayName "Allow ROS2 DDS UDP from robot" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 7400-7600 -RemoteAddress 10.0.0.180 -Profile Private
 ```
 
+usb management in wsl:
+
+- install https://github.com/dorssel/usbipd-win/releases
+
+```bash
+usbipd bind --busid 2-4
+usbipd attach --wsl --busid 2-4
+usbipd detach --busid 2-4
+```
+
 
 # Reference
 ## Commands
@@ -533,6 +544,7 @@ Packages of this repo are listed in this table
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
+| `rovi_display_monitor` | Serial display helper: down-samples `/voltage`, reads CPU load, and pushes JSON lines to the ESP32-S3 display |
 
 External ROS packages installed via apt (and a couple of local tools) and how they are used in this workspace:
 
@@ -550,6 +562,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-ros-gz-sim` | Used by `rovi_sim/gazebo_sim.launch.py` to start Gazebo Sim and spawn the simulated robot + world. |
 | `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo topics (e.g., LiDAR + `/clock`) into ROS 2 topics like `/scan` and `/clock`. |
 | `ros-jazzy-foxglove-bridge` | Optional WebSocket bridge for Foxglove Studio (run via the `bridge` command). |
+| `python3-psutil` | Used by `rovi_display_monitor` to read CPU utilization for the serial display. |
 | `ros-jazzy-slam-toolbox` | Used via `rovi_slam/slam_toolbox.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/map` and TF `map -> odom`. |
 | `ros-jazzy-robot-localization` | Used by `rovi_localization/ekf.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/odometry/filtered` and TF `odom -> base_footprint`. |
 | `ros-jazzy-nav2-bringup` | Provides Nav2 servers started by `rovi_nav/launch/nav.launch.py` for goal-based navigation (planner/controller/BT navigator/behaviors). |

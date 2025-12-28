@@ -177,6 +177,7 @@ install_ros_deps() {
     ros-jazzy-rosbag2
     ros-jazzy-rosbag2-compression-zstd
     ros-jazzy-diagnostic-updater
+    python3-psutil
     ros-jazzy-robot-state-publisher
     ros-jazzy-joint-state-publisher-gui
     ros-jazzy-rviz2
