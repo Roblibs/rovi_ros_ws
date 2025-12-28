@@ -10,6 +10,7 @@ from typing import Optional
 import psutil
 import rclpy
 from rclpy.node import Node
+from rcl_interfaces.msg import ParameterDescriptor
 from serial import Serial, SerialException
 from serial.tools import list_ports
 from std_msgs.msg import Float32
@@ -19,14 +20,15 @@ class DisplayMonitor(Node):
     def __init__(self) -> None:
         super().__init__('rovi_display_monitor')
 
-        self.declare_parameter('port', '')
-        self.declare_parameter('usb_vid', '0x303a')
-        self.declare_parameter('usb_pid', '0x1001')
-        self.declare_parameter('baudrate', 256000)
-        self.declare_parameter('voltage_topic', 'voltage')
-        self.declare_parameter('publish_period', 3.0)
-        self.declare_parameter('cpu_id', 'cpu')
-        self.declare_parameter('voltage_id', 'voltage')
+        dyn = ParameterDescriptor(dynamic_typing=True)
+        self.declare_parameter('port', '', descriptor=dyn)
+        self.declare_parameter('usb_vid', '0x303a', descriptor=dyn)
+        self.declare_parameter('usb_pid', '0x1001', descriptor=dyn)
+        self.declare_parameter('baudrate', 256000, descriptor=dyn)
+        self.declare_parameter('voltage_topic', 'voltage', descriptor=dyn)
+        self.declare_parameter('publish_period', 3.0, descriptor=dyn)
+        self.declare_parameter('cpu_id', 'cpu', descriptor=dyn)
+        self.declare_parameter('voltage_id', 'voltage', descriptor=dyn)
 
         self._serial: Optional[Serial] = None
         self._last_voltage: Optional[float] = None

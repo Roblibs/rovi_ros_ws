@@ -150,8 +150,8 @@ def generate_launch_description() -> LaunchDescription:
     )
     display_port_arg = DeclareLaunchArgument(
         'display_port',
-        default_value='',
-        description='Explicit serial port for the display (defaults to auto-detect by VID/PID).',
+        default_value='/dev/rovi_display',
+        description='Explicit serial port for the display (defaults to /dev/rovi_display symlink; auto-detect by VID/PID if empty).',
     )
     display_vid_arg = DeclareLaunchArgument(
         'display_usb_vid',

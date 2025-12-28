@@ -14,10 +14,11 @@ Tables with the full list of packages, launches, nodes and params are also avail
 
 | Command | Description |
 |---|---|
-| `sim` | PC Simulation: `sim` (default mapping) or `sim teleop / mapping / nav`,...|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
-| `view` | PC view of the real robot: `view` (default `nav`) or `view teleop / mapping / nav`. Use `view offline` for local URDF inspection (no hardware). |
+| `sim` | PC Simulation: `sim` (default mapping) or `sim teleop|mapping|nav|localization` → runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz (use `rviz:=false` for headless). |
+| `view` | PC view: `view` (default `nav`) or `view teleop|mapping|nav`; `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
+| `tools/rovi_display_setup.py` | One-time (run with sudo): installs udev rule `/dev/rovi_display` for the ESP32-S3 display. |
 
 
 # Diagrams
@@ -509,7 +510,10 @@ usbipd bind --busid 2-4
 usbipd attach --wsl --busid 2-4
 usbipd detach --busid 2-4
 ```
-
+in wsl or linux
+```bash
+sudo usermod -a -G dialout "$USER"
+```
 
 # Reference
 ## Commands
@@ -563,6 +567,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo topics (e.g., LiDAR + `/clock`) into ROS 2 topics like `/scan` and `/clock`. |
 | `ros-jazzy-foxglove-bridge` | Optional WebSocket bridge for Foxglove Studio (run via the `bridge` command). |
 | `python3-psutil` | Used by `rovi_display_monitor` to read CPU utilization for the serial display. |
+| `pyserial` | Used by `rovi_display_monitor` to talk to the ESP32-S3 display over USB serial. |
 | `ros-jazzy-slam-toolbox` | Used via `rovi_slam/slam_toolbox.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/map` and TF `map -> odom`. |
 | `ros-jazzy-robot-localization` | Used by `rovi_localization/ekf.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/odometry/filtered` and TF `odom -> base_footprint`. |
 | `ros-jazzy-nav2-bringup` | Provides Nav2 servers started by `rovi_nav/launch/nav.launch.py` for goal-based navigation (planner/controller/BT navigator/behaviors). |
