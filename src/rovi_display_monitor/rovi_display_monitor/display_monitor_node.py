@@ -33,6 +33,7 @@ class DisplayMonitor(Node):
         self._serial: Optional[Serial] = None
         self._last_voltage: Optional[float] = None
         self._last_no_device_warn = None
+        self._disabled = False
 
         voltage_topic = self.get_parameter('voltage_topic').get_parameter_value().string_value
         self.create_subscription(Float32, voltage_topic, self._on_voltage, 10)
@@ -57,6 +58,9 @@ class DisplayMonitor(Node):
         self._last_voltage = float(msg.data)
 
     def _ensure_serial(self) -> Optional[Serial]:
+        if self._disabled:
+            return None
+
         if self._serial and self._serial.is_open:
             return self._serial
 
@@ -73,14 +77,12 @@ class DisplayMonitor(Node):
                 port_to_use = matches[0].device
             elif len(matches) == 0:
                 now = self.get_clock().now()
-                if (
-                    self._last_no_device_warn is None
-                    or (now - self._last_no_device_warn).nanoseconds > 10e9
-                ):
+                if self._last_no_device_warn is None:
                     self.get_logger().warn(
-                        f"No serial device with VID:PID {vid_expected:04x}:{pid_expected:04x} found"
+                        f"No serial device with VID:PID {vid_expected:04x}:{pid_expected:04x} found; disabling display monitor for this session."
                     )
                     self._last_no_device_warn = now
+                self._disabled = True
                 return None
             else:
                 ports = ', '.join(m.device for m in matches)
@@ -88,6 +90,7 @@ class DisplayMonitor(Node):
                     f"Multiple matching devices for VID:PID {vid_expected:04x}:{pid_expected:04x}: {ports} "
                     "(set 'port' param explicitly)."
                 )
+                self._disabled = True
                 return None
 
         try:
@@ -99,8 +102,11 @@ class DisplayMonitor(Node):
             self._serial = Serial(port_to_use, baudrate=baud, timeout=1)
             self.get_logger().info(f"Opened display serial on {port_to_use} @ {baud} baud")
         except SerialException as exc:
-            self.get_logger().warn(f"Failed to open serial port {port_to_use}: {exc}")
+            self.get_logger().warn(
+                f"Failed to open serial port {port_to_use}: {exc}; disabling display monitor for this session."
+            )
             self._serial = None
+            self._disabled = True
         return self._serial
 
     def _build_payload(self) -> list[dict]:
@@ -128,6 +134,9 @@ class DisplayMonitor(Node):
         return payload
 
     def _on_timer(self) -> None:
+        if self._disabled:
+            return
+
         ser = self._ensure_serial()
         if ser is None:
             return
