@@ -12,8 +12,7 @@ class SerialDisplayConfig:
     gateway_address: str
     serial_port: str
     baudrate: int
-    cpu_id: str
-    voltage_id: str
+    selected_ids: list[str]
     reconnect_delay_s: float
 
 
@@ -47,13 +46,12 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
 
     gateway = _read_map(data, 'gateway')
     serial = _read_map(data, 'serial')
-    ids = _read_map(data, 'ids')
+    display = _read_map(data, 'display')
 
     gateway_address = str(gateway.get('address', '127.0.0.1:50051'))
     serial_port = str(serial.get('port', '/dev/rovi_display'))
     baudrate = int(serial.get('baudrate', 256000))
-    cpu_id = str(ids.get('cpu', 'cpu'))
-    voltage_id = str(ids.get('voltage', 'voltage'))
+    selected_ids = _read_string_list(display.get('selected_ids'))
     reconnect_delay_s = float(data.get('reconnect_delay_s', 2.0))
 
     if reconnect_delay_s <= 0:
@@ -63,8 +61,7 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
         gateway_address=gateway_address,
         serial_port=serial_port,
         baudrate=baudrate,
-        cpu_id=cpu_id,
-        voltage_id=voltage_id,
+        selected_ids=selected_ids,
         reconnect_delay_s=reconnect_delay_s,
     )
 
@@ -76,3 +73,18 @@ def _read_map(parent: dict[str, Any], key: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise RuntimeError(f"Invalid '{key}' section (expected mapping)")
     return value
+
+
+def _read_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise RuntimeError("Invalid 'display.selected_ids' (expected list)")
+    out: list[str] = []
+    for item in value:
+        if item is None:
+            continue
+        s = str(item).strip()
+        if s:
+            out.append(s)
+    return out

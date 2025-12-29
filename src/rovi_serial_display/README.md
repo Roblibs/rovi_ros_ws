@@ -12,13 +12,12 @@ Key options:
 
 - `gateway.address`: gRPC server address (default `127.0.0.1:50051`)
 - `serial.port` / `serial.baudrate`: serial device (e.g. `/dev/rovi_display`)
-- `ids.cpu` / `ids.voltage`: IDs used for CPU/voltage
+- `display.selected_ids`: ordered list of IDs to forward to the display (e.g. `cpu`, `voltage`, `hz_driver`, `hz_slam`)
 
-Any `rates[]` received from the gateway are forwarded as additional `{id,value,text}` entries in the same JSON payload.
+Only the selected IDs are forwarded (if the list is empty, nothing is sent). Rate metrics come from `rovi_ui_gateway` (`rates[]`) and are formatted as `{id,value,text}` like `40/50Hz` when a target is provided.
 
 ## Run
 
 ```bash
 ros2 run rovi_serial_display serial_display -- --config /path/to/serial_display.yaml
 ```
-

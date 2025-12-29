@@ -5,8 +5,11 @@ serial:
   port: "/dev/rovi_display"
   baudrate: 256000
 
-ids:
-  cpu: "cpu"
-  voltage: "voltage"
+display:
+  selected_ids:
+    - "cpu"
+    - "voltage"
+    - "hz_driver"
+    - "hz_slam"
 
 reconnect_delay_s: 2.0

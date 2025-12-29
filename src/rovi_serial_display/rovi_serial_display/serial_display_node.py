@@ -58,38 +58,62 @@ class _SerialWriter:
 
 def _build_payload(update: ui_gateway_pb2.StatusUpdate, cfg: SerialDisplayConfig) -> list[dict]:
     cpu_int = int(round(update.cpu_percent))
-    payload: list[dict] = [
-        {
-            'id': cfg.cpu_id,
-            'value': cpu_int,
-            'text': f"{cpu_int}%",
-        }
-    ]
+    selected_ids = _dedupe_preserve_order(cfg.selected_ids)
+    rate_by_id = {metric.id: metric for metric in update.rates}
 
-    if update.WhichOneof('voltage') == 'voltage_v':
-        payload.append(
-            {
-                'id': cfg.voltage_id,
-                'value': float(update.voltage_v),
-                'text': f"{float(update.voltage_v):.1f}V",
-            }
-        )
+    payload: list[dict] = []
+    for metric_id in selected_ids:
+        if metric_id == 'cpu':
+            payload.append(
+                {
+                    'id': 'cpu',
+                    'value': cpu_int,
+                    'text': f"{cpu_int}%",
+                }
+            )
+            continue
 
-    for metric in update.rates:
-        measured = int(round(metric.hz))
+        if metric_id == 'voltage':
+            if update.WhichOneof('voltage') == 'voltage_v':
+                voltage_v = float(update.voltage_v)
+                payload.append(
+                    {
+                        'id': 'voltage',
+                        'value': voltage_v,
+                        'text': f"{voltage_v:.1f}V",
+                    }
+                )
+            continue
+
+        rate_metric = rate_by_id.get(metric_id)
+        if rate_metric is None:
+            continue
+
+        measured = int(round(rate_metric.hz))
         target = None
-        if metric.WhichOneof('target') == 'target_hz':
-            target = int(round(metric.target_hz))
+        if rate_metric.WhichOneof('target') == 'target_hz':
+            target = int(round(rate_metric.target_hz))
 
         payload.append(
             {
-                'id': metric.id,
+                'id': metric_id,
                 'value': measured,
                 'text': f"{measured}/{target}Hz" if target is not None else f"{measured}Hz",
             }
         )
 
     return payload
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
 
 
 async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: logging.Logger) -> None:
@@ -106,6 +130,8 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: l
                 if stop_event.is_set():
                     break
                 payload = _build_payload(update, cfg)
+                if not payload:
+                    continue
                 try:
                     serial_writer.write_json_line(payload)
                 except SerialException as exc:
