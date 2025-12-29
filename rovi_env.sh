@@ -70,9 +70,9 @@ ws() {
   cd "${ROVI_ROS_WS_DIR}" || return
   setup
   #optioanl activate, silent skip
-  if [ -f "${ROVI_ROS_WS_DIR}/.venv/bin/activate" ]; then
-    source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
-  fi
+  #if [ -f "${ROVI_ROS_WS_DIR}/.venv/bin/activate" ]; then
+  #  source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
+  #fi
 }
 
 record() {

@@ -22,6 +22,7 @@ class _SerialWriter:
         self._baudrate = baudrate
         self._logger = logger
         self._serial: Optional[Serial] = None
+        self._last_open_error: Optional[str] = None
 
     def close(self) -> None:
         if self._serial is None:
@@ -38,8 +39,12 @@ class _SerialWriter:
         try:
             self._serial = Serial(self._port, baudrate=self._baudrate, timeout=1)
             self._logger.info("Opened display serial on %s @ %s baud", self._port, self._baudrate)
+            self._last_open_error = None
         except SerialException as exc:
-            self._logger.warning("Failed to open display serial %s: %s", self._port, exc)
+            error = str(exc)
+            if error != self._last_open_error:
+                self._logger.warning("Failed to open display serial %s: %s", self._port, exc)
+                self._last_open_error = error
             self._serial = None
         return self._serial
 

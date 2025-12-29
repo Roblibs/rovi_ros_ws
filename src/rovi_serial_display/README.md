@@ -16,6 +16,8 @@ Key options:
 
 Only the selected IDs are forwarded (if the list is empty, nothing is sent). Rate metrics come from `rovi_ui_gateway` (`rates[]`) and are formatted as `{id,value,text}` like `40/50Hz` when a target is provided.
 
+If the serial device is missing or can’t be opened, the node logs a warning once and keeps running; it will start sending automatically when the port becomes available.
+
 ## Run
 
 ```bash
