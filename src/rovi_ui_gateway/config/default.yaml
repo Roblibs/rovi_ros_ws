@@ -5,3 +5,14 @@ update_period_s: 3.0
 
 ros:
   voltage_topic: "voltage"
+
+metrics:
+  rates:
+    - id: "hz_driver"
+      topic: "/voltage"
+      target_hz: 10
+  tf_rates:
+    - id: "hz_slam"
+      parent: "map"
+      child: "odom"
+      target_hz: 50

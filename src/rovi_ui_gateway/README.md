@@ -10,8 +10,30 @@ Low-rate UI gateway for Rovi: collects status data (CPU, voltage, …) and serve
 - Server responds: stream of periodic `StatusUpdate` snapshots
   - `cpu_percent` is always set
   - `voltage_v` is only set after the gateway has received at least one voltage message from ROS (no “fake” voltage)
+  - `rates[]` contains any configured topic/TF rates that have been observed
 
 Proto: `proto/ui_gateway.proto`
+
+## Metrics configuration
+
+The gateway can also publish periodic rates (Hz) for arbitrary ROS topics and for specific TF transforms.
+
+Example:
+
+```yaml
+metrics:
+  rates:
+    - id: "hz_driver"
+      topic: "/voltage"
+      target_hz: 10
+  tf_rates:
+    - id: "hz_slam"
+      parent: "map"
+      child: "odom"
+      target_hz: 50
+```
+
+Rate metrics are only emitted once at least one message/transform has been received (to avoid “fake” values).
 
 ## Run
 
@@ -43,6 +65,13 @@ async def main() -> None:
             print(f"cpu={update.cpu_percent:.0f}% seq={update.seq}")
             if update.WhichOneof("voltage") == "voltage_v":
                 print(f"voltage={update.voltage_v:.1f}V")
+            for metric in update.rates:
+                name = metric.id
+                hz = metric.hz
+                if metric.WhichOneof("target") == "target_hz":
+                    print(f"{name}={hz:.1f}/{metric.target_hz:.0f}Hz")
+                else:
+                    print(f"{name}={hz:.1f}Hz")
 
 
 if __name__ == "__main__":

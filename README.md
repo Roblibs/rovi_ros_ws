@@ -548,7 +548,7 @@ Packages of this repo are listed in this table
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
-| `rovi_ui_gateway` | UI gateway: low-rate status collector + gRPC streaming server (CPU, voltage, …) |
+| `rovi_ui_gateway` | UI gateway: low-rate status collector + gRPC streaming server (CPU, voltage, topic/TF hz metrics, …) |
 | `rovi_serial_display` | Serial UI client: consumes `rovi_ui_gateway` gRPC status stream and pushes JSON lines to the ESP32-S3 display |
 
 External ROS packages installed via apt (and a couple of local tools) and how they are used in this workspace:

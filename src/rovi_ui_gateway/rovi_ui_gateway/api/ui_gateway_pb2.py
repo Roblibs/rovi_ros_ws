@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10ui_gateway.proto\x12\x12rovi.ui_gateway.v1\"\x0f\n\rStatusRequest\"k\n\x0cStatusUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x13\n\x0b\x63pu_percent\x18\x03 \x01(\x02\x12\x13\n\tvoltage_v\x18\x04 \x01(\x02H\x00\x42\t\n\x07voltage2_\n\tUiGateway\x12R\n\tGetStatus\x12!.rovi.ui_gateway.v1.StatusRequest\x1a .rovi.ui_gateway.v1.StatusUpdate0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10ui_gateway.proto\x12\x12rovi.ui_gateway.v1\"\x0f\n\rStatusRequest\"C\n\nRateMetric\x12\n\n\x02id\x18\x01 \x01(\t\x12\n\n\x02hz\x18\x02 \x01(\x02\x12\x13\n\ttarget_hz\x18\x03 \x01(\x02H\x00\x42\x08\n\x06target\"\x9a\x01\n\x0cStatusUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x13\n\x0b\x63pu_percent\x18\x03 \x01(\x02\x12\x13\n\tvoltage_v\x18\x04 \x01(\x02H\x00\x12-\n\x05rates\x18\x05 \x03(\x0b\x32\x1e.rovi.ui_gateway.v1.RateMetricB\t\n\x07voltage2_\n\tUiGateway\x12R\n\tGetStatus\x12!.rovi.ui_gateway.v1.StatusRequest\x1a .rovi.ui_gateway.v1.StatusUpdate0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,8 +33,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_STATUSREQUEST']._serialized_start=40
   _globals['_STATUSREQUEST']._serialized_end=55
-  _globals['_STATUSUPDATE']._serialized_start=57
-  _globals['_STATUSUPDATE']._serialized_end=164
-  _globals['_UIGATEWAY']._serialized_start=166
-  _globals['_UIGATEWAY']._serialized_end=261
+  _globals['_RATEMETRIC']._serialized_start=57
+  _globals['_RATEMETRIC']._serialized_end=124
+  _globals['_STATUSUPDATE']._serialized_start=127
+  _globals['_STATUSUPDATE']._serialized_end=281
+  _globals['_UIGATEWAY']._serialized_start=283
+  _globals['_UIGATEWAY']._serialized_end=378
 # @@protoc_insertion_point(module_scope)

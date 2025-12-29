@@ -16,8 +16,8 @@ from rclpy.executors import SingleThreadedExecutor
 from .api import ui_gateway_pb2_grpc
 from .config import UiGatewayConfig, load_config
 from .grpc_gateway import UiGatewayService
-from .ros_voltage_subscriber import VoltageSubscriber
-from .status_store import SnapshotBroadcaster
+from .ros_metrics_node import UiGatewayRosNode
+from .status_store import RateMetricSnapshot, SnapshotBroadcaster
 from .voltage_state import VoltageState
 
 
@@ -25,13 +25,18 @@ async def _publish_loop(
     *,
     cfg: UiGatewayConfig,
     voltage_state: VoltageState,
+    ros_node: UiGatewayRosNode,
     broadcaster: SnapshotBroadcaster,
     stop_event: asyncio.Event,
 ) -> None:
     while not stop_event.is_set():
         cpu_percent = float(psutil.cpu_percent(interval=None))
         voltage_v, _last_update = voltage_state.read()
-        await broadcaster.publish(cpu_percent=cpu_percent, voltage_v=voltage_v)
+        rates = [
+            RateMetricSnapshot(id=metric_id, hz=hz, target_hz=target_hz)
+            for metric_id, hz, target_hz in ros_node.sample_rate_metrics()
+        ]
+        await broadcaster.publish(cpu_percent=cpu_percent, voltage_v=voltage_v, rates=rates)
         await asyncio.sleep(cfg.update_period_s)
 
 
@@ -54,7 +59,13 @@ async def _serve_grpc(
         await server.stop(grace=1.0)
 
 
-async def _run_async(*, cfg: UiGatewayConfig, voltage_state: VoltageState, logger: logging.Logger) -> None:
+async def _run_async(
+    *,
+    cfg: UiGatewayConfig,
+    voltage_state: VoltageState,
+    ros_node: UiGatewayRosNode,
+    logger: logging.Logger,
+) -> None:
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -66,7 +77,7 @@ async def _run_async(*, cfg: UiGatewayConfig, voltage_state: VoltageState, logge
     broadcaster = SnapshotBroadcaster()
 
     publisher_task = asyncio.create_task(
-        _publish_loop(cfg=cfg, voltage_state=voltage_state, broadcaster=broadcaster, stop_event=stop_event)
+        _publish_loop(cfg=cfg, voltage_state=voltage_state, ros_node=ros_node, broadcaster=broadcaster, stop_event=stop_event)
     )
     grpc_task = asyncio.create_task(_serve_grpc(bind=cfg.grpc_bind, broadcaster=broadcaster, stop_event=stop_event, logger=logger))
 
@@ -89,9 +100,14 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     rclpy.init(args=ros_args)
     voltage_state = VoltageState()
-    voltage_node = VoltageSubscriber(voltage_state=voltage_state, topic=cfg.voltage_topic)
+    ros_node = UiGatewayRosNode(
+        voltage_state=voltage_state,
+        voltage_topic=cfg.voltage_topic,
+        topic_rates=cfg.topic_rates,
+        tf_rates=cfg.tf_rates,
+    )
     executor = SingleThreadedExecutor()
-    executor.add_node(voltage_node)
+    executor.add_node(ros_node)
 
     spin_thread = threading.Thread(target=executor.spin, name='rovi_ui_gateway_ros_spin', daemon=True)
     spin_thread.start()
@@ -100,14 +116,13 @@ def main(argv: Optional[list[str]] = None) -> None:
     psutil.cpu_percent(None)
 
     try:
-        asyncio.run(_run_async(cfg=cfg, voltage_state=voltage_state, logger=logger))
+        asyncio.run(_run_async(cfg=cfg, voltage_state=voltage_state, ros_node=ros_node, logger=logger))
     finally:
         executor.shutdown()
-        voltage_node.destroy_node()
+        ros_node.destroy_node()
         rclpy.shutdown()
         spin_thread.join(timeout=2.0)
 
 
 if __name__ == '__main__':
     main()
-

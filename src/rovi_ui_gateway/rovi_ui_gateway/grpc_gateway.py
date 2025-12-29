@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 import grpc
 
 from .api import ui_gateway_pb2, ui_gateway_pb2_grpc
-from .status_store import SnapshotBroadcaster, StatusSnapshot
+from .status_store import RateMetricSnapshot, SnapshotBroadcaster, StatusSnapshot
 
 
 class UiGatewayService(ui_gateway_pb2_grpc.UiGatewayServicer):
@@ -39,5 +39,15 @@ def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_gateway_pb2.StatusUpdate:
     )
     if snapshot.voltage_v is not None:
         msg.voltage_v = snapshot.voltage_v
+    msg.rates.extend(_rate_metrics_to_proto(snapshot.rates))
     return msg
 
+
+def _rate_metrics_to_proto(metrics: list[RateMetricSnapshot]) -> list[ui_gateway_pb2.RateMetric]:
+    out: list[ui_gateway_pb2.RateMetric] = []
+    for metric in metrics:
+        m = ui_gateway_pb2.RateMetric(id=metric.id, hz=metric.hz)
+        if metric.target_hz is not None:
+            m.target_hz = metric.target_hz
+        out.append(m)
+    return out

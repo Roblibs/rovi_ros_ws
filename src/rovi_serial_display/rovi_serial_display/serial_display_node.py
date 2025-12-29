@@ -75,6 +75,20 @@ def _build_payload(update: ui_gateway_pb2.StatusUpdate, cfg: SerialDisplayConfig
             }
         )
 
+    for metric in update.rates:
+        measured = int(round(metric.hz))
+        target = None
+        if metric.WhichOneof('target') == 'target_hz':
+            target = int(round(metric.target_hz))
+
+        payload.append(
+            {
+                'id': metric.id,
+                'value': measured,
+                'text': f"{measured}/{target}Hz" if target is not None else f"{measured}Hz",
+            }
+        )
+
     return payload
 
 
@@ -137,4 +151,3 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == '__main__':
     main()
-

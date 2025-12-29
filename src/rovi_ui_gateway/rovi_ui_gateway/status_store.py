@@ -7,11 +7,19 @@ from typing import Optional
 
 
 @dataclass(frozen=True)
+class RateMetricSnapshot:
+    id: str
+    hz: float
+    target_hz: Optional[float]
+
+
+@dataclass(frozen=True)
 class StatusSnapshot:
     seq: int
     timestamp_unix_ms: int
     cpu_percent: float
     voltage_v: Optional[float]
+    rates: list[RateMetricSnapshot]
 
 
 class SnapshotBroadcaster:
@@ -23,7 +31,13 @@ class SnapshotBroadcaster:
     def latest(self) -> Optional[StatusSnapshot]:
         return self._latest
 
-    async def publish(self, *, cpu_percent: float, voltage_v: Optional[float]) -> StatusSnapshot:
+    async def publish(
+        self,
+        *,
+        cpu_percent: float,
+        voltage_v: Optional[float],
+        rates: list[RateMetricSnapshot],
+    ) -> StatusSnapshot:
         async with self._condition:
             self._seq += 1
             snapshot = StatusSnapshot(
@@ -31,6 +45,7 @@ class SnapshotBroadcaster:
                 timestamp_unix_ms=int(time.time() * 1000),
                 cpu_percent=cpu_percent,
                 voltage_v=voltage_v,
+                rates=rates,
             )
             self._latest = snapshot
             self._condition.notify_all()

@@ -9,6 +9,16 @@ service UiGateway {
 
 message StatusRequest {}
 
+message RateMetric {
+  string id = 1;
+  float hz = 2;
+
+  // Optional target frequency for display purposes.
+  oneof target {
+    float target_hz = 3;
+  }
+}
+
 message StatusUpdate {
   // Unix epoch time in milliseconds when this snapshot was produced.
   int64 timestamp_unix_ms = 1;
@@ -23,4 +33,7 @@ message StatusUpdate {
   oneof voltage {
     float voltage_v = 4;
   }
+
+  // Periodic rates for configured topics/transforms.
+  repeated RateMetric rates = 5;
 }
