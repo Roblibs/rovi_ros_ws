@@ -124,6 +124,8 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
 async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: logging.Logger) -> None:
     serial_writer = _SerialWriter(port=cfg.serial_port, baudrate=cfg.baudrate, logger=logger)
     request = ui_gateway_pb2.StatusRequest()
+    grpc_connected = False
+    last_grpc_log_key: Optional[tuple[grpc.StatusCode, str]] = None
 
     while not stop_event.is_set():
         channel: Optional[grpc.aio.Channel] = None
@@ -134,6 +136,10 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: l
             async for update in stub.GetStatus(request):
                 if stop_event.is_set():
                     break
+                if not grpc_connected:
+                    logger.info("Connected to UI gateway at %s", cfg.gateway_address)
+                    grpc_connected = True
+                    last_grpc_log_key = None
                 payload = _build_payload(update, cfg)
                 if not payload:
                     continue
@@ -143,8 +149,34 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: l
                     logger.warning("Serial write failed: %s", exc)
 
         except grpc.aio.AioRpcError as exc:
-            logger.warning("gRPC stream error: %s", exc)
+            code = exc.code()
+            details = exc.details() or ""
+            log_key = (code, details)
+
+            if code == grpc.StatusCode.UNAVAILABLE and not grpc_connected:
+                if log_key != last_grpc_log_key:
+                    logger.info(
+                        "Waiting for UI gateway at %s (%s); retrying in %.1fs",
+                        cfg.gateway_address,
+                        details,
+                        cfg.reconnect_delay_s,
+                    )
+                    last_grpc_log_key = log_key
+            else:
+                if grpc_connected:
+                    grpc_connected = False
+                if log_key != last_grpc_log_key:
+                    logger.warning(
+                        "gRPC stream error (%s): %s; retrying in %.1fs",
+                        getattr(code, 'name', str(code)),
+                        details,
+                        cfg.reconnect_delay_s,
+                    )
+                    last_grpc_log_key = log_key
         except Exception:  # noqa: BLE001
+            if grpc_connected:
+                grpc_connected = False
+            last_grpc_log_key = None
             logger.exception("Unexpected error in serial display loop")
         finally:
             if channel is not None:
