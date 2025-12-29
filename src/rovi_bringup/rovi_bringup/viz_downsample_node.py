@@ -116,20 +116,26 @@ def main(argv: Optional[list[str]] = None) -> None:
     args, ros_args = parser.parse_known_args(argv)
 
     rclpy.init(args=ros_args)
+    config_path = args.config
+    if not config_path:
+        from ament_index_python.packages import get_package_share_directory
+
+        config_path = (
+            f"{get_package_share_directory('rovi_bringup')}/config/viz_downsample.yaml"
+        )
+
+    qos = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
+    node = _Throttle(config_path=config_path, qos=qos)
     try:
-        config_path = args.config
-        if not config_path:
-            from ament_index_python.packages import get_package_share_directory
-
-            config_path = (
-                f"{get_package_share_directory('rovi_bringup')}/config/viz_downsample.yaml"
-            )
-
-        qos = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)
-        node = _Throttle(config_path=config_path, qos=qos)
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
-        rclpy.shutdown()
+        node.destroy_node()
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':

@@ -14,10 +14,19 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    AppendEnvironmentVariable,
+    DeclareLaunchArgument,
+    EmitEvent,
+    IncludeLaunchDescription,
+    RegisterEventHandler,
+    TimerAction,
+)
 from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, TextSubstitution
+from launch.events import Shutdown
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -77,7 +86,8 @@ def generate_launch_description() -> LaunchDescription:
         PythonLaunchDescriptionSource(gz_launch),
         launch_arguments={
             'gz_args': [TextSubstitution(text='-r -s '), LaunchConfiguration('world')],
-            'on_exit_shutdown': TextSubstitution(text='true'),
+            # Do not hard-shutdown on exit; we emit a Shutdown event below.
+            'on_exit_shutdown': TextSubstitution(text='false'),
         }.items(),
     )
 
@@ -86,7 +96,7 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration('gazebo_gui')),
         launch_arguments={
             'gz_args': [TextSubstitution(text='-g ')],
-            'on_exit_shutdown': TextSubstitution(text='true'),
+            'on_exit_shutdown': TextSubstitution(text='false'),
         }.items(),
     )
 
@@ -118,6 +128,18 @@ def generate_launch_description() -> LaunchDescription:
 
     delayed_spawn = TimerAction(period=2.0, actions=[spawn_robot])
 
+    graceful_shutdown = RegisterEventHandler(
+        OnProcessExit(
+            target_action=lambda action: getattr(action, 'name', '') == 'gazebo',
+            on_exit=[
+                TimerAction(
+                    period=0.5,
+                    actions=[EmitEvent(event=Shutdown(reason='Gazebo exited'))],
+                )
+            ],
+        )
+    )
+
     return LaunchDescription([
         world_arg,
         gazebo_gui_arg,
@@ -130,4 +152,5 @@ def generate_launch_description() -> LaunchDescription:
         gazebo_client,
         bridge,
         delayed_spawn,
+        graceful_shutdown,
     ])
