@@ -6,6 +6,9 @@ requires-python = ">=3.12"
 dependencies = [
     "pyserial>=3.5",
     "psutil>=5.9",
+    "grpcio>=1.60",
+    "protobuf>=4.25",
+    "PyYAML>=6.0",
     "rosmaster-lib",
 ]
 

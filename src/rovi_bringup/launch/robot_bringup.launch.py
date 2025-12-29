@@ -40,10 +40,14 @@ def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
     desc_share = get_package_share_directory('rovi_description')
     sim_share = get_package_share_directory('rovi_sim')
+    ui_gateway_share = get_package_share_directory('rovi_ui_gateway')
+    serial_display_share = get_package_share_directory('rovi_serial_display')
 
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
     default_rovi_base_params = os.path.join(bringup_share, 'config', 'rovi_base.yaml')
     default_rosmaster_params = os.path.join(bringup_share, 'config', 'rosmaster_driver.yaml')
+    default_ui_gateway_config = os.path.join(ui_gateway_share, 'config', 'default.yaml')
+    default_serial_display_config = os.path.join(serial_display_share, 'config', 'default.yaml')
 
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
     sim_backend_launch = os.path.join(sim_share, 'launch', 'gazebo_sim.launch.py')
@@ -142,36 +146,26 @@ def generate_launch_description() -> LaunchDescription:
         description='Enable angle compensation in rplidar_ros',
     )
 
-    # Serial display monitor (all modes, can be disabled).
-    display_enable_arg = DeclareLaunchArgument(
-        'display_enabled',
+    # UI gateway + serial display client (all modes, can be disabled).
+    ui_gateway_enabled_arg = DeclareLaunchArgument(
+        'ui_gateway_enabled',
         default_value='true',
-        description='Enable serial display monitor (voltage + CPU).',
+        description='Start rovi_ui_gateway gRPC server.',
     )
-    display_port_arg = DeclareLaunchArgument(
-        'display_port',
-        default_value='/dev/rovi_display',
-        description='Explicit serial port for the display (defaults to /dev/rovi_display symlink; auto-detect by VID/PID if empty).',
+    ui_gateway_config_arg = DeclareLaunchArgument(
+        'ui_gateway_config',
+        default_value=default_ui_gateway_config,
+        description='Path to rovi_ui_gateway YAML config.',
     )
-    display_vid_arg = DeclareLaunchArgument(
-        'display_usb_vid',
-        default_value='0x303a',
-        description='USB VID to match for the display (hex or decimal).',
+    serial_display_enabled_arg = DeclareLaunchArgument(
+        'serial_display_enabled',
+        default_value='true',
+        description='Start rovi_serial_display (gRPC client -> USB serial display).',
     )
-    display_pid_arg = DeclareLaunchArgument(
-        'display_usb_pid',
-        default_value='0x1001',
-        description='USB PID to match for the display (hex or decimal).',
-    )
-    display_baud_arg = DeclareLaunchArgument(
-        'display_baudrate',
-        default_value='256000',
-        description='Serial baudrate for the display connection.',
-    )
-    display_period_arg = DeclareLaunchArgument(
-        'display_publish_period',
-        default_value='3.0',
-        description='Seconds between display updates.',
+    serial_display_config_arg = DeclareLaunchArgument(
+        'serial_display_config',
+        default_value=default_serial_display_config,
+        description='Path to rovi_serial_display YAML config.',
     )
 
     # Simulation backend (sim)
@@ -193,15 +187,18 @@ def generate_launch_description() -> LaunchDescription:
 
     use_sim_time_param = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
 
-    # If a virtual environment is active, prepend its site-packages to PYTHONPATH so rosmaster-lib is importable.
+    # Prefer an active venv; otherwise try $ROVI_ROS_WS_DIR/.venv so launches work without `activate`.
     venv_root = os.environ.get('VIRTUAL_ENV')
+    if not venv_root:
+        rovi_ws_dir = os.environ.get('ROVI_ROS_WS_DIR')
+        if rovi_ws_dir:
+            venv_root = os.path.join(rovi_ws_dir, '.venv')
     py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
     venv_site = os.path.join(venv_root, 'lib', py_ver, 'site-packages') if venv_root else ''
 
     if venv_site and os.path.isdir(venv_site):
         venv_env_actions = [
             SetEnvironmentVariable(
-                condition=is_real,
                 name='PYTHONPATH',
                 value=[
                     TextSubstitution(text=venv_site),
@@ -209,12 +206,12 @@ def generate_launch_description() -> LaunchDescription:
                     EnvironmentVariable('PYTHONPATH', default_value=''),
                 ],
             ),
-            SetEnvironmentVariable(condition=is_real, name='PYTHONUNBUFFERED', value='1'),
-            LogInfo(condition=is_real, msg=f"Using venv site-packages: {venv_site}"),
+            SetEnvironmentVariable(name='PYTHONUNBUFFERED', value='1'),
+            LogInfo(msg=f"Using venv site-packages: {venv_site}"),
         ]
     else:
         venv_env_actions = [
-            LogInfo(condition=is_real, msg="VIRTUAL_ENV not set or site-packages not found; using existing PYTHONPATH")
+            LogInfo(msg="No venv site-packages found; using existing PYTHONPATH")
         ]
 
     robot_description = ParameterValue(
@@ -365,22 +362,22 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    display_monitor_node = Node(
-        condition=IfCondition(LaunchConfiguration('display_enabled')),
-        package='rovi_display_monitor',
-        executable='display_monitor',
-        name='rovi_display_monitor',
+    ui_gateway_node = Node(
+        condition=IfCondition(LaunchConfiguration('ui_gateway_enabled')),
+        package='rovi_ui_gateway',
+        executable='ui_gateway',
+        name='rovi_ui_gateway',
         output='screen',
-        parameters=[
-            {
-                'port': LaunchConfiguration('display_port'),
-                'usb_vid': LaunchConfiguration('display_usb_vid'),
-                'usb_pid': LaunchConfiguration('display_usb_pid'),
-                'baudrate': LaunchConfiguration('display_baudrate'),
-                'publish_period': LaunchConfiguration('display_publish_period'),
-                'voltage_topic': 'voltage',
-            }
-        ],
+        arguments=['--config', LaunchConfiguration('ui_gateway_config')],
+    )
+
+    serial_display_node = Node(
+        condition=IfCondition(LaunchConfiguration('serial_display_enabled')),
+        package='rovi_serial_display',
+        executable='serial_display',
+        name='rovi_serial_display',
+        output='screen',
+        arguments=['--config', LaunchConfiguration('serial_display_config')],
     )
 
     return LaunchDescription([
@@ -400,12 +397,10 @@ def generate_launch_description() -> LaunchDescription:
         lidar_frame_arg,
         lidar_baud_arg,
         lidar_angle_comp_arg,
-        display_enable_arg,
-        display_port_arg,
-        display_vid_arg,
-        display_pid_arg,
-        display_baud_arg,
-        display_period_arg,
+        ui_gateway_enabled_arg,
+        ui_gateway_config_arg,
+        serial_display_enabled_arg,
+        serial_display_config_arg,
         world_arg,
         gazebo_gui_arg,
         *venv_env_actions,
@@ -416,7 +411,8 @@ def generate_launch_description() -> LaunchDescription:
         rovi_base_node,
         rosmaster_driver_node,
         lidar_node,
-        display_monitor_node,
+        ui_gateway_node,
+        serial_display_node,
         sim_backend,
         sim_base,
         sim_odom,

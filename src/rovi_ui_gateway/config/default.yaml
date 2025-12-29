@@ -1,0 +1,7 @@
+grpc:
+  bind: "0.0.0.0:50051"
+
+update_period_s: 3.0
+
+ros:
+  voltage_topic: "voltage"

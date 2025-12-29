@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package rovi.ui_gateway.v1;
+
+service UiGateway {
+  // Streams periodic status snapshots at a globally-configured cadence.
+  rpc GetStatus(StatusRequest) returns (stream StatusUpdate);
+}
+
+message StatusRequest {}
+
+message StatusUpdate {
+  // Unix epoch time in milliseconds when this snapshot was produced.
+  int64 timestamp_unix_ms = 1;
+
+  // Monotonic snapshot sequence number (starts at 1).
+  uint64 seq = 2;
+
+  // CPU utilization percentage [0..100].
+  float cpu_percent = 3;
+
+  // Present only after at least one voltage sample has been received from ROS.
+  oneof voltage {
+    float voltage_v = 4;
+  }
+}
