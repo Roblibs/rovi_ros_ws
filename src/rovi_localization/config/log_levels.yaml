@@ -1,0 +1,6 @@
+# Per-node ROS log levels used by rovi_localization launch files.
+# Valid levels: debug, info, warn, error, fatal
+
+# Silence noisy Madgwick IMU warnings in simulation by default.
+imu_filter: error
+

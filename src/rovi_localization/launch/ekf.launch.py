@@ -12,11 +12,41 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
+def _read_log_levels(path: str) -> dict[str, str]:
+    """Reads a simple YAML mapping of `node_name: level` (no nesting)."""
+    try:
+        lines = open(path, encoding='utf-8').read().splitlines()
+    except OSError:
+        return {}
+
+    out: dict[str, str] = {}
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        if ':' not in stripped:
+            continue
+        key, value = stripped.split(':', 1)
+        key = key.strip().strip('"').strip("'")
+        value = value.strip().strip('"').strip("'")
+        if key and value:
+            out[key] = value
+    return out
+
+
+def _ros_log_level_args(level: str | None) -> list[str]:
+    if not level:
+        return []
+    return ['--ros-args', '--log-level', level]
+
+
 def generate_launch_description() -> LaunchDescription:
     pkg_share = get_package_share_directory('rovi_localization')
     ekf_odom_params = os.path.join(pkg_share, 'config', 'ekf_odom.yaml')
     ekf_odom_imu_params = os.path.join(pkg_share, 'config', 'ekf_odom_imu.yaml')
     imu_filter_params = os.path.join(pkg_share, 'config', 'imu_filter_madgwick.yaml')
+    log_levels_path = os.path.join(pkg_share, 'config', 'log_levels.yaml')
+    log_levels = _read_log_levels(log_levels_path)
 
     odom_mode = DeclareLaunchArgument(
         'odom_mode',
@@ -40,6 +70,7 @@ def generate_launch_description() -> LaunchDescription:
         executable='imu_filter_madgwick_node',
         name='imu_filter',
         output='screen',
+        arguments=_ros_log_level_args(log_levels.get('imu_filter')),
         parameters=[
             imu_filter_params,
             {
