@@ -124,6 +124,11 @@ def generate_launch_description() -> LaunchDescription:
         default_value='fusion_wheels_imu',
         description="Odometry mode: 'raw', 'filtered', or 'fusion_wheels_imu'.",
     )
+    viz_downsample_config = DeclareLaunchArgument(
+        'viz_downsample_config',
+        default_value=os.path.join(bringup_share, 'config', 'viz_downsample.yaml'),
+        description='YAML config for RViz-only downsampled topics (published under /viz/*).',
+    )
     rovi_base_publish_tf = PythonExpression([
         "'true' if '",
         LaunchConfiguration('stack'),
@@ -223,6 +228,16 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[{'use_sim_time': ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)}],
     )
 
+    viz_downsample_node = Node(
+        condition=IfCondition(LaunchConfiguration('rviz')),
+        package='rovi_bringup',
+        executable='viz_downsample',
+        name='viz_downsample',
+        output='screen',
+        arguments=['--config', LaunchConfiguration('viz_downsample_config')],
+        parameters=[{'use_sim_time': ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)}],
+    )
+
     return LaunchDescription([
         robot_mode,
         stack,
@@ -239,10 +254,12 @@ def generate_launch_description() -> LaunchDescription:
         map_file_name,
         mag_enabled,
         odom_mode,
+        viz_downsample_config,
         backend,
         control_stack,
         stack_mapping,
         stack_localization,
         stack_nav,
+        viz_downsample_node,
         rviz_node,
     ])
