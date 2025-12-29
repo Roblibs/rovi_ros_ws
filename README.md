@@ -5,6 +5,10 @@ This repo provides a ROS2 Jazzy software stack that covers multiple run modes in
 
 This project is still in development, current stage is a functional navigation witl Lidar on real robot and simulaiton.
 
+related projects:
+* webapp : https://github.com/MicroWebStacks/tanstack-robot-space
+* LCD monitor firmware : https://github.com/ESP32Home/robot_serial_display
+
 # Usage
 Before first time usage, start with the [install](#install) section
 
