@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fui_bridge.proto\x12\x14roblibs.ui_bridge.v1\"\x0f\n\rStatusRequest\"C\n\nRateMetric\x12\n\n\x02id\x18\x01 \x01(\t\x12\n\n\x02hz\x18\x02 \x01(\x02\x12\x13\n\ttarget_hz\x18\x03 \x01(\x02H\x00\x42\x08\n\x06target\"\x9c\x01\n\x0cStatusUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x13\n\x0b\x63pu_percent\x18\x03 \x01(\x02\x12\x13\n\tvoltage_v\x18\x04 \x01(\x02H\x00\x12/\n\x05rates\x18\x05 \x03(\x0b\x32 .roblibs.ui_bridge.v1.RateMetricB\t\n\x07voltage2b\n\x08UiBridge\x12V\n\tGetStatus\x12#.roblibs.ui_bridge.v1.StatusRequest\x1a\".roblibs.ui_bridge.v1.StatusUpdate0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fui_bridge.proto\x12\x14roblibs.ui_bridge.v1\"\x0f\n\rStatusRequest\"\x13\n\x11RobotStateRequest\"\x13\n\x11RobotModelRequest\"C\n\nRateMetric\x12\n\n\x02id\x18\x01 \x01(\t\x12\n\n\x02hz\x18\x02 \x01(\x02\x12\x13\n\ttarget_hz\x18\x03 \x01(\x02H\x00\x42\x08\n\x06target\"\x9c\x01\n\x0cStatusUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x13\n\x0b\x63pu_percent\x18\x03 \x01(\x02\x12\x13\n\tvoltage_v\x18\x04 \x01(\x02H\x00\x12/\n\x05rates\x18\x05 \x03(\x0b\x32 .roblibs.ui_bridge.v1.RateMetricB\t\n\x07voltage\"k\n\x06Pose3D\x12\x10\n\x08\x66rame_id\x18\x01 \x01(\t\x12\t\n\x01x\x18\x02 \x01(\x01\x12\t\n\x01y\x18\x03 \x01(\x01\x12\t\n\x01z\x18\x04 \x01(\x01\x12\n\n\x02qx\x18\x05 \x01(\x01\x12\n\n\x02qy\x18\x06 \x01(\x01\x12\n\n\x02qz\x18\x07 \x01(\x01\x12\n\n\x02qw\x18\x08 \x01(\x01\"6\n\nJointAngle\x12\x12\n\njoint_name\x18\x01 \x01(\t\x12\x14\n\x0cposition_rad\x18\x02 \x01(\x01\"\xe1\x01\n\x10RobotStateUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12/\n\tpose_odom\x18\x03 \x01(\x0b\x32\x1c.roblibs.ui_bridge.v1.Pose3D\x12\x30\n\x08pose_map\x18\x04 \x01(\x0b\x32\x1c.roblibs.ui_bridge.v1.Pose3DH\x00\x12\x36\n\x0cwheel_angles\x18\x05 \x03(\x0b\x32 .roblibs.ui_bridge.v1.JointAngleB\n\n\x08map_pose\"\x8a\x01\n\x0eRobotModelMeta\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x04\x12\x19\n\x11wheel_joint_names\x18\x03 \x03(\t\x12\x12\n\nodom_frame\x18\x04 \x01(\t\x12\x12\n\nbase_frame\x18\x05 \x01(\t\x12\x11\n\tmap_frame\x18\x06 \x01(\t\"i\n\x0fRobotModelChunk\x12\x32\n\x04meta\x18\x01 \x01(\x0b\x32$.roblibs.ui_bridge.v1.RobotModelMeta\x12\r\n\x05\x63hunk\x18\x02 \x01(\x0c\x12\x13\n\x0b\x63hunk_index\x18\x03 \x01(\r2\xac\x02\n\x08UiBridge\x12V\n\tGetStatus\x12#.roblibs.ui_bridge.v1.StatusRequest\x1a\".roblibs.ui_bridge.v1.StatusUpdate0\x01\x12\x65\n\x10StreamRobotState\x12\'.roblibs.ui_bridge.v1.RobotStateRequest\x1a&.roblibs.ui_bridge.v1.RobotStateUpdate0\x01\x12\x61\n\rGetRobotModel\x12\'.roblibs.ui_bridge.v1.RobotModelRequest\x1a%.roblibs.ui_bridge.v1.RobotModelChunk0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,10 +33,24 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_STATUSREQUEST']._serialized_start=41
   _globals['_STATUSREQUEST']._serialized_end=56
-  _globals['_RATEMETRIC']._serialized_start=58
-  _globals['_RATEMETRIC']._serialized_end=125
-  _globals['_STATUSUPDATE']._serialized_start=128
-  _globals['_STATUSUPDATE']._serialized_end=284
-  _globals['_UIBRIDGE']._serialized_start=286
-  _globals['_UIBRIDGE']._serialized_end=384
+  _globals['_ROBOTSTATEREQUEST']._serialized_start=58
+  _globals['_ROBOTSTATEREQUEST']._serialized_end=77
+  _globals['_ROBOTMODELREQUEST']._serialized_start=79
+  _globals['_ROBOTMODELREQUEST']._serialized_end=98
+  _globals['_RATEMETRIC']._serialized_start=100
+  _globals['_RATEMETRIC']._serialized_end=167
+  _globals['_STATUSUPDATE']._serialized_start=170
+  _globals['_STATUSUPDATE']._serialized_end=326
+  _globals['_POSE3D']._serialized_start=328
+  _globals['_POSE3D']._serialized_end=435
+  _globals['_JOINTANGLE']._serialized_start=437
+  _globals['_JOINTANGLE']._serialized_end=491
+  _globals['_ROBOTSTATEUPDATE']._serialized_start=494
+  _globals['_ROBOTSTATEUPDATE']._serialized_end=719
+  _globals['_ROBOTMODELMETA']._serialized_start=722
+  _globals['_ROBOTMODELMETA']._serialized_end=860
+  _globals['_ROBOTMODELCHUNK']._serialized_start=862
+  _globals['_ROBOTMODELCHUNK']._serialized_end=967
+  _globals['_UIBRIDGE']._serialized_start=970
+  _globals['_UIBRIDGE']._serialized_end=1270
 # @@protoc_insertion_point(module_scope)

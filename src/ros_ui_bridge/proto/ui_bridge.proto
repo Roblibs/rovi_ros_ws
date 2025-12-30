@@ -5,9 +5,19 @@ package roblibs.ui_bridge.v1;
 service UiBridge {
   // Streams periodic status snapshots at a globally-configured cadence.
   rpc GetStatus(StatusRequest) returns (stream StatusUpdate);
+
+  // Streams robot pose + wheel joint angles for 3D rendering.
+  rpc StreamRobotState(RobotStateRequest) returns (stream RobotStateUpdate);
+
+  // Returns the robot model as a GLB (binary glTF) stream (chunked to avoid gRPC message size limits).
+  rpc GetRobotModel(RobotModelRequest) returns (stream RobotModelChunk);
 }
 
 message StatusRequest {}
+
+message RobotStateRequest {}
+
+message RobotModelRequest {}
 
 message RateMetric {
   // Stable identifier for this rate metric; clients should treat it as a key.
@@ -38,4 +48,72 @@ message StatusUpdate {
 
   // Periodic rates for configured topics/transforms.
   repeated RateMetric rates = 5;
+}
+
+message Pose3D {
+  // Frame in which this pose is expressed (e.g. "odom", "map").
+  string frame_id = 1;
+
+  // Translation in meters.
+  double x = 2;
+  double y = 3;
+  double z = 4;
+
+  // Unit quaternion.
+  double qx = 5;
+  double qy = 6;
+  double qz = 7;
+  double qw = 8;
+}
+
+message JointAngle {
+  string joint_name = 1;
+  double position_rad = 2;
+}
+
+message RobotStateUpdate {
+  // Unix epoch time in milliseconds when this snapshot was produced.
+  int64 timestamp_unix_ms = 1;
+
+  // Monotonic snapshot sequence number (starts at 1).
+  uint64 seq = 2;
+
+  // Pose derived from /odom_raw (stable contract for sim + real).
+  Pose3D pose_odom = 3;
+
+  // Pose in map frame when map->odom is available (optional).
+  oneof map_pose {
+    Pose3D pose_map = 4;
+  }
+
+  // Wheel joint angles (positions) in radians.
+  // Always present for configured wheel joints; defaults to 0 when unseen.
+  repeated JointAngle wheel_angles = 5;
+}
+
+message RobotModelMeta {
+  // Hash of the GLB payload (sha256 hex).
+  string sha256 = 1;
+
+  // Total GLB size in bytes.
+  uint64 size_bytes = 2;
+
+  // Configured wheel joints used by StreamRobotState.
+  repeated string wheel_joint_names = 3;
+
+  // Frames used by StreamRobotState.
+  string odom_frame = 4;
+  string base_frame = 5;
+  string map_frame = 6;
+}
+
+message RobotModelChunk {
+  // Present only on the first chunk.
+  RobotModelMeta meta = 1;
+
+  // Raw GLB bytes.
+  bytes chunk = 2;
+
+  // Chunk index starting at 0.
+  uint32 chunk_index = 3;
 }

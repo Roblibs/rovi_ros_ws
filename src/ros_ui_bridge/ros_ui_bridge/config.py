@@ -26,12 +26,32 @@ class TfRateMetricConfig:
 
 
 @dataclass(frozen=True)
+class RobotModelConfig:
+    glb_path: str | None
+    chunk_size_bytes: int
+
+
+@dataclass(frozen=True)
+class RobotStateConfig:
+    update_hz: float
+    odom_topic: str
+    joint_states_topic: str
+    odom_frame: str
+    base_frame: str
+    map_frame: str
+    wheel_joint_names: list[str]
+    map_tf_max_age_s: float
+
+
+@dataclass(frozen=True)
 class UiBridgeConfig:
     grpc_bind: str
     update_period_s: float
     voltage_topic: str
     topic_rates: list[TopicRateMetricConfig]
     tf_rates: list[TfRateMetricConfig]
+    robot_state: RobotStateConfig
+    robot_model: RobotModelConfig
 
 
 def default_config_path() -> Path:
@@ -65,12 +85,16 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
     grpc = _read_map(data, 'grpc')
     ros = _read_map(data, 'ros')
     metrics = _read_map(data, 'metrics')
+    robot_state = _read_map(data, 'robot_state')
+    robot_model = _read_map(data, 'robot_model')
 
     grpc_bind = str(grpc.get('bind', '0.0.0.0:50051'))
     update_period_s = float(data.get('update_period_s', 3.0))
     voltage_topic = str(ros.get('voltage_topic', 'voltage'))
     topic_rates = _parse_topic_rates(metrics.get('rates'))
     tf_rates = _parse_tf_rates(metrics.get('tf_rates'))
+    robot_state_cfg = _parse_robot_state(robot_state)
+    robot_model_cfg = _parse_robot_model(robot_model)
 
     if update_period_s <= 0:
         raise RuntimeError(f"update_period_s must be > 0 (got {update_period_s}) in: {config_path}")
@@ -81,6 +105,8 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
         voltage_topic=voltage_topic,
         topic_rates=topic_rates,
         tf_rates=tf_rates,
+        robot_state=robot_state_cfg,
+        robot_model=robot_model_cfg,
     )
 
 
@@ -162,3 +188,54 @@ def _parse_tf_rates(value: Any) -> list[TfRateMetricConfig]:
             )
         )
     return out
+
+
+def _parse_robot_state(section: dict[str, Any]) -> RobotStateConfig:
+    update_hz = float(section.get('update_hz', 10.0))
+    if update_hz <= 0.0:
+        update_hz = 10.0
+
+    odom_topic = str(section.get('odom_topic', '/odom_raw'))
+    joint_states_topic = str(section.get('joint_states_topic', '/joint_states'))
+    odom_frame = str(section.get('odom_frame', 'odom'))
+    base_frame = str(section.get('base_frame', 'base_footprint'))
+    map_frame = str(section.get('map_frame', 'map'))
+    map_tf_max_age_s = float(section.get('map_tf_max_age_s', 1.0))
+
+    wheel_joint_names_raw = section.get('wheel_joint_names')
+    wheel_joint_names: list[str]
+    if wheel_joint_names_raw is None:
+        wheel_joint_names = [
+            'front_left_joint',
+            'front_right_joint',
+            'back_left_joint',
+            'back_right_joint',
+        ]
+    elif isinstance(wheel_joint_names_raw, list):
+        wheel_joint_names = [str(name).strip() for name in wheel_joint_names_raw if str(name).strip()]
+    else:
+        raise RuntimeError("Invalid 'robot_state.wheel_joint_names' (expected list)")
+
+    return RobotStateConfig(
+        update_hz=update_hz,
+        odom_topic=odom_topic,
+        joint_states_topic=joint_states_topic,
+        odom_frame=odom_frame,
+        base_frame=base_frame,
+        map_frame=map_frame,
+        wheel_joint_names=wheel_joint_names,
+        map_tf_max_age_s=map_tf_max_age_s,
+    )
+
+
+def _parse_robot_model(section: dict[str, Any]) -> RobotModelConfig:
+    glb_path_raw = section.get('glb_path', section.get('glb'))
+    glb_path = str(glb_path_raw).strip() if glb_path_raw is not None else None
+    if glb_path == '':
+        glb_path = None
+
+    chunk_size_bytes = int(section.get('chunk_size_bytes', 1024 * 1024))
+    if chunk_size_bytes <= 0:
+        chunk_size_bytes = 1024 * 1024
+
+    return RobotModelConfig(glb_path=glb_path, chunk_size_bytes=chunk_size_bytes)

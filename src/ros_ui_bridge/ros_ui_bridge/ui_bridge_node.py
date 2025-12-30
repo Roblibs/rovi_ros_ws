@@ -16,6 +16,9 @@ from rclpy.executors import SingleThreadedExecutor
 from .api import ui_bridge_pb2_grpc
 from .config import UiBridgeConfig, load_config
 from .grpc_gateway import UiBridgeService
+from .robot_model_provider import RobotModelProvider
+from .robot_state_node import UiBridgeRobotStateNode
+from .robot_state_store import RobotStateBroadcaster
 from .ros_metrics_node import UiBridgeRosNode
 from .status_store import RateMetricSnapshot, SnapshotBroadcaster
 from .voltage_state import VoltageState
@@ -40,15 +43,32 @@ async def _publish_loop(
         await asyncio.sleep(cfg.update_period_s)
 
 
+async def _publish_robot_state_loop(
+    *,
+    cfg: UiBridgeConfig,
+    state_node: UiBridgeRobotStateNode,
+    broadcaster: RobotStateBroadcaster,
+    stop_event: asyncio.Event,
+) -> None:
+    period_s = 1.0 / float(cfg.robot_state.update_hz)
+    if period_s <= 0.0:
+        period_s = 0.1
+
+    while not stop_event.is_set():
+        pose_odom, pose_map, wheel_angles = state_node.sample()
+        await broadcaster.publish(pose_odom=pose_odom, pose_map=pose_map, wheel_angles=wheel_angles)
+        await asyncio.sleep(period_s)
+
+
 async def _serve_grpc(
     *,
     bind: str,
-    broadcaster: SnapshotBroadcaster,
+    service: UiBridgeService,
     stop_event: asyncio.Event,
     logger: logging.Logger,
 ) -> None:
     server = grpc.aio.server()
-    ui_bridge_pb2_grpc.add_UiBridgeServicer_to_server(UiBridgeService(broadcaster), server)
+    ui_bridge_pb2_grpc.add_UiBridgeServicer_to_server(service, server)
     server.add_insecure_port(bind)
     await server.start()
     logger.info("ros_ui_bridge gRPC listening on %s", bind)
@@ -64,6 +84,7 @@ async def _run_async(
     cfg: UiBridgeConfig,
     voltage_state: VoltageState,
     ros_node: UiBridgeRosNode,
+    state_node: UiBridgeRobotStateNode,
     logger: logging.Logger,
 ) -> None:
     stop_event = asyncio.Event()
@@ -74,17 +95,45 @@ async def _run_async(
         except NotImplementedError:
             pass
 
-    broadcaster = SnapshotBroadcaster()
+    status_broadcaster = SnapshotBroadcaster()
+    robot_state_broadcaster = RobotStateBroadcaster()
+
+    model_provider = RobotModelProvider(glb_path=cfg.robot_model.glb_path)
+
+    service = UiBridgeService(
+        status_broadcaster=status_broadcaster,
+        robot_state_broadcaster=robot_state_broadcaster,
+        model_provider=model_provider,
+        model_chunk_size_bytes=cfg.robot_model.chunk_size_bytes,
+        odom_frame=cfg.robot_state.odom_frame,
+        base_frame=cfg.robot_state.base_frame,
+        map_frame=cfg.robot_state.map_frame,
+        wheel_joint_names=cfg.robot_state.wheel_joint_names,
+    )
 
     publisher_task = asyncio.create_task(
-        _publish_loop(cfg=cfg, voltage_state=voltage_state, ros_node=ros_node, broadcaster=broadcaster, stop_event=stop_event)
+        _publish_loop(
+            cfg=cfg,
+            voltage_state=voltage_state,
+            ros_node=ros_node,
+            broadcaster=status_broadcaster,
+            stop_event=stop_event,
+        )
     )
-    grpc_task = asyncio.create_task(_serve_grpc(bind=cfg.grpc_bind, broadcaster=broadcaster, stop_event=stop_event, logger=logger))
+    robot_state_task = asyncio.create_task(
+        _publish_robot_state_loop(
+            cfg=cfg,
+            state_node=state_node,
+            broadcaster=robot_state_broadcaster,
+            stop_event=stop_event,
+        )
+    )
+    grpc_task = asyncio.create_task(_serve_grpc(bind=cfg.grpc_bind, service=service, stop_event=stop_event, logger=logger))
 
     try:
-        await asyncio.gather(publisher_task, grpc_task)
+        await asyncio.gather(publisher_task, robot_state_task, grpc_task)
     finally:
-        for task in (publisher_task, grpc_task):
+        for task in (publisher_task, robot_state_task, grpc_task):
             task.cancel()
 
 
@@ -106,8 +155,18 @@ def main(argv: Optional[list[str]] = None) -> None:
         topic_rates=cfg.topic_rates,
         tf_rates=cfg.tf_rates,
     )
+    state_node = UiBridgeRobotStateNode(
+        odom_topic=cfg.robot_state.odom_topic,
+        joint_states_topic=cfg.robot_state.joint_states_topic,
+        odom_frame=cfg.robot_state.odom_frame,
+        base_frame=cfg.robot_state.base_frame,
+        map_frame=cfg.robot_state.map_frame,
+        wheel_joint_names=cfg.robot_state.wheel_joint_names,
+        map_tf_max_age_s=cfg.robot_state.map_tf_max_age_s,
+    )
     executor = SingleThreadedExecutor()
     executor.add_node(ros_node)
+    executor.add_node(state_node)
 
     spin_thread = threading.Thread(target=executor.spin, name='ros_ui_bridge_ros_spin', daemon=True)
     spin_thread.start()
@@ -116,10 +175,11 @@ def main(argv: Optional[list[str]] = None) -> None:
     psutil.cpu_percent(None)
 
     try:
-        asyncio.run(_run_async(cfg=cfg, voltage_state=voltage_state, ros_node=ros_node, logger=logger))
+        asyncio.run(_run_async(cfg=cfg, voltage_state=voltage_state, ros_node=ros_node, state_node=state_node, logger=logger))
     finally:
         executor.shutdown()
         ros_node.destroy_node()
+        state_node.destroy_node()
         rclpy.shutdown()
         spin_thread.join(timeout=2.0)
 

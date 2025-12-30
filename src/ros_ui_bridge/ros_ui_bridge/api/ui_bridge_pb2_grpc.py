@@ -39,6 +39,16 @@ class UiBridgeStub(object):
                 request_serializer=ui__bridge__pb2.StatusRequest.SerializeToString,
                 response_deserializer=ui__bridge__pb2.StatusUpdate.FromString,
                 _registered_method=True)
+        self.StreamRobotState = channel.unary_stream(
+                '/roblibs.ui_bridge.v1.UiBridge/StreamRobotState',
+                request_serializer=ui__bridge__pb2.RobotStateRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.RobotStateUpdate.FromString,
+                _registered_method=True)
+        self.GetRobotModel = channel.unary_stream(
+                '/roblibs.ui_bridge.v1.UiBridge/GetRobotModel',
+                request_serializer=ui__bridge__pb2.RobotModelRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.RobotModelChunk.FromString,
+                _registered_method=True)
 
 
 class UiBridgeServicer(object):
@@ -51,6 +61,20 @@ class UiBridgeServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StreamRobotState(self, request, context):
+        """Streams robot pose + wheel joint angles for 3D rendering.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetRobotModel(self, request, context):
+        """Returns the robot model as a GLB (binary glTF) stream (chunked to avoid gRPC message size limits).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_UiBridgeServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -58,6 +82,16 @@ def add_UiBridgeServicer_to_server(servicer, server):
                     servicer.GetStatus,
                     request_deserializer=ui__bridge__pb2.StatusRequest.FromString,
                     response_serializer=ui__bridge__pb2.StatusUpdate.SerializeToString,
+            ),
+            'StreamRobotState': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamRobotState,
+                    request_deserializer=ui__bridge__pb2.RobotStateRequest.FromString,
+                    response_serializer=ui__bridge__pb2.RobotStateUpdate.SerializeToString,
+            ),
+            'GetRobotModel': grpc.unary_stream_rpc_method_handler(
+                    servicer.GetRobotModel,
+                    request_deserializer=ui__bridge__pb2.RobotModelRequest.FromString,
+                    response_serializer=ui__bridge__pb2.RobotModelChunk.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -87,6 +121,60 @@ class UiBridge(object):
             '/roblibs.ui_bridge.v1.UiBridge/GetStatus',
             ui__bridge__pb2.StatusRequest.SerializeToString,
             ui__bridge__pb2.StatusUpdate.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamRobotState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/StreamRobotState',
+            ui__bridge__pb2.RobotStateRequest.SerializeToString,
+            ui__bridge__pb2.RobotStateUpdate.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetRobotModel(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/GetRobotModel',
+            ui__bridge__pb2.RobotModelRequest.SerializeToString,
+            ui__bridge__pb2.RobotModelChunk.FromString,
             options,
             channel_credentials,
             insecure,

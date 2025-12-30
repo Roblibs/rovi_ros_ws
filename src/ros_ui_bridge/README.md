@@ -1,39 +1,25 @@
 # ros_ui_bridge
 
-Low-rate ROS UI bridge: collects status data (CPU, voltage, …) and serves it to UI clients over gRPC.
+ROS UI bridge: a small ROS 2 node that exposes robot telemetry and visualization data to UI clients over gRPC.
 
-## gRPC API
+It is designed to be generic and reusable: it reads from ROS topics / TF and streams downsampled snapshots suitable for dashboards and web UIs.
 
-`GetStatus` is a request/stream RPC:
+## What it provides
 
-- Client sends: `StatusRequest{}`
-- Server responds: stream of periodic `StatusUpdate` snapshots
-  - `cpu_percent` is always set
-  - `voltage_v` is only set after the gateway has received at least one voltage message from ROS (no “fake” voltage)
-  - `rates[]` contains any configured topic/TF rates that have been observed
+| Capability | gRPC RPC | Notes |
+| --- | --- | --- |
+| Periodic status snapshots (CPU, voltage, configurable rate metrics) | `GetStatus` | Low-rate stream for UI dashboards. |
+| Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Always emits `pose_odom`; emits `pose_map` when `map->odom` is available. |
+| Robot model asset (GLB / binary glTF) | `GetRobotModel` | Chunked stream to avoid gRPC message size limits. |
 
-Proto: `proto/ui_bridge.proto`
+Proto: `proto/ui_bridge.proto` (`package roblibs.ui_bridge.v1`)
 
-## Metrics configuration
+## ROS inputs (high level)
 
-The gateway can also publish periodic rates (Hz) for arbitrary ROS topics and for specific TF transforms.
-
-Example:
-
-```yaml
-metrics:
-  rates:
-    - id: "hz_driver"
-      topic: "/voltage"
-      target_hz: 10
-  tf_rates:
-    - id: "hz_slam"
-      parent: "map"
-      child: "odom"
-      target_hz: 50
-```
-
-Rate metrics are only emitted once at least one message/transform has been received (to avoid “fake” values).
+- Voltage is read from a `std_msgs/Float32` topic (configurable).
+- Rate metrics can be collected from arbitrary topics and TF pairs (configurable).
+- Robot pose is derived from `/odom_raw` (`nav_msgs/Odometry`) and optionally projected into `map` using the `map->odom` TF transform.
+- Wheel angles are read from `/joint_states` (`sensor_msgs/JointState`) using the configured wheel joint names.
 
 ## Run
 
@@ -45,35 +31,12 @@ To run manually:
 ros2 run ros_ui_bridge ui_bridge -- --config /path/to/ui_bridge.yaml
 ```
 
-Default config is installed at:
+## Configuration
 
-- `$(ros2 pkg prefix ros_ui_bridge)/share/ros_ui_bridge/config/default.yaml`
+See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/ros_ui_bridge/config/default.yaml`) for:
 
-## Python client example
-
-```python
-import asyncio
-import grpc
-
-from ros_ui_bridge.api import ui_bridge_pb2, ui_bridge_pb2_grpc
-
-
-async def main() -> None:
-    async with grpc.aio.insecure_channel("127.0.0.1:50051") as channel:
-        stub = ui_bridge_pb2_grpc.UiBridgeStub(channel)
-        async for update in stub.GetStatus(ui_bridge_pb2.StatusRequest()):
-            print(f"cpu={update.cpu_percent:.0f}% seq={update.seq}")
-            if update.WhichOneof("voltage") == "voltage_v":
-                print(f"voltage={update.voltage_v:.1f}V")
-            for metric in update.rates:
-                name = metric.id
-                hz = metric.hz
-                if metric.WhichOneof("target") == "target_hz":
-                    print(f"{name}={hz:.1f}/{metric.target_hz:.0f}Hz")
-                else:
-                    print(f"{name}={hz:.1f}Hz")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+- gRPC bind address
+- Status update cadence
+- Which topic / TF rate metrics to track
+- Robot state topics, frames, wheel joint list, and map TF freshness window
+- Robot model GLB path + chunk size
