@@ -89,7 +89,7 @@ class UiBridgeRosNode(Node):
                 try:
                     msg_cls = get_message(type_str)
                 except Exception as exc:  # noqa: BLE001
-                    self.get_logger().warn("Failed to import message type %s for %s: %s", type_str, topic, exc)
+                    self.get_logger().warn(f"Failed to import message type {type_str} for {topic}: {exc}")
                     self._pending_topics.add(topic)
                     continue
 
@@ -100,7 +100,7 @@ class UiBridgeRosNode(Node):
                     self._qos_best_effort,
                 )
                 self._topic_subscriptions.append(sub)
-                self.get_logger().info("Subscribed for hz metric topic=%s type=%s (configured)", topic, type_str)
+                self.get_logger().info(f"Subscribed for hz metric topic={topic} type={type_str} (configured)")
             else:
                 self._pending_topics.add(topic)
 
@@ -154,7 +154,7 @@ class UiBridgeRosNode(Node):
         try:
             from rosidl_runtime_py.utilities import get_message  # type: ignore
         except ModuleNotFoundError as exc:
-            self.get_logger().error("Missing rosidl_runtime_py (cannot resolve topic types): %s", exc)
+            self.get_logger().error(f"Missing rosidl_runtime_py (cannot resolve topic types): {exc}")
             return
 
         name_and_types = dict(self.get_topic_names_and_types())
@@ -165,14 +165,14 @@ class UiBridgeRosNode(Node):
             if not types:
                 continue
             if len(types) != 1:
-                self.get_logger().warn("Topic %s has multiple types %s; cannot subscribe for hz metrics.", topic, types)
+                self.get_logger().warn(f"Topic {topic} has multiple types {types}; cannot subscribe for hz metrics.")
                 continue
 
             type_str = types[0]
             try:
                 msg_cls = get_message(type_str)
             except Exception as exc:  # noqa: BLE001
-                self.get_logger().warn("Failed to import message type %s for %s: %s", type_str, topic, exc)
+                self.get_logger().warn(f"Failed to import message type {type_str} for {topic}: {exc}")
                 continue
 
             sub = self.create_subscription(
@@ -183,7 +183,7 @@ class UiBridgeRosNode(Node):
             )
             self._topic_subscriptions.append(sub)
             resolved.append(topic)
-            self.get_logger().info("Subscribed for hz metric topic=%s type=%s", topic, type_str)
+            self.get_logger().info(f"Subscribed for hz metric topic={topic} type={type_str}")
 
         for topic in resolved:
             self._pending_topics.discard(topic)
