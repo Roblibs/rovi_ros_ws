@@ -11,6 +11,14 @@ metrics:
     - id: "hz_driver"
       topic: "/voltage"
       target_hz: 10
+    - id: "hz_odom"
+      topic: "/odom_raw"
+      type: "nav_msgs/msg/Odometry"
+      target_hz: 10
+    - id: "hz_lidar"
+      topic: "/scan"
+      type: "sensor_msgs/msg/LaserScan"
+      target_hz: 10
   tf_rates:
     - id: "hz_slam"
       parent: "map"

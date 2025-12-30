@@ -10,6 +10,8 @@ service UiBridge {
 message StatusRequest {}
 
 message RateMetric {
+  // Stable identifier for this rate metric; clients should treat it as a key.
+  // Example ids (default config): "hz_driver", "hz_odom", "hz_lidar", "hz_slam".
   string id = 1;
   float hz = 2;
 
