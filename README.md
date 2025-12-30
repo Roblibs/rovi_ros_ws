@@ -194,6 +194,13 @@ flowchart TD
   TF -->|subscribe| RVIZ
 ```
 
+## Sim joint states
+`robot_mode=sim`
+
+In simulation we still publish `/joint_states` so `robot_state_publisher` (and any consumers like the UI bridge) can operate the same way as on the real robot.
+
+We **do not** use upstream `joint_state_publisher` here because on ROS 2 Jazzy it can occasionally throw an `RCLError: context is not valid` during Ctrl-C shutdown (a shutdown race in `rclpy` executors). Instead we run a small local publisher.
+
 
 ## Robot Control
 
@@ -406,6 +413,7 @@ flowchart LR
   TeleopKey[tools/rovi_keyboard.py]
   TwistMux[twist_mux]
   RSP[robot_state_publisher]
+  LocalJoints[rovi_local_joint_states]
   JSPG[joint_state_publisher_gui]
   RVIZ[rviz2]
   Diag[diagnostic_updater]
@@ -429,6 +437,7 @@ flowchart LR
   RoviBringup -.-> TeleopKey
   RoviBringup --> TwistMux
   RoviBringup --> RSP
+  RoviBringup -.-> LocalJoints
   RoviBringup --> JSPG
   RoviBringup --> RVIZ
   RoviBringup --> RPLidar
@@ -608,6 +617,7 @@ ROS nodes started by the launches above (some are conditional based on params).
 | `rosmaster_driver` | `rosmaster_driver` | Hardware bridge for the Rosmaster base board: subscribes to `/cmd_vel` and publishes feedback like `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, and `/voltage`. |
 | `rovi_odom_integrator` | `rovi_odom_integrator` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
+| `rovi_local_joint_states` | `rovi_bringup` | Local (stub) publisher for `/joint_states` in `robot_mode=sim` (zeros for non-fixed URDF joints). Exists to avoid a known noisy shutdown race in upstream `joint_state_publisher` on Jazzy. |
 | `rplidar_composition` | `rplidar_ros` | Publishes `/scan` (`sensor_msgs/msg/LaserScan`) from an RPLIDAR (only when `lidar_enabled:=true`). |
 | `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan`, `/clock`, and `/imu/data_raw`). |
 | `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_odom_integrator`). |
@@ -615,7 +625,7 @@ ROS nodes started by the launches above (some are conditional based on params).
 | `ekf_filter_node` | `robot_localization` | EKF that produces `/odometry/filtered` and TF `odom -> base_footprint` from `/odom_raw` (and `/imu/data` in `fusion_wheels_imu`). |
 | `slam_toolbox` | `slam_toolbox` | Lifecycle SLAM node that publishes TF `map -> odom` and (in mapping mode) `/map` (only when `slam_enabled:=true`). |
 | `odom_to_basefootprint` | `tf2_ros` | Static TF publisher used by `offline_view.launch.py` to provide `odom -> base_footprint` without hardware. |
-| `joint_state_publisher_gui` | `joint_state_publisher_gui` | GUI for publishing `/joint_states` for offline URDF inspection. |
+| `joint_state_publisher_gui` | `joint_state_publisher_gui` | GUI for publishing `/joint_states` for offline URDF inspection (`robot_mode=offline`). |
 | `rviz2` | `rviz2` | Visualization client (used by `offline_view.launch.py` and standalone `rviz2 -d ...`). |
 | `bt_navigator` | `nav2_bt_navigator` | Nav2 behavior tree navigator; provides the `/navigate_to_pose` action server. |
 | `planner_server` | `nav2_planner` | Nav2 global planner that produces paths in the `map` frame. |

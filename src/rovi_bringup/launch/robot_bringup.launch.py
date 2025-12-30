@@ -231,10 +231,12 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # Provide joint_states in modes where hardware isn't publishing them.
+    # NOTE: upstream joint_state_publisher sometimes exits with an RCLError on SIGINT in Jazzy.
+    # Use a small local publisher to keep shutdown clean.
     joint_state_pub_sim = Node(
         condition=is_sim,
-        package='joint_state_publisher',
-        executable='joint_state_publisher',
+        package='rovi_bringup',
+        executable='rovi_local_joint_states',
         output='screen',
         arguments=[LaunchConfiguration('model')],
         parameters=[{'use_sim_time': use_sim_time_param}],
