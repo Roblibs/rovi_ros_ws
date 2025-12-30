@@ -70,6 +70,31 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
             last_seq = snapshot.seq
             yield _robot_state_to_proto(snapshot)
 
+    async def GetRobotModelMeta(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.RobotModelRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> ui_bridge_pb2.RobotModelMeta:
+        del request
+
+        try:
+            model_meta = self._model_provider.load_meta()
+        except FileNotFoundError as exc:
+            await context.abort(grpc.StatusCode.NOT_FOUND, str(exc))
+            raise AssertionError("unreachable") from exc
+        except Exception as exc:  # noqa: BLE001
+            await context.abort(grpc.StatusCode.INTERNAL, f"Failed to load robot model: {exc}")
+            raise AssertionError("unreachable") from exc
+
+        return ui_bridge_pb2.RobotModelMeta(
+            sha256=model_meta.sha256,
+            size_bytes=model_meta.size_bytes,
+            wheel_joint_names=self._wheel_joint_names,
+            odom_frame=self._odom_frame,
+            base_frame=self._base_frame,
+            map_frame=self._map_frame,
+        )
+
     async def GetRobotModel(  # noqa: N802 - gRPC interface name
         self,
         request: ui_bridge_pb2.RobotModelRequest,
@@ -78,7 +103,8 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         del request
 
         try:
-            model = self._model_provider.load()
+            glb_path = self._model_provider.resolve_glb_path()
+            glb_file = glb_path.open("rb")
         except FileNotFoundError as exc:
             await context.abort(grpc.StatusCode.NOT_FOUND, str(exc))
             return
@@ -90,24 +116,14 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         if chunk_size <= 0:
             chunk_size = 1024 * 1024
 
-        meta = ui_bridge_pb2.RobotModelMeta(
-            sha256=model.sha256,
-            size_bytes=model.size_bytes,
-            wheel_joint_names=self._wheel_joint_names,
-            odom_frame=self._odom_frame,
-            base_frame=self._base_frame,
-            map_frame=self._map_frame,
-        )
-
         chunk_index = 0
-        data = model.glb_bytes
-        for offset in range(0, len(data), chunk_size):
-            chunk = data[offset : offset + chunk_size]
-            if chunk_index == 0:
-                yield ui_bridge_pb2.RobotModelChunk(meta=meta, chunk=chunk, chunk_index=chunk_index)
-            else:
+        with glb_file as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
                 yield ui_bridge_pb2.RobotModelChunk(chunk=chunk, chunk_index=chunk_index)
-            chunk_index += 1
+                chunk_index += 1
 
 
 def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusUpdate:

@@ -23,7 +23,7 @@ def _ensure_glb_generated() -> None:
     try:
         regenerated = generate_glb_if_needed(urdf_path=urdf_path, out_glb_path=out_glb, package_root=pkg_root)
         if regenerated:
-            print(f"[rovi_description] Generated GLB: {out_glb}", file=sys.stderr)
+            print(f"[rovi_description] Generated GLB + meta: {out_glb}", file=sys.stderr)
     except Exception as exc:
         print(f"[rovi_description] Failed to generate GLB from {urdf_path}: {exc}", file=sys.stderr)
         raise
@@ -43,7 +43,7 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'meshes', 'mecanum'), glob('meshes/mecanum/*.STL') + glob('meshes/mecanum/*.stl')),
         (os.path.join('share', package_name, 'meshes', 'sensor'), glob('meshes/sensor/*.STL') + glob('meshes/sensor/*.stl')),
-        (os.path.join('share', package_name, 'models'), glob('models/*.glb')),
+        (os.path.join('share', package_name, 'models'), glob('models/*.glb') + glob('models/*.glb.meta.json')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

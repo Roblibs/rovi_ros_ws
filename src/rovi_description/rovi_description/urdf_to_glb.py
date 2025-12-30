@@ -45,6 +45,7 @@ def generate_glb_if_needed(*, urdf_path: Path, out_glb_path: Path, package_root:
     urdf_path = urdf_path.resolve()
     out_glb_path = out_glb_path.resolve()
     package_root = package_root.resolve()
+    out_meta_path = Path(f"{out_glb_path}.meta.json")
 
     mesh_paths = _collect_mesh_paths_from_urdf(urdf_path=urdf_path, package_root=package_root)
     # Also include this generator module itself so changes to the exporter regenerate the model.
@@ -52,19 +53,33 @@ def generate_glb_if_needed(*, urdf_path: Path, out_glb_path: Path, package_root:
 
     newest_input_mtime = max(p.stat().st_mtime_ns for p in input_paths)
     try:
-        out_mtime = out_glb_path.stat().st_mtime_ns
-        if out_mtime >= newest_input_mtime:
+        out_glb_mtime = out_glb_path.stat().st_mtime_ns
+        out_meta_mtime = out_meta_path.stat().st_mtime_ns
+        if out_glb_mtime >= newest_input_mtime and out_meta_mtime >= newest_input_mtime:
             return False
     except FileNotFoundError:
         pass
 
     out_glb_path.parent.mkdir(parents=True, exist_ok=True)
-    glb = urdf_to_glb_bytes(urdf_path=urdf_path, package_root=package_root)
-    out_glb_path.write_bytes(glb)
+    glb, meta = urdf_to_glb_bytes_and_meta(urdf_path=urdf_path, package_root=package_root)
+    glb_sha256 = hashlib.sha256(glb).hexdigest()
+    meta["glb"] = {
+        "path": _try_relpath(out_glb_path, package_root=package_root),
+        "sha256": glb_sha256,
+        "size_bytes": int(len(glb)),
+    }
+
+    _write_atomic(out_glb_path, glb)
+    _write_atomic(out_meta_path, json.dumps(meta, indent=2, sort_keys=True).encode("utf-8"))
     return True
 
 
 def urdf_to_glb_bytes(*, urdf_path: Path, package_root: Path) -> bytes:
+    glb, _meta = urdf_to_glb_bytes_and_meta(urdf_path=urdf_path, package_root=package_root)
+    return glb
+
+
+def urdf_to_glb_bytes_and_meta(*, urdf_path: Path, package_root: Path) -> tuple[bytes, dict]:
     urdf_path = urdf_path.resolve()
     package_root = package_root.resolve()
 
@@ -269,19 +284,8 @@ def urdf_to_glb_bytes(*, urdf_path: Path, package_root: Path) -> bytes:
     for root in roots:
         scene_roots.append(build_link(root, None))
 
-    extras = {
-        "roblibs": {
-            "urdf_to_glb": {
-                "robot_name": robot_name,
-                "coordinate_convention": "ROS (X forward, Y left, Z up)",
-                "urdf": {"path": urdf_rel, "sha256": urdf_sha256},
-                "meshes": [mesh_meta_by_path[p] for p in sorted(mesh_meta_by_path.keys(), key=lambda x: str(x))],
-            }
-        }
-    }
-
     gltf: dict = {
-        "asset": {"version": "2.0", "generator": "rovi_description.urdf_to_glb", "extras": extras},
+        "asset": {"version": "2.0", "generator": "rovi_description.urdf_to_glb"},
         "scene": 0,
         "scenes": [{"name": robot_name, "nodes": scene_roots}],
         "nodes": nodes,
@@ -293,7 +297,17 @@ def urdf_to_glb_bytes(*, urdf_path: Path, package_root: Path) -> bytes:
     }
 
     json_chunk = json.dumps(gltf, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return _build_glb(json_chunk=json_chunk, bin_chunk=bytes(bin_buffer))
+    glb = _build_glb(json_chunk=json_chunk, bin_chunk=bytes(bin_buffer))
+
+    meta = {
+        "schema_version": 1,
+        "generator": "rovi_description.urdf_to_glb",
+        "robot_name": robot_name,
+        "coordinate_convention": "ROS (X forward, Y left, Z up)",
+        "urdf": {"path": urdf_rel, "sha256": urdf_sha256},
+        "stl_meshes": [mesh_meta_by_path[p] for p in sorted(mesh_meta_by_path.keys(), key=lambda x: str(x))],
+    }
+    return glb, meta
 
 
 def _collect_mesh_paths_from_urdf(*, urdf_path: Path, package_root: Path) -> list[Path]:
@@ -317,6 +331,13 @@ def _parse_urdf(*, urdf_path: Path, package_root: Path) -> tuple[str, dict[str, 
     visuals = _parse_visuals(root, materials=materials, package_root=package_root, urdf_dir=urdf_path.parent)
 
     return robot_name, materials, joints, visuals
+
+
+def _write_atomic(path: Path, data: bytes) -> None:
+    path = path.resolve()
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_bytes(data)
+    tmp.replace(path)
 
 
 def _parse_materials(robot: ET.Element) -> dict[str, MaterialDef]:

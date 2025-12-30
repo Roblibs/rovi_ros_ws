@@ -9,6 +9,9 @@ service UiBridge {
   // Streams robot pose + wheel joint angles for 3D rendering.
   rpc StreamRobotState(RobotStateRequest) returns (stream RobotStateUpdate);
 
+  // Returns metadata for the current robot model (no GLB bytes).
+  rpc GetRobotModelMeta(RobotModelRequest) returns (RobotModelMeta);
+
   // Returns the robot model as a GLB (binary glTF) stream (chunked to avoid gRPC message size limits).
   rpc GetRobotModel(RobotModelRequest) returns (stream RobotModelChunk);
 }
@@ -108,8 +111,7 @@ message RobotModelMeta {
 }
 
 message RobotModelChunk {
-  // Present only on the first chunk.
-  RobotModelMeta meta = 1;
+  reserved 1;
 
   // Raw GLB bytes.
   bytes chunk = 2;

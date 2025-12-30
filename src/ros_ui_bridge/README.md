@@ -10,6 +10,7 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 | --- | --- | --- |
 | Periodic status snapshots (CPU, voltage, configurable rate metrics) | `GetStatus` | Low-rate stream for UI dashboards. |
 | Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Always emits `pose_odom`; emits `pose_map` when `map->odom` is available. |
+| Robot model metadata (cache key / sha256, size) | `GetRobotModelMeta` | Use this as an ETag-like key to decide whether to refresh cached assets. |
 | Robot model asset (GLB / binary glTF) | `GetRobotModel` | Chunked stream to avoid gRPC message size limits. |
 
 Proto: `proto/ui_bridge.proto` (`package roblibs.ui_bridge.v1`)
@@ -42,3 +43,5 @@ See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/
 - Robot model GLB path + chunk size
 
 In this repo, `rovi_description` generates and installs a model at `package://rovi_description/models/rovi.glb` during `colcon build`.
+
+`GetRobotModelMeta` expects a sidecar meta file next to the GLB at `<glb_path>.meta.json` (generated during build); it reads this file (no runtime hashing).
