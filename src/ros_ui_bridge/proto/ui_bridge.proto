@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package roblibs.ui_bridge.v1;
+
+service UiBridge {
+  // Streams periodic status snapshots at a globally-configured cadence.
+  rpc GetStatus(StatusRequest) returns (stream StatusUpdate);
+}
+
+message StatusRequest {}
+
+message RateMetric {
+  string id = 1;
+  float hz = 2;
+
+  // Optional target frequency for display purposes.
+  oneof target {
+    float target_hz = 3;
+  }
+}
+
+message StatusUpdate {
+  // Unix epoch time in milliseconds when this snapshot was produced.
+  int64 timestamp_unix_ms = 1;
+
+  // Monotonic snapshot sequence number (starts at 1).
+  uint64 seq = 2;
+
+  // CPU utilization percentage [0..100].
+  float cpu_percent = 3;
+
+  // Present only after at least one voltage sample has been received from ROS.
+  oneof voltage {
+    float voltage_v = 4;
+  }
+
+  // Periodic rates for configured topics/transforms.
+  repeated RateMetric rates = 5;
+}

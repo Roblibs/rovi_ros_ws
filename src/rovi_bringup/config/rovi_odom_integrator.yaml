@@ -1,0 +1,4 @@
+rovi_odom_integrator:
+  ros__parameters:
+    diagnostics_period: 10.0
+    publish_rate: 10.0

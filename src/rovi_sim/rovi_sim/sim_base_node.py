@@ -18,7 +18,7 @@ class RoviSimBase(Node):
 
     - Subscribes: /cmd_vel (Twist)
     - Publishes:  /cmd_vel_sim (Twist) to drive Gazebo
-    - Publishes:  /vel_raw (Twist) as a "measured" velocity for rovi_base
+    - Publishes:  /vel_raw (Twist) as a "measured" velocity for rovi_odom_integrator
     """
 
     def __init__(self) -> None:

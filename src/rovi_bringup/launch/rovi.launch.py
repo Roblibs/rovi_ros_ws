@@ -129,7 +129,7 @@ def generate_launch_description() -> LaunchDescription:
         default_value=os.path.join(bringup_share, 'config', 'viz_downsample.yaml'),
         description='YAML config for RViz-only downsampled topics (published under /viz/*).',
     )
-    rovi_base_publish_tf = PythonExpression([
+    odom_integrator_publish_tf = PythonExpression([
         "'true' if '",
         LaunchConfiguration('stack'),
         "' == 'teleop' else ('true' if '",
@@ -165,7 +165,7 @@ def generate_launch_description() -> LaunchDescription:
             'model': LaunchConfiguration('model'),
             'world': LaunchConfiguration('world'),
             'gazebo_gui': LaunchConfiguration('gazebo_gui'),
-            'rovi_base_publish_tf': rovi_base_publish_tf,
+            'odom_integrator_publish_tf': odom_integrator_publish_tf,
             'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
         }.items(),
     )

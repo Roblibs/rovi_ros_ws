@@ -22,7 +22,7 @@ Tables with the full list of packages, launches, nodes and params are also avail
 | `view` | PC view: `view` (default `nav`) or `view teleop|mapping|nav`; `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
-| `tools/rovi_display_setup.py` | One-time (run with sudo): installs udev rule `/dev/rovi_display` for the ESP32-S3 display. |
+| `tools/robot_display_setup.py` | One-time (run with sudo): installs udev rule `/dev/robot_display` for the ESP32-S3 display. |
 
 
 # Diagrams
@@ -99,8 +99,8 @@ flowchart TD
   Rosmaster -->|publish| IMU_RAW
   Rosmaster -->|publish| MAG
 
-  RoviBase["rovi_base"]
-  VRAW -->|subscribe| RoviBase
+  RoviOdom["rovi_odom_integrator"]
+  VRAW -->|subscribe| RoviOdom
   ODRAW(["/odom_raw<br/>(Odometry)"])
 
   subgraph TF["/tf"]
@@ -108,8 +108,8 @@ flowchart TD
     TF_LINKS_JOINTS("links/joints")
   end
 
-  RoviBase -->|publish| ODRAW
-  RoviBase -->|publish| TF_ODOM_BASE
+  RoviOdom -->|publish| ODRAW
+  RoviOdom -->|publish| TF_ODOM_BASE
 
   RSP["robot_state_publisher"]
   JSTATE -->|subscribe| RSP
@@ -232,7 +232,7 @@ Odometry filtering is only applicable for the real robot. When odom_mode=fusion_
 flowchart TD
   Rosmaster[rosmaster_driver] -->|publish| IMU_RAW(["/imu/data_raw<br/>(Imu)"])
   Rosmaster -->|publish| MAG(["/imu/mag<br/>(MagneticField)"])
-  RoviBase[rovi_base] -->|publish| ODRAW(["/odom_raw<br/>(Odometry)"])
+  RoviOdom[rovi_odom_integrator] -->|publish| ODRAW(["/odom_raw<br/>(Odometry)"])
 
   ImuFilter["imu_filter_madgwick (odom_mode=fusion_wheels_imu)"]
   IMU_RAW -->|subscribe| ImuFilter
@@ -351,7 +351,7 @@ TF frames are not regular ROS topics; this is the chain RViz and SLAM use at run
 ```mermaid
 flowchart TD
   MAP[map] -->|slam_toolbox| ODOM[odom]
-  ODOM -->|"ekf_node OR rovi_base (real) OR rovi_gz_odom (sim)"| BASEF[base_footprint]
+  ODOM -->|"ekf_node OR rovi_odom_integrator (real) OR rovi_gz_odom (sim)"| BASEF[base_footprint]
   BASEF -->|robot_state_publisher| BASEL[base_link]
   BASEL -->|robot_state_publisher| LASER[laser_link]
   BASEL -->|robot_state_publisher| IMU[imu_link]
@@ -394,7 +394,7 @@ flowchart LR
     RoviBringup[rovi_bringup]
     RoviDesc[rovi_description]
     Rosmaster[rosmaster_driver]
-    RoviBase[rovi_base]
+    RoviOdom[rovi_odom_integrator]
     RoviLoc[rovi_localization]
     RoviSlam[rovi_slam]
     RoviNav[rovi_nav]
@@ -421,7 +421,7 @@ flowchart LR
 
   RoviBringup --> RoviDesc
   RoviBringup --> Rosmaster
-  RoviBringup --> RoviBase
+  RoviBringup --> RoviOdom
   RoviBringup -.-> RoviLoc
   RoviBringup -.-> RoviSlam
   RoviBringup --> Joy
@@ -439,7 +439,7 @@ flowchart LR
   RoviSim --> RosGzBridge
   RoviSim --> RoviDesc
 
-  RoviBase --> Diag
+  RoviOdom --> Diag
 
   RoviLoc --> EKF
   RoviLoc -.-> ImuFilter
@@ -548,12 +548,12 @@ Packages of this repo are listed in this table
 | `rovi_sim` | Gazebo Sim backend: worlds + bridges + `rovi_sim_base` + `rovi_gz_odom`; spawns the shared robot model from `rovi_description` into Gazebo Sim |
 | `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
 | `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
-| `rovi_base` | Odometry integrator (real robot): `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom). In simulation, `/odom_raw` comes from Gazebo ground truth. |
+| `rovi_odom_integrator` | Odometry integrator (real robot): `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom). In simulation, `/odom_raw` comes from Gazebo ground truth. |
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
-| `rovi_ui_gateway` | UI gateway: low-rate status collector + gRPC streaming server (CPU, voltage, topic/TF hz metrics, …) |
-| `rovi_serial_display` | Serial UI client: consumes `rovi_ui_gateway` gRPC status stream and pushes JSON lines to the ESP32-S3 display |
+| `ros_ui_bridge` | UI bridge: low-rate status/metrics collector + gRPC streaming server (CPU, voltage, topic/TF hz metrics, …) |
+| `robot_serial_display` | Serial UI client: consumes `ros_ui_bridge` gRPC status stream and pushes JSON lines to the ESP32-S3 display |
 
 External ROS packages installed via apt (and a couple of local tools) and how they are used in this workspace:
 
@@ -563,7 +563,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-teleop-twist-joy` | Used by `rovi_bringup/teleop.launch.py` to convert `/joy` into `/cmd_vel_joy`, using `rovi_bringup/config/teleop_twist_joy.yaml`. |
 | `tools/rovi_keyboard.py` | Keyboard teleop (`keyboard` command) that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) and is muxed via `twist_mux` like joystick and Nav2. |
 | `ros-jazzy-twist-mux` | Used by `rovi_bringup/teleop.launch.py` to mux joystick `/cmd_vel_joy`, keyboard `/cmd_vel_keyboard`, and Nav2 `/cmd_vel_nav` into the final `/cmd_vel` topic consumed by the robot backend. |
-| `ros-jazzy-diagnostic-updater` | Used by `rovi_base` to publish runtime diagnostics (for example on `/diagnostics`). |
+| `ros-jazzy-diagnostic-updater` | Used by `rovi_odom_integrator` to publish runtime diagnostics (for example on `/diagnostics`). |
 | `ros-jazzy-robot-state-publisher` | Used by `rovi_bringup/robot_bringup.launch.py` (all modes) to publish the TF tree from the `rovi_description` URDF and provide `/robot_description` to RViz. |
 | `ros-jazzy-joint-state-publisher-gui` | Used by `rovi_bringup/robot_bringup.launch.py` in `robot_mode=offline` for interactive URDF inspection. |
 | `ros-jazzy-rviz2` | Used by `view` (PC viewer command) and by `rovi_bringup/rovi.launch.py` in `robot_mode=sim|offline` (optional auto-start). |
@@ -571,8 +571,8 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-ros-gz-sim` | Used by `rovi_sim/gazebo_sim.launch.py` to start Gazebo Sim and spawn the simulated robot + world. |
 | `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo topics (e.g., LiDAR + `/clock`) into ROS 2 topics like `/scan` and `/clock`. |
 | `ros-jazzy-foxglove-bridge` | Optional WebSocket bridge for Foxglove Studio (run via the `bridge` command). |
-| `python3-psutil` | Used by `rovi_ui_gateway` to read CPU utilization. |
-| `pyserial` | Used by `rovi_serial_display` to talk to the ESP32-S3 display over USB serial. |
+| `python3-psutil` | Used by `ros_ui_bridge` to read CPU utilization. |
+| `pyserial` | Used by `robot_serial_display` to talk to the ESP32-S3 display over USB serial. |
 | `ros-jazzy-slam-toolbox` | Used via `rovi_slam/slam_toolbox.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/map` and TF `map -> odom`. |
 | `ros-jazzy-robot-localization` | Used by `rovi_localization/ekf.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/odometry/filtered` and TF `odom -> base_footprint`. |
 | `ros-jazzy-nav2-bringup` | Provides Nav2 servers started by `rovi_nav/launch/nav.launch.py` for goal-based navigation (planner/controller/BT navigator/behaviors). |
@@ -606,11 +606,11 @@ ROS nodes started by the launches above (some are conditional based on params).
 | `rovi_keyboard` | `tools/rovi_keyboard.py` | Keyboard teleop tool that publishes `/cmd_vel_keyboard` (`geometry_msgs/msg/Twist`) (run via the `keyboard` command in its own terminal). |
 | `twist_mux` | `twist_mux` | Selects the active velocity command source (e.g., `/cmd_vel_nav` vs `/cmd_vel_joy`) and publishes `/cmd_vel`. |
 | `rosmaster_driver` | `rosmaster_driver` | Hardware bridge for the Rosmaster base board: subscribes to `/cmd_vel` and publishes feedback like `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, and `/voltage`. |
-| `rovi_base` | `rovi_base` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
+| `rovi_odom_integrator` | `rovi_odom_integrator` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
 | `rplidar_composition` | `rplidar_ros` | Publishes `/scan` (`sensor_msgs/msg/LaserScan`) from an RPLIDAR (only when `lidar_enabled:=true`). |
 | `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan`, `/clock`, and `/imu/data_raw`). |
-| `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_base`). |
+| `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_odom_integrator`). |
 | `imu_filter` | `imu_filter_madgwick` | Filters `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` (only when `odom_mode:=fusion_wheels_imu`). |
 | `ekf_filter_node` | `robot_localization` | EKF that produces `/odometry/filtered` and TF `odom -> base_footprint` from `/odom_raw` (and `/imu/data` in `fusion_wheels_imu`). |
 | `slam_toolbox` | `slam_toolbox` | Lifecycle SLAM node that publishes TF `map -> odom` and (in mapping mode) `/map` (only when `slam_enabled:=true`). |
@@ -653,9 +653,9 @@ Only the parameters toggeling nodes activation are listed here
 ### Odometry Modes
 Used by: `rovi_bringup/mapping.launch.py`, `rovi_bringup/localization.launch.py`, and `rovi_localization/ekf.launch.py`.
 
-| `odom_mode` | `rovi_base_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
+| `odom_mode` | `odom_integrator_publish_tf` (bringup) | TF `odom -> base_footprint` | Nodes started | Notes |
 |---|---|---|---|---|
-| `raw` | `true` | `rovi_base` (real) / `rovi_gz_odom` (sim) | (none) | Fastest/simplest; no `/odometry/filtered` |
+| `raw` | `true` | `rovi_odom_integrator` (real) / `rovi_gz_odom` (sim) | (none) | Fastest/simplest; no `/odometry/filtered` |
 | `filtered` | `false` | `robot_localization/ekf_node` | `robot_localization/ekf_node` | Filters wheel odom (`/odom_raw` → `/odometry/filtered`) |
 | `fusion_wheels_imu` | `false` | `robot_localization/ekf_node` | `imu_filter_madgwick` + `robot_localization/ekf_node` | Adds IMU yaw + yaw rate (`/imu/data_raw` → `/imu/data`); set `mag_enabled:=true` to use `/imu/mag` |
 
@@ -686,7 +686,7 @@ Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`,
 ### Robot interface contract (what the rest of the stack assumes)
 - `/cmd_vel` (`geometry_msgs/msg/Twist`) holonomic X/Y + yaw
 - `/scan` (`sensor_msgs/msg/LaserScan`)
-- `/vel_raw` (`geometry_msgs/msg/Twist`) base feedback (used by `rovi_base`)
+- `/vel_raw` (`geometry_msgs/msg/Twist`) base feedback (used by `rovi_odom_integrator`)
 - `/odom_raw` (`nav_msgs/msg/Odometry`) and TF `odom -> base_footprint` (raw or filtered depending on `odom_mode`)
 - `/imu/data_raw` (`sensor_msgs/msg/Imu`) (needed for `odom_mode=fusion_wheels_imu`)
 - `/clock` (sim only, with `use_sim_time:=true`)

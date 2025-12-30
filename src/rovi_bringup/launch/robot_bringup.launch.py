@@ -10,7 +10,7 @@ This launch provides the "robot interface contract" expected by higher-level sta
 - /clock when robot_mode=sim (use_sim_time:=true)
 
 robot_mode:
-  - real: hardware drivers (rosmaster_driver + rplidar_ros) + rovi_base + robot_state_publisher
+  - real: hardware drivers (rosmaster_driver + rplidar_ros) + rovi_odom_integrator + robot_state_publisher
   - sim:  Gazebo Sim backend (rovi_sim) + rovi_sim_base + rovi_gz_odom + robot_state_publisher
   - offline: model inspection only (robot_state_publisher + joint_state_publisher_gui)
 """
@@ -40,13 +40,13 @@ def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
     desc_share = get_package_share_directory('rovi_description')
     sim_share = get_package_share_directory('rovi_sim')
-    ui_gateway_share = get_package_share_directory('rovi_ui_gateway')
-    serial_display_share = get_package_share_directory('rovi_serial_display')
+    ui_bridge_share = get_package_share_directory('ros_ui_bridge')
+    serial_display_share = get_package_share_directory('robot_serial_display')
 
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
-    default_rovi_base_params = os.path.join(bringup_share, 'config', 'rovi_base.yaml')
+    default_odom_integrator_params = os.path.join(bringup_share, 'config', 'rovi_odom_integrator.yaml')
     default_rosmaster_params = os.path.join(bringup_share, 'config', 'rosmaster_driver.yaml')
-    default_ui_gateway_config = os.path.join(ui_gateway_share, 'config', 'default.yaml')
+    default_ui_bridge_config = os.path.join(ui_bridge_share, 'config', 'default.yaml')
     default_serial_display_config = os.path.join(serial_display_share, 'config', 'default.yaml')
 
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
@@ -81,25 +81,25 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # Base / odom integrator
-    rovi_base_params_arg = DeclareLaunchArgument(
-        'rovi_base_params_file',
-        default_value=default_rovi_base_params,
-        description='YAML file with parameters for rovi_base',
+    odom_integrator_params_arg = DeclareLaunchArgument(
+        'odom_integrator_params_file',
+        default_value=default_odom_integrator_params,
+        description='YAML file with parameters for rovi_odom_integrator',
     )
-    rovi_base_tf_arg = DeclareLaunchArgument(
-        'rovi_base_publish_tf',
+    odom_integrator_tf_arg = DeclareLaunchArgument(
+        'odom_integrator_publish_tf',
         default_value='true',
-        description='Enable TF broadcast from rovi_base (raw odom).',
+        description='Enable TF broadcast from rovi_odom_integrator (raw odom).',
     )
-    rovi_base_frame_arg = DeclareLaunchArgument(
-        'rovi_base_frame',
+    odom_integrator_base_frame_arg = DeclareLaunchArgument(
+        'odom_integrator_base_frame',
         default_value='base_footprint',
-        description='Child frame id for rovi_base',
+        description='Child frame id for rovi_odom_integrator',
     )
-    rovi_base_odom_arg = DeclareLaunchArgument(
-        'rovi_base_odom_frame',
+    odom_integrator_odom_frame_arg = DeclareLaunchArgument(
+        'odom_integrator_odom_frame',
         default_value='odom',
-        description='Odom frame id for rovi_base',
+        description='Odom frame id for rovi_odom_integrator',
     )
 
     # Hardware driver (real)
@@ -146,26 +146,26 @@ def generate_launch_description() -> LaunchDescription:
         description='Enable angle compensation in rplidar_ros',
     )
 
-    # UI gateway + serial display client (all modes, can be disabled).
-    ui_gateway_enabled_arg = DeclareLaunchArgument(
-        'ui_gateway_enabled',
+    # UI bridge + serial display client (all modes, can be disabled).
+    ui_bridge_enabled_arg = DeclareLaunchArgument(
+        'ui_bridge_enabled',
         default_value='true',
-        description='Start rovi_ui_gateway gRPC server.',
+        description='Start ros_ui_bridge gRPC server.',
     )
-    ui_gateway_config_arg = DeclareLaunchArgument(
-        'ui_gateway_config',
-        default_value=default_ui_gateway_config,
-        description='Path to rovi_ui_gateway YAML config.',
+    ui_bridge_config_arg = DeclareLaunchArgument(
+        'ui_bridge_config',
+        default_value=default_ui_bridge_config,
+        description='Path to ros_ui_bridge YAML config.',
     )
     serial_display_enabled_arg = DeclareLaunchArgument(
         'serial_display_enabled',
         default_value='true',
-        description='Start rovi_serial_display (gRPC client -> USB serial display).',
+        description='Start robot_serial_display (gRPC client -> USB serial display).',
     )
     serial_display_config_arg = DeclareLaunchArgument(
         'serial_display_config',
         default_value=default_serial_display_config,
-        description='Path to rovi_serial_display YAML config.',
+        description='Path to robot_serial_display YAML config.',
     )
 
     # Simulation backend (sim)
@@ -263,18 +263,18 @@ def generate_launch_description() -> LaunchDescription:
         arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_footprint'],
     )
 
-    rovi_base_node = Node(
+    odom_integrator_node = Node(
         condition=is_real,
-        package='rovi_base',
-        executable='rovi_base_node',
-        name='rovi_base',
+        package='rovi_odom_integrator',
+        executable='rovi_odom_integrator_node',
+        name='rovi_odom_integrator',
         output='screen',
         parameters=[
-            LaunchConfiguration('rovi_base_params_file'),
+            LaunchConfiguration('odom_integrator_params_file'),
             {
-                'publish_tf': ParameterValue(LaunchConfiguration('rovi_base_publish_tf'), value_type=bool),
-                'odom_frame': LaunchConfiguration('rovi_base_odom_frame'),
-                'base_frame': LaunchConfiguration('rovi_base_frame'),
+                'publish_tf': ParameterValue(LaunchConfiguration('odom_integrator_publish_tf'), value_type=bool),
+                'odom_frame': LaunchConfiguration('odom_integrator_odom_frame'),
+                'base_frame': LaunchConfiguration('odom_integrator_base_frame'),
                 'use_sim_time': use_sim_time_param,
             },
         ],
@@ -353,29 +353,29 @@ def generate_launch_description() -> LaunchDescription:
             {
                 'input_topic': 'odom_gz',
                 'output_topic': 'odom_raw',
-                'odom_frame': LaunchConfiguration('rovi_base_odom_frame'),
-                'base_frame': LaunchConfiguration('rovi_base_frame'),
-                'publish_tf': ParameterValue(LaunchConfiguration('rovi_base_publish_tf'), value_type=bool),
+                'odom_frame': LaunchConfiguration('odom_integrator_odom_frame'),
+                'base_frame': LaunchConfiguration('odom_integrator_base_frame'),
+                'publish_tf': ParameterValue(LaunchConfiguration('odom_integrator_publish_tf'), value_type=bool),
                 'two_d_mode': True,
                 'use_sim_time': use_sim_time_param,
             }
         ],
     )
 
-    ui_gateway_node = Node(
-        condition=IfCondition(LaunchConfiguration('ui_gateway_enabled')),
-        package='rovi_ui_gateway',
-        executable='ui_gateway',
-        name='rovi_ui_gateway',
+    ui_bridge_node = Node(
+        condition=IfCondition(LaunchConfiguration('ui_bridge_enabled')),
+        package='ros_ui_bridge',
+        executable='ui_bridge',
+        name='ros_ui_bridge',
         output='screen',
-        arguments=['--config', LaunchConfiguration('ui_gateway_config')],
+        arguments=['--config', LaunchConfiguration('ui_bridge_config')],
     )
 
     serial_display_node = Node(
         condition=IfCondition(LaunchConfiguration('serial_display_enabled')),
-        package='rovi_serial_display',
+        package='robot_serial_display',
         executable='serial_display',
-        name='rovi_serial_display',
+        name='robot_serial_display',
         output='screen',
         arguments=['--config', LaunchConfiguration('serial_display_config')],
     )
@@ -385,10 +385,10 @@ def generate_launch_description() -> LaunchDescription:
         model_arg,
         use_sim_time_arg,
         cmd_vel_arg,
-        rovi_base_params_arg,
-        rovi_base_tf_arg,
-        rovi_base_frame_arg,
-        rovi_base_odom_arg,
+        odom_integrator_params_arg,
+        odom_integrator_tf_arg,
+        odom_integrator_base_frame_arg,
+        odom_integrator_odom_frame_arg,
         rosmaster_params_arg,
         rosmaster_port_arg,
         rosmaster_debug_arg,
@@ -397,8 +397,8 @@ def generate_launch_description() -> LaunchDescription:
         lidar_frame_arg,
         lidar_baud_arg,
         lidar_angle_comp_arg,
-        ui_gateway_enabled_arg,
-        ui_gateway_config_arg,
+        ui_bridge_enabled_arg,
+        ui_bridge_config_arg,
         serial_display_enabled_arg,
         serial_display_config_arg,
         world_arg,
@@ -408,10 +408,10 @@ def generate_launch_description() -> LaunchDescription:
         joint_state_pub_sim,
         static_odom_tf,
         delayed_jsp_gui,
-        rovi_base_node,
+        odom_integrator_node,
         rosmaster_driver_node,
         lidar_node,
-        ui_gateway_node,
+        ui_bridge_node,
         serial_display_node,
         sim_backend,
         sim_base,

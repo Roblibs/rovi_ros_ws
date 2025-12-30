@@ -1,0 +1,15 @@
+gateway:
+  address: "127.0.0.1:50051"
+
+serial:
+  port: "/dev/robot_display"
+  baudrate: 256000
+
+display:
+  selected_ids:
+    - "cpu"
+    - "voltage"
+    - "hz_driver"
+    - "hz_slam"
+
+reconnect_delay_s: 2.0

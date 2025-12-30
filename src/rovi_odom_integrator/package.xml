@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rovi_odom_integrator</name>
+  <version>0.1.0</version>
+  <description>Odometry integrator for Room View Bot: integrates vel_raw feedback and optionally broadcasts TF.</description>
+  <maintainer email="wassim.filali@gmail.com">wassfila</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>diagnostic_updater</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
