@@ -11,7 +11,7 @@ from typing import Optional
 import grpc
 import psutil
 import rclpy
-from rclpy.executors import SingleThreadedExecutor
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 
 from .api import ui_bridge_pb2_grpc
 from .config import UiBridgeConfig, load_config
@@ -175,13 +175,43 @@ def main(argv: Optional[list[str]] = None) -> None:
     psutil.cpu_percent(None)
 
     try:
-        asyncio.run(_run_async(cfg=cfg, voltage_state=voltage_state, ros_node=ros_node, state_node=state_node, logger=logger))
+        try:
+            asyncio.run(
+                _run_async(
+                    cfg=cfg,
+                    voltage_state=voltage_state,
+                    ros_node=ros_node,
+                    state_node=state_node,
+                    logger=logger,
+                )
+            )
+        except (KeyboardInterrupt, ExternalShutdownException):
+            pass
     finally:
-        executor.shutdown()
-        ros_node.destroy_node()
-        state_node.destroy_node()
-        rclpy.shutdown()
-        spin_thread.join(timeout=2.0)
+        try:
+            executor.shutdown()
+        except Exception:
+            pass
+
+        try:
+            ros_node.destroy_node()
+        except Exception:
+            pass
+
+        try:
+            state_node.destroy_node()
+        except Exception:
+            pass
+
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
+
+        try:
+            spin_thread.join(timeout=2.0)
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':
