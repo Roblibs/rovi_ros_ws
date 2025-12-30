@@ -40,3 +40,5 @@ See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/
 - Which topic / TF rate metrics to track
 - Robot state topics, frames, wheel joint list, and map TF freshness window
 - Robot model GLB path + chunk size
+
+In this repo, `rovi_description` generates and installs a model at `package://rovi_description/models/rovi.glb` during `colcon build`.

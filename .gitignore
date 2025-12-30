@@ -6,3 +6,4 @@ log
 *.pyc
 __pycache__/
 out/
+src/rovi_description/models/*.glb

@@ -43,5 +43,5 @@ robot_model:
   # Path to a pre-generated GLB (binary glTF). Examples:
   # - absolute: /path/to/robot.glb
   # - package URI: package://rovi_description/models/rovi.glb
-  glb_path: ""
+  glb_path: "package://rovi_description/models/rovi.glb"
   chunk_size_bytes: 1048576
