@@ -25,8 +25,6 @@ setup(
         'console_scripts': [
             'rovi_session = rovi_bringup.cli.session:main',
             'rovi_bag = rovi_bringup.cli.bag:main',
-            'viz_downsample = rovi_bringup.viz_downsample_node:main',
-            'rovi_local_joint_states = rovi_bringup.local_joint_states_node:main',
         ],
     },
 )

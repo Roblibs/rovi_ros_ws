@@ -45,3 +45,5 @@ See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/
 In this repo, `rovi_description` generates and installs a model at `package://rovi_description/models/rovi.glb` during `colcon build`.
 
 `GetRobotModelMeta` expects a sidecar meta file next to the GLB at `<glb_path>.meta.json` (generated during build); it reads this file (no runtime hashing).
+
+This package also ships `viz_downsample`: a small helper node to downsample high-rate topics for RViz (publishes to `/viz/*`, configured via `config/viz_downsample.yaml`).

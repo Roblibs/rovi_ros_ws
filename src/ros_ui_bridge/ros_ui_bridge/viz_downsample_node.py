@@ -121,7 +121,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         from ament_index_python.packages import get_package_share_directory
 
         config_path = (
-            f"{get_package_share_directory('rovi_bringup')}/config/viz_downsample.yaml"
+            f"{get_package_share_directory('ros_ui_bridge')}/config/viz_downsample.yaml"
         )
 
     qos = QoSProfile(depth=5, reliability=ReliabilityPolicy.BEST_EFFORT)

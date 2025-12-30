@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """Local (stub) JointState publisher.
 
 Why this exists

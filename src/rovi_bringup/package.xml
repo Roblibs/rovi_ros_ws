@@ -29,9 +29,6 @@
   <exec_depend>rovi_sim</exec_depend>
   <exec_depend>ros_ui_bridge</exec_depend>
   <exec_depend>robot_serial_display</exec_depend>
-  <exec_depend>rclpy</exec_depend>
-  <exec_depend>rosidl_runtime_py</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

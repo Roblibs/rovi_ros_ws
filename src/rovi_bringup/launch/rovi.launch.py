@@ -28,6 +28,7 @@ def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
     desc_share = get_package_share_directory('rovi_description')
     sim_share = get_package_share_directory('rovi_sim')
+    ui_bridge_share = get_package_share_directory('ros_ui_bridge')
 
     robot_bringup_launch = os.path.join(bringup_share, 'launch', 'robot_bringup.launch.py')
     teleop_stack_launch = os.path.join(bringup_share, 'launch', 'teleop.launch.py')
@@ -126,7 +127,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     viz_downsample_config = DeclareLaunchArgument(
         'viz_downsample_config',
-        default_value=os.path.join(bringup_share, 'config', 'viz_downsample.yaml'),
+        default_value=os.path.join(ui_bridge_share, 'config', 'viz_downsample.yaml'),
         description='YAML config for RViz-only downsampled topics (published under /viz/*).',
     )
     odom_integrator_publish_tf = PythonExpression([
@@ -230,7 +231,7 @@ def generate_launch_description() -> LaunchDescription:
 
     viz_downsample_node = Node(
         condition=IfCondition(LaunchConfiguration('rviz')),
-        package='rovi_bringup',
+        package='ros_ui_bridge',
         executable='viz_downsample',
         name='viz_downsample',
         output='screen',

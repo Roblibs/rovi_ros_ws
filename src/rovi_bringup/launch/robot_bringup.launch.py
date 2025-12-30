@@ -235,7 +235,7 @@ def generate_launch_description() -> LaunchDescription:
     # Use a small local publisher to keep shutdown clean.
     joint_state_pub_sim = Node(
         condition=is_sim,
-        package='rovi_bringup',
+        package='rovi_sim',
         executable='rovi_local_joint_states',
         output='screen',
         arguments=[LaunchConfiguration('model')],
