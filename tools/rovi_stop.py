@@ -146,6 +146,11 @@ def _looks_like_ros_or_gz(cmdline: str) -> bool:
         return True
     if re.search(r'\brviz2\b', lower):
         return True
+    # Direct node executables (ament/colcon install layout), e.g.:
+    #   <ws>/install/<pkg>/lib/<pkg>/<exe>
+    #   /opt/ros/<distro>/lib/<pkg>/<exe>
+    if re.search(r'/(?:install/[^/\s]+|opt/ros/[^/\s]+)/(?:lib|libexec)/[a-z0-9_]+/', lower):
+        return True
     if 'gz sim' in lower:
         return True
     if re.search(r'\bgazebo\b', lower):
