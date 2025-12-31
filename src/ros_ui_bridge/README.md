@@ -32,6 +32,12 @@ To run manually:
 ros2 run ros_ui_bridge ui_bridge -- --config /path/to/ui_bridge.yaml
 ```
 
+To verify the gRPC robot state stream (server reflection is not enabled):
+
+```bash
+grpcurl -plaintext -import-path /home/wassi/dev/Roblibs/rovi_ros_ws/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamRobotState
+```
+
 ## Configuration
 
 See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/ros_ui_bridge/config/default.yaml`) for:
