@@ -54,9 +54,9 @@ class UiBridgeRosNode(Node):
         # TF "demux" topics for visualization tools (e.g. Foxglove) that don't easily
         # filter individual transforms inside a TFMessage array.
         self.declare_parameter('tf_demux_enabled', True)
-        self.declare_parameter('tf_demux_prefix', '/viz/frame_id')
+        self.declare_parameter('tf_demux_prefix', '/viz/tf')
         self._tf_demux_enabled = bool(self.get_parameter('tf_demux_enabled').value)
-        self._tf_demux_prefix = str(self.get_parameter('tf_demux_prefix').value).strip() or '/viz/frame_id'
+        self._tf_demux_prefix = str(self.get_parameter('tf_demux_prefix').value).strip() or '/viz/tf'
         if not self._tf_demux_prefix.startswith('/'):
             self._tf_demux_prefix = '/' + self._tf_demux_prefix
         self._tf_demux_pub_by_pair: dict[tuple[str, str], Any] = {}

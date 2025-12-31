@@ -54,11 +54,11 @@ Some tools make it hard to plot a specific transform inside `/tf` because `/tf` 
 
 When `ui_bridge` is running, it republishes each dynamic `/tf` transform into its own topic:
 
-- `/viz/frame_id/<parent>_<child>` (`tf2_msgs/TFMessage` with exactly one transform)
+- `/viz/tf/<parent>_<child>` (`tf2_msgs/TFMessage` with exactly one transform)
 
 Frame ids are normalized (leading `/` removed) and sanitized for topic safety.
 
 ROS parameters (on node `ros_ui_bridge`):
 
 - `tf_demux_enabled` (bool, default: `true`)
-- `tf_demux_prefix` (string, default: `/viz/frame_id`)
+- `tf_demux_prefix` (string, default: `/viz/tf`)
