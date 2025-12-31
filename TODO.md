@@ -1,0 +1,1 @@
+- use logger instead of print to have things in rosout

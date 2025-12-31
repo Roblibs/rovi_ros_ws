@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import struct
 from array import array
 from dataclasses import dataclass
@@ -37,6 +38,9 @@ class JointDef:
     origin_rpy: tuple[float, float, float]
 
 
+_HASHED_STEM_RE = re.compile(r"^(?P<base>.+)-[0-9a-f]{10}$")
+
+
 def generate_glb_if_needed(*, urdf_path: Path, out_glb_path: Path, package_root: Path) -> bool:
     """Generate a GLB if the URDF or any referenced meshes are newer than the output.
 
@@ -52,8 +56,32 @@ def generate_glb_if_needed(*, urdf_path: Path, out_glb_path: Path, package_root:
     input_paths = [urdf_path, *mesh_paths, Path(__file__).resolve()]
 
     newest_input_mtime = max(p.stat().st_mtime_ns for p in input_paths)
+
+    # If we have a meta file already, follow glb.filename (or legacy glb.path) to find the actual hashed GLB.
+    referenced_glb_path: Optional[Path] = None
     try:
-        out_glb_mtime = out_glb_path.stat().st_mtime_ns
+        meta = json.loads(out_meta_path.read_text(encoding="utf-8"))
+        glb_ref_raw = meta.get("glb", {}).get("filename")
+        if glb_ref_raw is None:
+            glb_ref_raw = meta.get("glb", {}).get("path")
+        if isinstance(glb_ref_raw, str) and glb_ref_raw:
+            p = Path(glb_ref_raw)
+            if p.is_absolute():
+                referenced_glb_path = p.resolve()
+            else:
+                # Prefer resolving relative to the meta file location (typically the models/ dir).
+                referenced_glb_path = (out_meta_path.parent / p).resolve()
+                if not referenced_glb_path.exists():
+                    referenced_glb_path = (package_root / p).resolve()
+    except FileNotFoundError:
+        referenced_glb_path = None
+    except Exception:
+        # Corrupt / unexpected meta; fall back to regeneration.
+        referenced_glb_path = None
+
+    candidate_glb_path = referenced_glb_path or out_glb_path
+    try:
+        out_glb_mtime = candidate_glb_path.stat().st_mtime_ns
         out_meta_mtime = out_meta_path.stat().st_mtime_ns
         if out_glb_mtime >= newest_input_mtime and out_meta_mtime >= newest_input_mtime:
             return False
@@ -61,16 +89,26 @@ def generate_glb_if_needed(*, urdf_path: Path, out_glb_path: Path, package_root:
         pass
 
     out_glb_path.parent.mkdir(parents=True, exist_ok=True)
+
     glb, meta = urdf_to_glb_bytes_and_meta(urdf_path=urdf_path, package_root=package_root)
     glb_sha256 = hashlib.sha256(glb).hexdigest()
+    hash10 = glb_sha256[:10]
+
+    base_stem = _strip_hash_suffix(out_glb_path.stem)
+    hashed_glb_path = out_glb_path.with_name(f"{base_stem}-{hash10}{out_glb_path.suffix}")
+
     meta["glb"] = {
-        "path": _try_relpath(out_glb_path, package_root=package_root),
+        # Keep this as a simple filename; meta.json lives next to the GLB.
+        "filename": hashed_glb_path.name,
         "sha256": glb_sha256,
         "size_bytes": int(len(glb)),
     }
 
-    _write_atomic(out_glb_path, glb)
+    _write_atomic(hashed_glb_path, glb)
     _write_atomic(out_meta_path, json.dumps(meta, indent=2, sort_keys=True).encode("utf-8"))
+
+    _cleanup_old_hashed_glbs(out_glb_path=out_glb_path, keep_path=hashed_glb_path)
+    _cleanup_unhashed_placeholder(out_glb_path=out_glb_path, keep_path=hashed_glb_path)
     return True
 
 
@@ -318,6 +356,50 @@ def _collect_mesh_paths_from_urdf(*, urdf_path: Path, package_root: Path) -> lis
     return sorted(set(out))
 
 
+def _strip_hash_suffix(stem: str) -> str:
+    m = _HASHED_STEM_RE.match(stem)
+    if m:
+        return str(m.group("base"))
+    return stem
+
+
+def _cleanup_old_hashed_glbs(*, out_glb_path: Path, keep_path: Path) -> None:
+    """Best-effort cleanup of previous hashed outputs.
+
+    Leaves non-hashed files (e.g. 'rovi.glb') alone.
+    """
+    try:
+        base_stem = _strip_hash_suffix(out_glb_path.stem)
+        suffix = out_glb_path.suffix
+        parent = out_glb_path.parent
+        keep_resolved = keep_path.resolve()
+        for candidate in parent.glob(f"{base_stem}-*{suffix}"):
+            if candidate.resolve() == keep_resolved:
+                continue
+            # Only delete files that match our 10-hex suffix convention.
+            if _HASHED_STEM_RE.match(candidate.stem):
+                candidate.unlink(missing_ok=True)
+    except Exception:
+        # Never fail the build because of cleanup.
+        return
+
+
+def _cleanup_unhashed_placeholder(*, out_glb_path: Path, keep_path: Path) -> None:
+    """Remove the unhashed placeholder output file (e.g. 'rovi.glb').
+
+    We keep the stable meta.json and the hashed GLB only.
+    """
+    try:
+        out_resolved = out_glb_path.resolve()
+        keep_resolved = keep_path.resolve()
+        if out_resolved == keep_resolved:
+            return
+        if out_glb_path.exists():
+            out_glb_path.unlink(missing_ok=True)
+    except Exception:
+        return
+
+
 def _parse_urdf(*, urdf_path: Path, package_root: Path) -> tuple[str, dict[str, MaterialDef], list[JointDef], list[MeshVisual]]:
     tree = ET.parse(urdf_path)
     root = tree.getroot()
@@ -509,7 +591,7 @@ def _normalize_quat(x: float, y: float, z: float, w: float) -> tuple[float, floa
     return x * inv, y * inv, z * inv, w * inv
 
 
-def _read_binary_stl(path: Path) -> tuple[array, array, tuple[float, float, float, float, float, float]]:
+def _read_binary_stl(path: Path) -> tuple[array, array, tuple[float, float, float, float, float, float], str, int]:
     data = path.read_bytes()
     sha256 = hashlib.sha256(data).hexdigest()
     size_bytes = len(data)

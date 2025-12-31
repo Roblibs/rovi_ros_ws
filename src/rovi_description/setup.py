@@ -3,6 +3,7 @@ import os
 from glob import glob
 from pathlib import Path
 import sys
+import json
 
 package_name = 'rovi_description'
 
@@ -23,7 +24,18 @@ def _ensure_glb_generated() -> None:
     try:
         regenerated = generate_glb_if_needed(urdf_path=urdf_path, out_glb_path=out_glb, package_root=pkg_root)
         if regenerated:
-            print(f"[rovi_description] Generated GLB + meta: {out_glb}", file=sys.stderr)
+            meta_path = Path(f"{out_glb}.meta.json")
+            glb_hint = str(out_glb)
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                glb_rel = meta.get("glb", {}).get("filename")
+                if glb_rel is None:
+                    glb_rel = meta.get("glb", {}).get("path")
+                if isinstance(glb_rel, str) and glb_rel:
+                    glb_hint = str((meta_path.parent / glb_rel).resolve())
+            except Exception:
+                pass
+            print(f"[rovi_description] Generated GLB + meta: {glb_hint}", file=sys.stderr)
     except Exception as exc:
         print(f"[rovi_description] Failed to generate GLB from {urdf_path}: {exc}", file=sys.stderr)
         raise
