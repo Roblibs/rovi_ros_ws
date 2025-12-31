@@ -30,7 +30,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     odom_mode = DeclareLaunchArgument(
         'odom_mode',
-        default_value='fusion_wheels_imu',
+        default_value='filtered',
         description="Odometry mode: 'raw' (rovi_odom_integrator), 'filtered' (EKF wheel-only), 'fusion_wheels_imu' (EKF + IMU).",
     )
     mag_enabled = DeclareLaunchArgument(

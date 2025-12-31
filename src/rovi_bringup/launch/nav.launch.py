@@ -37,7 +37,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     odom_mode = DeclareLaunchArgument(
         'odom_mode',
-        default_value='fusion_wheels_imu',
+        default_value='filtered',
         description="Odometry mode: 'raw', 'filtered', or 'fusion_wheels_imu'.",
     )
     mag_enabled = DeclareLaunchArgument(

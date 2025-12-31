@@ -122,7 +122,7 @@ def generate_launch_description() -> LaunchDescription:
     # Odometry coordination between backend and localization stack.
     odom_mode = DeclareLaunchArgument(
         'odom_mode',
-        default_value='fusion_wheels_imu',
+        default_value='filtered',
         description="Odometry mode: 'raw', 'filtered', or 'fusion_wheels_imu'.",
     )
     viz_downsample_config = DeclareLaunchArgument(
