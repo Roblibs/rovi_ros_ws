@@ -47,3 +47,18 @@ In this repo, `rovi_description` generates and installs a model at `package://ro
 `GetRobotModelMeta` expects a sidecar meta file next to the GLB at `<glb_path>.meta.json` (generated during build); it reads this file (no runtime hashing).
 
 This package also ships `viz_downsample`: a small helper node to downsample high-rate topics for RViz (publishes to `/viz/*`, configured via `config/viz_downsample.yaml`).
+
+## TF demux topics (plot-friendly)
+
+Some tools make it hard to plot a specific transform inside `/tf` because `/tf` is a `tf2_msgs/TFMessage` containing an array of transforms.
+
+When `ui_bridge` is running, it republishes each dynamic `/tf` transform into its own topic:
+
+- `/viz/frame_id/<parent>_<child>` (`tf2_msgs/TFMessage` with exactly one transform)
+
+Frame ids are normalized (leading `/` removed) and sanitized for topic safety.
+
+ROS parameters (on node `ros_ui_bridge`):
+
+- `tf_demux_enabled` (bool, default: `true`)
+- `tf_demux_prefix` (string, default: `/viz/frame_id`)

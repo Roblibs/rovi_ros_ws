@@ -17,6 +17,29 @@ def _normalize_frame(frame_id: str) -> str:
     return str(frame_id).lstrip('/')
 
 
+def _sanitize_topic_segment(value: str) -> str:
+    """Sanitize a ROS topic segment.
+
+    ROS 2 topic segments should be composed of alphanumerics and underscores.
+    Frame ids are not guaranteed to follow that, so we map other characters to '_'.
+    """
+    s = str(value).strip()
+    if not s:
+        return 'unknown'
+    out_chars: list[str] = []
+    for ch in s:
+        if ch.isalnum() or ch == '_':
+            out_chars.append(ch)
+        else:
+            out_chars.append('_')
+    out = ''.join(out_chars).strip('_')
+    if not out:
+        return 'unknown'
+    while '__' in out:
+        out = out.replace('__', '_')
+    return out
+
+
 class UiBridgeRosNode(Node):
     def __init__(
         self,
@@ -27,6 +50,16 @@ class UiBridgeRosNode(Node):
         tf_rates: list[TfRateMetricConfig],
     ) -> None:
         super().__init__('ros_ui_bridge')
+
+        # TF "demux" topics for visualization tools (e.g. Foxglove) that don't easily
+        # filter individual transforms inside a TFMessage array.
+        self.declare_parameter('tf_demux_enabled', True)
+        self.declare_parameter('tf_demux_prefix', '/viz/frame_id')
+        self._tf_demux_enabled = bool(self.get_parameter('tf_demux_enabled').value)
+        self._tf_demux_prefix = str(self.get_parameter('tf_demux_prefix').value).strip() or '/viz/frame_id'
+        if not self._tf_demux_prefix.startswith('/'):
+            self._tf_demux_prefix = '/' + self._tf_demux_prefix
+        self._tf_demux_pub_by_pair: dict[tuple[str, str], Any] = {}
 
         self._voltage_state = voltage_state
         self._qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
@@ -46,6 +79,11 @@ class UiBridgeRosNode(Node):
 
         self._configure_topic_rates(topic_rates)
         self._configure_tf_rates(tf_rates)
+
+        # Ensure we subscribe to /tf when TF demux is enabled, even if no tf-rate metrics
+        # are configured.
+        if self._tf_demux_enabled and self._tf_sub is None:
+            self._tf_sub = self.create_subscription(TFMessage, '/tf', self._on_tf, self._qos_best_effort)
 
         if self._pending_topics:
             self._resolve_timer = self.create_timer(2.0, self._try_resolve_pending_topics)
@@ -141,6 +179,23 @@ class UiBridgeRosNode(Node):
             metric_id = self._tf_metric_by_pair.get((parent, child))
             if metric_id is not None:
                 self._tf_trackers[metric_id].on_event(now)
+
+            if not self._tf_demux_enabled:
+                continue
+
+            # Publish a per-(parent,child) TFMessage with a single transform.
+            key = (parent, child)
+            pub = self._tf_demux_pub_by_pair.get(key)
+            if pub is None:
+                parent_seg = _sanitize_topic_segment(parent)
+                child_seg = _sanitize_topic_segment(child)
+                topic = f"{self._tf_demux_prefix}/{parent_seg}_{child_seg}"
+                pub = self.create_publisher(TFMessage, topic, self._qos_best_effort)
+                self._tf_demux_pub_by_pair[key] = pub
+
+            out = TFMessage()
+            out.transforms.append(transform)
+            pub.publish(out)
 
     def _on_generic_topic(self, topic: str) -> None:
         now = time.monotonic()

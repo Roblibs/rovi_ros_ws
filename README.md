@@ -546,7 +546,7 @@ All commands in this section are provided by `rovi_env.sh`
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
 | `keyboard` | Runs `tools/rovi_keyboard.py` in the current terminal and publishes `/cmd_vel_keyboard` for `twist_mux` (run in its own terminal). |
-| `bridge` | PC only: runs `ros2 launch foxglove_bridge foxglove_bridge_launch.xml` (Foxglove WebSocket bridge). |
+| `foxglove` | PC only: runs `ros2 launch foxglove_bridge foxglove_bridge_launch.xml` (Foxglove WebSocket bridge). |
 
 ## Packages
 Packages of this repo are listed in this table
