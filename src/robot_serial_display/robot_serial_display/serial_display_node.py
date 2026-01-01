@@ -4,11 +4,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import logging
 import signal
+import traceback
 from typing import Optional
 
 import grpc
+import rclpy
 from serial import Serial, SerialException
 
 from ros_ui_bridge.api import ui_bridge_pb2, ui_bridge_pb2_grpc
@@ -17,7 +18,7 @@ from .config import SerialDisplayConfig, load_config
 
 
 class _SerialWriter:
-    def __init__(self, *, port: str, baudrate: int, logger: logging.Logger) -> None:
+    def __init__(self, *, port: str, baudrate: int, logger) -> None:
         self._port = port
         self._baudrate = baudrate
         self._logger = logger
@@ -38,12 +39,12 @@ class _SerialWriter:
 
         try:
             self._serial = Serial(self._port, baudrate=self._baudrate, timeout=1)
-            self._logger.info("Opened display serial on %s @ %s baud", self._port, self._baudrate)
+            self._logger.info(f"Opened display serial on {self._port} @ {self._baudrate} baud")
             self._last_open_error = None
         except SerialException as exc:
             error = str(exc)
             if error != self._last_open_error:
-                self._logger.warning("Failed to open display serial %s: %s", self._port, exc)
+                self._logger.warning(f"Failed to open display serial {self._port}: {exc}")
                 self._last_open_error = error
             self._serial = None
         return self._serial
@@ -121,7 +122,7 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
     return out
 
 
-async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: logging.Logger) -> None:
+async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger) -> None:
     serial_writer = _SerialWriter(port=cfg.serial_port, baudrate=cfg.baudrate, logger=logger)
     request = ui_bridge_pb2.StatusRequest()
     grpc_connected = False
@@ -137,7 +138,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: l
                 if stop_event.is_set():
                     break
                 if not grpc_connected:
-                    logger.info("Connected to UI gateway at %s", cfg.gateway_address)
+                    logger.info(f"Connected to UI gateway at {cfg.gateway_address}")
                     grpc_connected = True
                     last_grpc_log_key = None
                 payload = _build_payload(update, cfg)
@@ -146,7 +147,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: l
                 try:
                     serial_writer.write_json_line(payload)
                 except SerialException as exc:
-                    logger.warning("Serial write failed: %s", exc)
+                    logger.warning(f"Serial write failed: {exc}")
 
         except grpc.aio.AioRpcError as exc:
             code = exc.code()
@@ -156,28 +157,26 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: l
             if code == grpc.StatusCode.UNAVAILABLE and not grpc_connected:
                 if log_key != last_grpc_log_key:
                     logger.info(
-                        "Waiting for UI gateway at %s (%s); retrying in %.1fs",
-                        cfg.gateway_address,
-                        details,
-                        cfg.reconnect_delay_s,
+                        f"Waiting for UI gateway at {cfg.gateway_address} ({details}); "
+                        f"retrying in {cfg.reconnect_delay_s:.1f}s"
                     )
                     last_grpc_log_key = log_key
             else:
                 if grpc_connected:
                     grpc_connected = False
                 if log_key != last_grpc_log_key:
+                    code_name = getattr(code, 'name', str(code))
                     logger.warning(
-                        "gRPC stream error (%s): %s; retrying in %.1fs",
-                        getattr(code, 'name', str(code)),
-                        details,
-                        cfg.reconnect_delay_s,
+                        f"gRPC stream error ({code_name}): {details}; retrying in {cfg.reconnect_delay_s:.1f}s"
                     )
                     last_grpc_log_key = log_key
         except Exception:  # noqa: BLE001
             if grpc_connected:
                 grpc_connected = False
             last_grpc_log_key = None
-            logger.exception("Unexpected error in serial display loop")
+            logger.error(
+                "Unexpected error in serial display loop:\n" + traceback.format_exc()
+            )
         finally:
             if channel is not None:
                 await channel.close()
@@ -187,14 +186,14 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger: l
 
 
 def main(argv: list[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('robot_serial_display')
-
     parser = argparse.ArgumentParser(description='Robot serial display (gRPC client).')
     parser.add_argument('--config', default=None, help='Path to YAML config (defaults to package config/default.yaml).')
-    args, _unknown = parser.parse_known_args(argv)
+    args, ros_args = parser.parse_known_args(argv)
 
     cfg = load_config(args.config)
+
+    rclpy.init(args=ros_args)
+    logger = rclpy.logging.get_logger('robot_serial_display')
 
     stop_event = asyncio.Event()
     loop = asyncio.new_event_loop()
@@ -210,6 +209,10 @@ def main(argv: list[str] | None = None) -> None:
         loop.run_until_complete(_run(cfg, stop_event=stop_event, logger=logger))
     finally:
         loop.close()
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import logging
 import signal
 import threading
 from typing import Optional
@@ -55,13 +54,13 @@ async def _serve_grpc(
     bind: str,
     service: UiBridgeService,
     stop_event: asyncio.Event,
-    logger: logging.Logger,
+    logger,
 ) -> None:
     server = grpc.aio.server()
     ui_bridge_pb2_grpc.add_UiBridgeServicer_to_server(service, server)
     server.add_insecure_port(bind)
     await server.start()
-    logger.info("ros_ui_bridge gRPC listening on %s", bind)
+    logger.info(f"ros_ui_bridge gRPC listening on {bind}")
 
     try:
         await stop_event.wait()
@@ -76,7 +75,7 @@ async def _run_async(
     ros_node: UiBridgeRosNode,
     robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
     lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
-    logger: logging.Logger,
+    logger,
 ) -> None:
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -125,9 +124,6 @@ async def _run_async(
 
 
 def main(argv: Optional[list[str]] = None) -> None:
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('ros_ui_bridge')
-
     parser = argparse.ArgumentParser(description='ROS UI bridge (gRPC).')
     parser.add_argument('--config', default=None, help='Path to YAML config (defaults to package config/default.yaml).')
     args, ros_args = parser.parse_known_args(argv)
@@ -135,6 +131,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     cfg = load_config(args.config)
 
     rclpy.init(args=ros_args)
+    logger = rclpy.logging.get_logger('ros_ui_bridge')
     voltage_state = VoltageState()
     ros_node = UiBridgeRosNode(
         voltage_state=voltage_state,
