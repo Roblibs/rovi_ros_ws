@@ -61,6 +61,11 @@ message StatusUpdate {
 
   // Periodic rates for configured topics/transforms.
   repeated RateMetric rates = 5;
+
+  // Session context (best-effort; may be empty if the launcher didn't set it).
+  string current_launch_ref = 6;
+  string stack = 7;
+  string fixed_frame = 8;
 }
 
 message Pose3D {
@@ -91,13 +96,12 @@ message RobotStateUpdate {
   // Monotonic snapshot sequence number (starts at 1).
   uint64 seq = 2;
 
-  // Pose derived from /odom_raw (stable contract for sim + real).
-  Pose3D pose_odom = 3;
+  // Single authoritative pose for UI rendering, expressed in the bridge-chosen fixed frame.
+  // NOTE: Field number 3 intentionally matches the previous pose_odom field for wire compatibility.
+  Pose3D pose = 3;
 
-  // Pose in map frame when map->odom is available (optional).
-  oneof map_pose {
-    Pose3D pose_map = 4;
-  }
+  // Reserved: previous optional pose_map field.
+  reserved 4;
 
   // Wheel joint angles (positions) in radians.
   // Always present for configured wheel joints; defaults to 0 when unseen.

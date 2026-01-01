@@ -9,10 +9,12 @@ from typing import Optional
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
+from rclpy.time import Time
 from sensor_msgs.msg import JointState
 from tf2_msgs.msg import TFMessage
 
 from .throttled_forwarder import AsyncStreamBroadcaster, ThrottledForwarder
+from .session_info import resolve_session
 
 
 def _normalize_frame(frame_id: str) -> str:
@@ -79,8 +81,7 @@ class JointAngleSnapshot:
 class RobotStateData:
     """Immutable robot state snapshot for gRPC streaming."""
     timestamp_ms: int
-    pose_odom: PoseSnapshot
-    pose_map: Optional[PoseSnapshot]
+    pose: PoseSnapshot
     wheel_angles: tuple[JointAngleSnapshot, ...]
 
 
@@ -140,8 +141,17 @@ class UiBridgeRobotStateNode(Node):
 
         self._have_odom = False
         self._odom_pose: Optional[PoseSnapshot] = None
+        self._odom_stamp_ns: int = 0
         self._wheel_positions: dict[str, float] = {}
         self._map_to_odom: Optional[_TransformSnapshot] = None
+
+        session = resolve_session()
+        self._fixed_frame = session.fixed_frame
+        self._session_current_launch_ref = session.current_launch_ref
+        self._session_stack = session.stack
+        self.get_logger().info(
+            f"Fixed frame resolved from session: {self._fixed_frame} (stack={self._session_stack or 'unknown'})"
+        )
 
         self._forwarder: ThrottledForwarder[RobotStateData] | None
         if downsampling_period_s is not None and float(downsampling_period_s) > 0:
@@ -203,6 +213,8 @@ class UiBridgeRobotStateNode(Node):
         with self._lock:
             self._have_odom = True
             self._odom_pose = snap
+            # Prefer ROS header stamp for time alignment (sim uses /clock).
+            self._odom_stamp_ns = Time.from_msg(msg.header.stamp).nanoseconds
 
         # Build current state and forward (throttled if enabled)
         state = self._build_state()
@@ -263,49 +275,72 @@ class UiBridgeRobotStateNode(Node):
         with self._lock:
             have_odom = self._have_odom
             odom_pose = self._odom_pose
+            odom_stamp_ns = int(self._odom_stamp_ns)
             map_to_odom = self._map_to_odom
             wheel_positions = dict(self._wheel_positions)
 
         if odom_pose is None:
             return None
 
-        pose_map: Optional[PoseSnapshot] = None
-        if have_odom and map_to_odom is not None:
-            if self._map_tf_max_age_s <= 0.0 or (now - map_to_odom.last_seen_monotonic) <= self._map_tf_max_age_s:
-                rx, ry, rz = _rotate_vec_by_quat(
-                    odom_pose.x,
-                    odom_pose.y,
-                    odom_pose.z,
-                    map_to_odom.qx,
-                    map_to_odom.qy,
-                    map_to_odom.qz,
-                    map_to_odom.qw,
-                )
-                px = map_to_odom.x + rx
-                py = map_to_odom.y + ry
-                pz = map_to_odom.z + rz
-                qx, qy, qz, qw = _quat_mul(
-                    map_to_odom.qx,
-                    map_to_odom.qy,
-                    map_to_odom.qz,
-                    map_to_odom.qw,
-                    odom_pose.qx,
-                    odom_pose.qy,
-                    odom_pose.qz,
-                    odom_pose.qw,
-                )
-                qx, qy, qz, qw = _normalize_quat(qx, qy, qz, qw)
-                pose_map = PoseSnapshot(frame_id=self._map_frame, x=px, y=py, z=pz, qx=qx, qy=qy, qz=qz, qw=qw)
+        # Deterministic fixed frame choice is resolved from the launch session.
+        # We never publish a mix of odom/map poses in the same stream.
+        pose_fixed: Optional[PoseSnapshot]
+        if self._fixed_frame == self._odom_frame or self._fixed_frame == 'odom':
+            pose_fixed = odom_pose
+        else:
+            pose_fixed = None
+            if have_odom and map_to_odom is not None:
+                if self._map_tf_max_age_s <= 0.0 or (now - map_to_odom.last_seen_monotonic) <= self._map_tf_max_age_s:
+                    rx, ry, rz = _rotate_vec_by_quat(
+                        odom_pose.x,
+                        odom_pose.y,
+                        odom_pose.z,
+                        map_to_odom.qx,
+                        map_to_odom.qy,
+                        map_to_odom.qz,
+                        map_to_odom.qw,
+                    )
+                    px = map_to_odom.x + rx
+                    py = map_to_odom.y + ry
+                    pz = map_to_odom.z + rz
+                    qx, qy, qz, qw = _quat_mul(
+                        map_to_odom.qx,
+                        map_to_odom.qy,
+                        map_to_odom.qz,
+                        map_to_odom.qw,
+                        odom_pose.qx,
+                        odom_pose.qy,
+                        odom_pose.qz,
+                        odom_pose.qw,
+                    )
+                    qx, qy, qz, qw = _normalize_quat(qx, qy, qz, qw)
+                    pose_fixed = PoseSnapshot(
+                        frame_id=self._map_frame,
+                        x=px,
+                        y=py,
+                        z=pz,
+                        qx=qx,
+                        qy=qy,
+                        qz=qz,
+                        qw=qw,
+                    )
+
+        if pose_fixed is None:
+            return None
 
         wheel_angles = tuple(
             JointAngleSnapshot(joint_name=name, position_rad=float(wheel_positions.get(name, 0.0)))
             for name in self._wheel_joint_names
         )
 
+        # Use odom header time if present; otherwise fall back to node clock.
+        stamp_ns = odom_stamp_ns
+        if stamp_ns <= 0:
+            stamp_ns = self.get_clock().now().nanoseconds
+
         return RobotStateData(
-            timestamp_ms=int(time.time() * 1000),
-            pose_odom=odom_pose,
-            pose_map=pose_map,
+            timestamp_ms=int(stamp_ns // 1_000_000),
+            pose=pose_fixed,
             wheel_angles=wheel_angles,
         )
 

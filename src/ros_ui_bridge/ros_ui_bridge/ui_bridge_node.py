@@ -25,6 +25,7 @@ from .ros_metrics_node import UiBridgeRosNode
 from .status_store import RateMetricSnapshot, SnapshotBroadcaster
 from .throttled_forwarder import AsyncStreamBroadcaster
 from .voltage_state import VoltageState
+from .session_info import resolve_session
 
 
 async def _publish_status_loop(
@@ -97,7 +98,12 @@ async def _run_async(
             pass
 
     # Status still uses SnapshotBroadcaster (timer-based collection)
-    status_broadcaster = SnapshotBroadcaster()
+    session = resolve_session()
+    status_broadcaster = SnapshotBroadcaster(
+        current_launch_ref=session.current_launch_ref,
+        stack=session.stack,
+        fixed_frame=session.fixed_frame,
+    )
 
     model_provider = RobotModelProvider(glb_path=cfg.robot_model.glb_path)
 

@@ -9,7 +9,7 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 | Capability | gRPC RPC | Notes |
 | --- | --- | --- |
 | Periodic status snapshots (CPU, voltage, configurable rate metrics) | `GetStatus` | Low-rate stream (~0.3 Hz default) for UI dashboards. |
-| Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Always emits `pose_odom`; emits `pose_map` when `map->odom` is available. |
+| Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Emits a single fixed-frame `pose` chosen by the bridge from the current launch session (teleop=odom, mapping/localization/nav=map). |
 | Downsampled lidar scans for 3D visualization | `StreamLidar` | Low-rate (2 Hz default) LaserScan stream; optional. |
 | Occupancy grid map (`/map`) as an encoded image | `StreamMap` | Grayscale PNG stream (0=occupied, 255=free, 127=unknown); optional. |
 | Robot model metadata (cache key / sha256, size) | `GetRobotModelMeta` | Use this as an ETag-like key to decide whether to refresh cached assets. |
@@ -24,6 +24,15 @@ Proto: `proto/ui_bridge.proto` (`package roblibs.ui_bridge.v1`)
 - Robot pose is derived from `/odom_raw` (`nav_msgs/Odometry`) and optionally projected into `map` using the `map->odom` TF transform.
 - Wheel angles are read from `/joint_states` (`sensor_msgs/JointState`) using the configured wheel joint names.
 - Lidar scans are read from `/scan` (`sensor_msgs/LaserScan`) and downsampled to the configured rate.
+
+### Timestamp note (important for UI rendering)
+
+The gRPC streams include `timestamp_unix_ms` fields, but clients should treat them as a **monotonic-ish timebase in milliseconds** that is consistent across streams.
+
+- In simulation (`use_sim_time:=true`), timestamps are derived from ROS message header stamps / ROS time (driven by `/clock`).
+- On real hardware, timestamps typically track wall-clock time.
+
+If you need strict Unix epoch time, add it on the client side; for visualization, the key requirement is that robot pose and sensor samples share the same time base.
 
 ## Run
 

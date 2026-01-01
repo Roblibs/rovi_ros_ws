@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from rclpy.node import Node
+from rclpy.time import Time
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 
@@ -113,8 +114,15 @@ class UiBridgeLidarNode(Node):
         if not frame_id:
             frame_id = _normalize_frame(msg.header.frame_id)
 
+        # Prefer sensor/header time for time alignment (RViz uses header stamps).
+        # Fall back to current node clock when stamp is unset.
+        stamp_ns = Time.from_msg(msg.header.stamp).nanoseconds
+        if stamp_ns <= 0:
+            stamp_ns = self.get_clock().now().nanoseconds
+        timestamp_ms = int(stamp_ns // 1_000_000)
+
         scan_data = LidarScanData(
-            timestamp_ms=int(time.time() * 1000),
+            timestamp_ms=timestamp_ms,
             frame_id=frame_id,
             angle_min=float(msg.angle_min),
             angle_increment=float(msg.angle_increment),

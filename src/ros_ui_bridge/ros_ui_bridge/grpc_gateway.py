@@ -190,6 +190,12 @@ def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusUpdate:
     if snapshot.voltage_v is not None:
         msg.voltage_v = snapshot.voltage_v
     msg.rates.extend(_rate_metrics_to_proto(snapshot.rates))
+    if getattr(snapshot, 'current_launch_ref', None):
+        msg.current_launch_ref = str(snapshot.current_launch_ref)
+    if getattr(snapshot, 'stack', None):
+        msg.stack = str(snapshot.stack)
+    if getattr(snapshot, 'fixed_frame', None):
+        msg.fixed_frame = str(snapshot.fixed_frame)
     return msg
 
 
@@ -227,10 +233,8 @@ def _robot_state_to_proto(state: RobotStateData, seq: int) -> ui_bridge_pb2.Robo
     msg = ui_bridge_pb2.RobotStateUpdate(
         timestamp_unix_ms=state.timestamp_ms,
         seq=seq,
-        pose_odom=_pose_to_proto(state.pose_odom),
+        pose=_pose_to_proto(state.pose),
     )
-    if state.pose_map is not None:
-        msg.pose_map.CopyFrom(_pose_to_proto(state.pose_map))
     msg.wheel_angles.extend(_joint_angles_to_proto(state.wheel_angles))
     return msg
 

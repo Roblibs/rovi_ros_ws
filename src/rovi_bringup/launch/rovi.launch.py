@@ -13,15 +13,37 @@ Intended usage:
 """
 
 import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+
+
+def _ros_home() -> Path:
+    return Path(os.environ.get('ROS_HOME', Path.home() / '.ros')).expanduser()
+
+
+def _write_current_launch(context, *args, **kwargs):  # noqa: ANN001
+    del args, kwargs
+    stack = LaunchConfiguration('stack').perform(context).strip()
+
+    # Persist the *stack* launch ref (not rovi.launch.py) so tools can infer intent
+    # (bagging, UI fixed frame policy, etc.). This is deterministic and not TF-dependent.
+    if stack in {'teleop', 'mapping', 'localization', 'nav'}:
+        launch_ref = f"rovi_bringup/{stack}.launch.py"
+    else:
+        launch_ref = 'rovi_bringup/teleop.launch.py'
+
+    path = _ros_home() / 'rovi' / 'session' / 'current_launch'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{launch_ref}\n", encoding='utf-8')
+    return []
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -230,6 +252,7 @@ def generate_launch_description() -> LaunchDescription:
         use_sim_time,
         rviz,
         rviz_config,
+        OpaqueFunction(function=_write_current_launch),
         joy_enabled,
         cmd_vel_topic,
         model,
