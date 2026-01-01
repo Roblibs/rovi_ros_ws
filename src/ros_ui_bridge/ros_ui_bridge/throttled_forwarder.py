@@ -10,6 +10,7 @@ The ThrottledForwarder implements "capped downsampling":
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -109,48 +110,66 @@ class AsyncStreamBroadcaster(Generic[T]):
 
     def __init__(self, max_queue_size: int = 1) -> None:
         self._subscribers: set[asyncio.Queue[T]] = set()
-        self._lock = asyncio.Lock()
-        self._max_queue_size = max_queue_size
+        # NOTE: Accessed from both the asyncio loop thread (subscribe/publish)
+        # and the ROS spin thread (publish_sync).
+        self._subscribers_lock = threading.Lock()
+        self._max_queue_size = int(max_queue_size)
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Attach the asyncio loop used to service subscribers.
+
+        This must be called from the asyncio thread (e.g. inside asyncio.run()).
+        """
+        self._loop = loop
 
     async def subscribe(self):
         """Async generator that yields items as they're published."""
         queue: asyncio.Queue[T] = asyncio.Queue(maxsize=self._max_queue_size)
-        async with self._lock:
+        with self._subscribers_lock:
             self._subscribers.add(queue)
         try:
             while True:
                 item = await queue.get()
                 yield item
         finally:
-            async with self._lock:
+            with self._subscribers_lock:
                 self._subscribers.discard(queue)
 
     async def publish(self, data: T) -> None:
         """Publish data to all subscribers. Non-blocking, drops if queue full."""
-        async with self._lock:
-            for queue in self._subscribers:
+        with self._subscribers_lock:
+            subscribers = list(self._subscribers)
+
+        for queue in subscribers:
+            try:
+                queue.put_nowait(data)
+            except asyncio.QueueFull:
+                # Drop oldest, add new (keep latest)
                 try:
+                    queue.get_nowait()
                     queue.put_nowait(data)
-                except asyncio.QueueFull:
-                    # Drop oldest, add new (keep latest)
-                    try:
-                        queue.get_nowait()
-                        queue.put_nowait(data)
-                    except (asyncio.QueueEmpty, asyncio.QueueFull):
-                        pass
+                except (asyncio.QueueEmpty, asyncio.QueueFull):
+                    pass
 
     def publish_sync(self, data: T) -> None:
-        """Synchronous publish for use from ROS callbacks. Uses event loop if available."""
-        try:
-            loop = asyncio.get_running_loop()
-            loop.call_soon_threadsafe(self._sync_publish, data)
-        except RuntimeError:
-            # No event loop running, publish directly (may block)
-            self._sync_publish(data)
+        """Thread-safe publish for use from ROS callbacks.
+
+        Must NOT touch asyncio primitives (Queue) from a non-async thread.
+        """
+        loop = self._loop
+        if loop is None:
+            # No loop attached yet (likely during startup, before asyncio.run()).
+            # Drop silently; next update will arrive soon.
+            return
+        loop.call_soon_threadsafe(self._sync_publish, data)
 
     def _sync_publish(self, data: T) -> None:
         """Direct sync publish to all queues."""
-        for queue in list(self._subscribers):
+        with self._subscribers_lock:
+            subscribers = list(self._subscribers)
+
+        for queue in subscribers:
             try:
                 queue.put_nowait(data)
             except asyncio.QueueFull:
@@ -162,4 +181,5 @@ class AsyncStreamBroadcaster(Generic[T]):
 
     @property
     def subscriber_count(self) -> int:
-        return len(self._subscribers)
+        with self._subscribers_lock:
+            return len(self._subscribers)

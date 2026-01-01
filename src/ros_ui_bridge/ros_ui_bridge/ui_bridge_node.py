@@ -82,6 +82,14 @@ async def _run_async(
 ) -> None:
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
+
+    # Ensure broadcasters know which asyncio loop to publish onto.
+    robot_state_broadcaster.set_loop(loop)
+    if lidar_broadcaster is not None:
+        lidar_broadcaster.set_loop(loop)
+    if map_broadcaster is not None:
+        map_broadcaster.set_loop(loop)
+
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, stop_event.set)
