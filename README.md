@@ -65,6 +65,8 @@ Add these lines to your real `~/.bashrc`:
 
 ```bash
 export ROVI_ROS_WS_DIR="$HOME/dev/Roblibs/rovi_ros_ws"
+# Example: pin Gazebo Transport to a stable local IPv4
+export GZ_IP="<your-ipv4>"
 source "$ROVI_ROS_WS_DIR/rovi_env.sh"
 ```
 
