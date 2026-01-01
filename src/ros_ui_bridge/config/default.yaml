@@ -6,7 +6,7 @@ ros:
 
 streams:
   status:
-    rate_hz: 0.333  # ~3 second period
+    period_s: 3
     rates:
       - id: "hz_driver"
         topic: "/voltage"

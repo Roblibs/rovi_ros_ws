@@ -1,8 +1,6 @@
-# Generation Log
+# 2026-01-01
 
-## 2026-01-01
-
-### Lidar gRPC + Capped Downsampling Refactor
+## Lidar gRPC + Capped Downsampling Refactor
 
 Added lidar streaming to the gRPC interface (`StreamLidar`) and refactored the architecture to use "capped downsampling" — data is forwarded on arrival if rate cap allows, never duplicating stale data. Merged the separate `viz_downsample` node into `ui_bridge`; lidar throttle now republishes to `/viz/scan` for RViz.
 

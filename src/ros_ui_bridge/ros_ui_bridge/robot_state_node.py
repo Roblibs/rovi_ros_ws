@@ -116,7 +116,7 @@ class UiBridgeRobotStateNode(Node):
         period_s: float,
         grpc_broadcaster: AsyncStreamBroadcaster[RobotStateData],
     ) -> None:
-        super().__init__('ros_ui_bridge_state')
+        super().__init__('ui_bridge_robot_state')
 
         self._lock = threading.Lock()
 

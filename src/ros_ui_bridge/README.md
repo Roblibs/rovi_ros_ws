@@ -73,7 +73,7 @@ When `ui_bridge` is running, it republishes each dynamic `/tf` transform into it
 
 Frame ids are normalized (leading `/` removed) and sanitized for topic safety.
 
-ROS parameters (on node `ros_ui_bridge`):
+ROS parameters (on node `ui_bridge_metrics`):
 
 - `tf_demux_enabled` (bool, default: `true`)
 - `tf_demux_prefix` (string, default: `/viz/tf`)

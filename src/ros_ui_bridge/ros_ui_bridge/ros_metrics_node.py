@@ -49,7 +49,7 @@ class UiBridgeRosNode(Node):
         topic_rates: list[TopicRateMetricConfig],
         tf_rates: list[TfRateMetricConfig],
     ) -> None:
-        super().__init__('ros_ui_bridge')
+        super().__init__('ui_bridge_metrics')
 
         # TF "demux" topics for visualization tools (e.g. Foxglove) that don't easily
         # filter individual transforms inside a TFMessage array.

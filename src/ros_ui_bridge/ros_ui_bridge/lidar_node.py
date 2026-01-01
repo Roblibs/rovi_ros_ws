@@ -47,7 +47,7 @@ class UiBridgeLidarNode(Node):
         period_s: float,
         grpc_broadcaster: AsyncStreamBroadcaster[LidarScanData],
     ) -> None:
-        super().__init__('ros_ui_bridge_lidar')
+        super().__init__('ui_bridge_lidar')
 
         self._input_topic = self.resolve_topic_name(str(input_topic))
         self._output_topic = self.resolve_topic_name(str(output_topic))
