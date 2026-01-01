@@ -1,43 +1,49 @@
 grpc:
   bind: "0.0.0.0:50051"
 
-update_period_s: 3.0
-
 ros:
   voltage_topic: "voltage"
 
-metrics:
-  rates:
-    - id: "hz_driver"
-      topic: "/voltage"
-      target_hz: 10
-    - id: "hz_odom"
-      topic: "/odom_raw"
-      type: "nav_msgs/msg/Odometry"
-      target_hz: 10
-    - id: "hz_lidar"
-      topic: "/scan"
-      type: "sensor_msgs/msg/LaserScan"
-      target_hz: 10
-  tf_rates:
-    - id: "hz_slam"
-      parent: "map"
-      child: "odom"
-      target_hz: 50
+streams:
+  status:
+    rate_hz: 0.333  # ~3 second period
+    rates:
+      - id: "hz_driver"
+        topic: "/voltage"
+        target_hz: 10
+      - id: "hz_odom"
+        topic: "/odom_raw"
+        type: "nav_msgs/msg/Odometry"
+        target_hz: 10
+      - id: "hz_lidar"
+        topic: "/scan"
+        type: "sensor_msgs/msg/LaserScan"
+        target_hz: 10
+    tf_rates:
+      - id: "hz_slam"
+        parent: "map"
+        child: "odom"
+        target_hz: 50
 
-robot_state:
-  update_hz: 10.0
-  odom_topic: "/odom_raw"
-  joint_states_topic: "/joint_states"
-  odom_frame: "odom"
-  base_frame: "base_footprint"
-  map_frame: "map"
-  map_tf_max_age_s: 1.0
-  wheel_joint_names:
-    - "front_left_joint"
-    - "front_right_joint"
-    - "back_left_joint"
-    - "back_right_joint"
+  robot_state:
+    rate_hz: 10.0
+    odom_topic: "/odom_raw"
+    joint_states_topic: "/joint_states"
+    odom_frame: "odom"
+    base_frame: "base_footprint"
+    map_frame: "map"
+    map_tf_max_age_s: 1.0
+    wheel_joint_names:
+      - "front_left_joint"
+      - "front_right_joint"
+      - "back_left_joint"
+      - "back_right_joint"
+
+  lidar:
+    rate_hz: 2.0
+    topic: "/scan"
+    output_topic: "/viz/scan"  # Throttled scan for RViz
+    frame_id: "laser_link"
 
 robot_model:
   # Path to a pre-generated GLB (binary glTF). Examples:

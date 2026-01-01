@@ -12,7 +12,7 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import JointState
 from tf2_msgs.msg import TFMessage
 
-from .robot_state_store import JointAngleSnapshot, PoseSnapshot
+from .throttled_forwarder import AsyncStreamBroadcaster, ThrottledForwarder
 
 
 def _normalize_frame(frame_id: str) -> str:
@@ -58,6 +58,33 @@ def _normalize_quat(x: float, y: float, z: float, w: float) -> tuple[float, floa
 
 
 @dataclass(frozen=True)
+class PoseSnapshot:
+    frame_id: str
+    x: float
+    y: float
+    z: float
+    qx: float
+    qy: float
+    qz: float
+    qw: float
+
+
+@dataclass(frozen=True)
+class JointAngleSnapshot:
+    joint_name: str
+    position_rad: float
+
+
+@dataclass(frozen=True)
+class RobotStateData:
+    """Immutable robot state snapshot for gRPC streaming."""
+    timestamp_ms: int
+    pose_odom: PoseSnapshot
+    pose_map: Optional[PoseSnapshot]
+    wheel_angles: tuple[JointAngleSnapshot, ...]
+
+
+@dataclass(frozen=True)
 class _TransformSnapshot:
     x: float
     y: float
@@ -70,6 +97,12 @@ class _TransformSnapshot:
 
 
 class UiBridgeRobotStateNode(Node):
+    """ROS node that subscribes to odom/joints/TF and throttle-forwards to gRPC.
+    
+    Uses capped downsampling: forwards on arrival if rate cap allows,
+    otherwise forwards on next timer tick. Never duplicates stale data.
+    """
+
     def __init__(
         self,
         *,
@@ -80,6 +113,8 @@ class UiBridgeRobotStateNode(Node):
         map_frame: str,
         wheel_joint_names: list[str],
         map_tf_max_age_s: float,
+        period_s: float,
+        grpc_broadcaster: AsyncStreamBroadcaster[RobotStateData],
     ) -> None:
         super().__init__('ros_ui_bridge_state')
 
@@ -90,6 +125,7 @@ class UiBridgeRobotStateNode(Node):
         self._odom_frame = _normalize_frame(str(odom_frame))
         self._base_frame = _normalize_frame(str(base_frame))
         self._map_frame = _normalize_frame(str(map_frame))
+        self._grpc_broadcaster = grpc_broadcaster
 
         self._wheel_joint_names = [str(name).strip() for name in wheel_joint_names if str(name).strip()]
         if not self._wheel_joint_names:
@@ -104,17 +140,25 @@ class UiBridgeRobotStateNode(Node):
 
         self._have_odom = False
         self._odom_pose: Optional[PoseSnapshot] = None
-
         self._wheel_positions: dict[str, float] = {}
         self._map_to_odom: Optional[_TransformSnapshot] = None
+
+        # Throttled forwarder for odom updates
+        self._forwarder: ThrottledForwarder[RobotStateData] = ThrottledForwarder(
+            period_s=period_s,
+            on_forward=self._on_forward,
+        )
 
         qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
         self._odom_sub = self.create_subscription(Odometry, self._odom_topic, self._on_odom, qos_best_effort)
         self._joint_sub = self.create_subscription(JointState, self._joint_states_topic, self._on_joint_state, qos_best_effort)
-
-        # Listen for map->odom when available (usually published by localization / SLAM).
         self._tf_sub = self.create_subscription(TFMessage, '/tf', self._on_tf, qos_best_effort)
+
+        # Timer for throttle
+        self._timer = self.create_timer(period_s, self._on_timer)
+
+        self.get_logger().info(f"Robot state throttle: {1.0/period_s:.1f} Hz cap")
 
     @property
     def odom_frame(self) -> str:
@@ -133,6 +177,7 @@ class UiBridgeRobotStateNode(Node):
         return list(self._wheel_joint_names)
 
     def _on_odom(self, msg: Odometry) -> None:
+        """Called on every odom message. Updates state and triggers throttled forward."""
         pose = msg.pose.pose
         q = pose.orientation
         qx, qy, qz, qw = _normalize_quat(float(q.x), float(q.y), float(q.z), float(q.w))
@@ -150,6 +195,11 @@ class UiBridgeRobotStateNode(Node):
         with self._lock:
             self._have_odom = True
             self._odom_pose = snap
+
+        # Build current state and pass to throttler
+        state = self._build_state()
+        if state is not None:
+            self._forwarder.on_input(state)
 
     def _on_joint_state(self, msg: JointState) -> None:
         if not msg.name or not msg.position:
@@ -186,7 +236,16 @@ class UiBridgeRobotStateNode(Node):
             with self._lock:
                 self._map_to_odom = snap
 
-    def sample(self) -> tuple[PoseSnapshot, Optional[PoseSnapshot], list[JointAngleSnapshot]]:
+    def _on_timer(self) -> None:
+        """Called periodically. Lets throttler send pending if any."""
+        self._forwarder.on_timer()
+
+    def _on_forward(self, state: RobotStateData) -> None:
+        """Called by throttler when it's time to forward state."""
+        self._grpc_broadcaster.publish_sync(state)
+
+    def _build_state(self) -> Optional[RobotStateData]:
+        """Build current robot state snapshot. Returns None if no odom yet."""
         now = time.monotonic()
 
         with self._lock:
@@ -196,7 +255,7 @@ class UiBridgeRobotStateNode(Node):
             wheel_positions = dict(self._wheel_positions)
 
         if odom_pose is None:
-            odom_pose = PoseSnapshot(frame_id=self._odom_frame, x=0.0, y=0.0, z=0.0, qx=0.0, qy=0.0, qz=0.0, qw=1.0)
+            return None
 
         pose_map: Optional[PoseSnapshot] = None
         if have_odom and map_to_odom is not None:
@@ -226,10 +285,15 @@ class UiBridgeRobotStateNode(Node):
                 qx, qy, qz, qw = _normalize_quat(qx, qy, qz, qw)
                 pose_map = PoseSnapshot(frame_id=self._map_frame, x=px, y=py, z=pz, qx=qx, qy=qy, qz=qz, qw=qw)
 
-        wheel_angles = [
+        wheel_angles = tuple(
             JointAngleSnapshot(joint_name=name, position_rad=float(wheel_positions.get(name, 0.0)))
             for name in self._wheel_joint_names
-        ]
+        )
 
-        return odom_pose, pose_map, wheel_angles
+        return RobotStateData(
+            timestamp_ms=int(time.time() * 1000),
+            pose_odom=odom_pose,
+            pose_map=pose_map,
+            wheel_angles=wheel_angles,
+        )
 

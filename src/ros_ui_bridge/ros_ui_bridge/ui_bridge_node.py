@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""UI bridge main node: wires ROS nodes + gRPC service together."""
 from __future__ import annotations
 
 import argparse
@@ -16,15 +17,16 @@ from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from .api import ui_bridge_pb2_grpc
 from .config import UiBridgeConfig, load_config
 from .grpc_gateway import UiBridgeService
+from .lidar_node import LidarScanData, UiBridgeLidarNode
 from .robot_model_provider import RobotModelProvider
-from .robot_state_node import UiBridgeRobotStateNode
-from .robot_state_store import RobotStateBroadcaster
+from .robot_state_node import RobotStateData, UiBridgeRobotStateNode
 from .ros_metrics_node import UiBridgeRosNode
 from .status_store import RateMetricSnapshot, SnapshotBroadcaster
+from .throttled_forwarder import AsyncStreamBroadcaster
 from .voltage_state import VoltageState
 
 
-async def _publish_loop(
+async def _publish_status_loop(
     *,
     cfg: UiBridgeConfig,
     voltage_state: VoltageState,
@@ -32,6 +34,11 @@ async def _publish_loop(
     broadcaster: SnapshotBroadcaster,
     stop_event: asyncio.Event,
 ) -> None:
+    """Status stream still uses timer-based collection (legacy SnapshotBroadcaster)."""
+    period_s = cfg.status_stream.period_s
+    if period_s <= 0.0:
+        period_s = 3.0
+
     while not stop_event.is_set():
         cpu_percent = float(psutil.cpu_percent(interval=None))
         voltage_v, _last_update = voltage_state.read()
@@ -40,23 +47,6 @@ async def _publish_loop(
             for metric_id, hz, target_hz in ros_node.sample_rate_metrics()
         ]
         await broadcaster.publish(cpu_percent=cpu_percent, voltage_v=voltage_v, rates=rates)
-        await asyncio.sleep(cfg.update_period_s)
-
-
-async def _publish_robot_state_loop(
-    *,
-    cfg: UiBridgeConfig,
-    state_node: UiBridgeRobotStateNode,
-    broadcaster: RobotStateBroadcaster,
-    stop_event: asyncio.Event,
-) -> None:
-    period_s = 1.0 / float(cfg.robot_state.update_hz)
-    if period_s <= 0.0:
-        period_s = 0.1
-
-    while not stop_event.is_set():
-        pose_odom, pose_map, wheel_angles = state_node.sample()
-        await broadcaster.publish(pose_odom=pose_odom, pose_map=pose_map, wheel_angles=wheel_angles)
         await asyncio.sleep(period_s)
 
 
@@ -84,7 +74,8 @@ async def _run_async(
     cfg: UiBridgeConfig,
     voltage_state: VoltageState,
     ros_node: UiBridgeRosNode,
-    state_node: UiBridgeRobotStateNode,
+    robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
+    lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
     logger: logging.Logger,
 ) -> None:
     stop_event = asyncio.Event()
@@ -95,45 +86,41 @@ async def _run_async(
         except NotImplementedError:
             pass
 
+    # Status still uses SnapshotBroadcaster (timer-based collection)
     status_broadcaster = SnapshotBroadcaster()
-    robot_state_broadcaster = RobotStateBroadcaster()
 
     model_provider = RobotModelProvider(glb_path=cfg.robot_model.glb_path)
 
     service = UiBridgeService(
         status_broadcaster=status_broadcaster,
         robot_state_broadcaster=robot_state_broadcaster,
+        lidar_broadcaster=lidar_broadcaster,
         model_provider=model_provider,
         model_chunk_size_bytes=cfg.robot_model.chunk_size_bytes,
-        odom_frame=cfg.robot_state.odom_frame,
-        base_frame=cfg.robot_state.base_frame,
-        map_frame=cfg.robot_state.map_frame,
-        wheel_joint_names=cfg.robot_state.wheel_joint_names,
+        odom_frame=cfg.robot_state_stream.odom_frame,
+        base_frame=cfg.robot_state_stream.base_frame,
+        map_frame=cfg.robot_state_stream.map_frame,
+        wheel_joint_names=cfg.robot_state_stream.wheel_joint_names,
     )
 
-    publisher_task = asyncio.create_task(
-        _publish_loop(
+    tasks: list[asyncio.Task[None]] = []
+
+    # Only status uses a publish loop now; robot_state and lidar are event-driven
+    tasks.append(asyncio.create_task(
+        _publish_status_loop(
             cfg=cfg,
             voltage_state=voltage_state,
             ros_node=ros_node,
             broadcaster=status_broadcaster,
             stop_event=stop_event,
         )
-    )
-    robot_state_task = asyncio.create_task(
-        _publish_robot_state_loop(
-            cfg=cfg,
-            state_node=state_node,
-            broadcaster=robot_state_broadcaster,
-            stop_event=stop_event,
-        )
-    )
-    grpc_task = asyncio.create_task(_serve_grpc(bind=cfg.grpc_bind, service=service, stop_event=stop_event, logger=logger))
+    ))
+    tasks.append(asyncio.create_task(_serve_grpc(bind=cfg.grpc_bind, service=service, stop_event=stop_event, logger=logger)))
 
     try:
-        await asyncio.gather(publisher_task, robot_state_task, grpc_task)
+        await asyncio.gather(*tasks)
     finally:
-        for task in (publisher_task, robot_state_task, grpc_task):
+        for task in tasks:
             task.cancel()
 
 
@@ -152,21 +139,42 @@ def main(argv: Optional[list[str]] = None) -> None:
     ros_node = UiBridgeRosNode(
         voltage_state=voltage_state,
         voltage_topic=cfg.voltage_topic,
-        topic_rates=cfg.topic_rates,
-        tf_rates=cfg.tf_rates,
+        topic_rates=cfg.status_stream.rates,
+        tf_rates=cfg.status_stream.tf_rates,
     )
+
+    # Create broadcasters for queue-based gRPC streaming
+    robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData] = AsyncStreamBroadcaster()
+    lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]] = None
+
     state_node = UiBridgeRobotStateNode(
-        odom_topic=cfg.robot_state.odom_topic,
-        joint_states_topic=cfg.robot_state.joint_states_topic,
-        odom_frame=cfg.robot_state.odom_frame,
-        base_frame=cfg.robot_state.base_frame,
-        map_frame=cfg.robot_state.map_frame,
-        wheel_joint_names=cfg.robot_state.wheel_joint_names,
-        map_tf_max_age_s=cfg.robot_state.map_tf_max_age_s,
+        odom_topic=cfg.robot_state_stream.odom_topic,
+        joint_states_topic=cfg.robot_state_stream.joint_states_topic,
+        odom_frame=cfg.robot_state_stream.odom_frame,
+        base_frame=cfg.robot_state_stream.base_frame,
+        map_frame=cfg.robot_state_stream.map_frame,
+        wheel_joint_names=cfg.robot_state_stream.wheel_joint_names,
+        map_tf_max_age_s=cfg.robot_state_stream.map_tf_max_age_s,
+        period_s=cfg.robot_state_stream.period_s,
+        grpc_broadcaster=robot_state_broadcaster,
     )
+
+    lidar_node: Optional[UiBridgeLidarNode] = None
+    if cfg.lidar_stream is not None:
+        lidar_broadcaster = AsyncStreamBroadcaster()
+        lidar_node = UiBridgeLidarNode(
+            input_topic=cfg.lidar_stream.topic,
+            output_topic=cfg.lidar_stream.output_topic,
+            frame_id=cfg.lidar_stream.frame_id,
+            period_s=cfg.lidar_stream.period_s,
+            grpc_broadcaster=lidar_broadcaster,
+        )
+
     executor = SingleThreadedExecutor()
     executor.add_node(ros_node)
     executor.add_node(state_node)
+    if lidar_node is not None:
+        executor.add_node(lidar_node)
 
     spin_thread = threading.Thread(target=executor.spin, name='ros_ui_bridge_ros_spin', daemon=True)
     spin_thread.start()
@@ -181,7 +189,8 @@ def main(argv: Optional[list[str]] = None) -> None:
                     cfg=cfg,
                     voltage_state=voltage_state,
                     ros_node=ros_node,
-                    state_node=state_node,
+                    robot_state_broadcaster=robot_state_broadcaster,
+                    lidar_broadcaster=lidar_broadcaster,
                     logger=logger,
                 )
             )
@@ -202,6 +211,12 @@ def main(argv: Optional[list[str]] = None) -> None:
             state_node.destroy_node()
         except Exception:
             pass
+
+        if lidar_node is not None:
+            try:
+                lidar_node.destroy_node()
+            except Exception:
+                pass
 
         try:
             rclpy.shutdown()

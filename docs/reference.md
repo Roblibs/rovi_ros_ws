@@ -87,7 +87,6 @@ ROS nodes started by the launches above (some are conditional based on params).
 | `rovi_odom_integrator` | `rovi_odom_integrator` | Integrates `/vel_raw` into `/odom_raw` and can broadcast TF `odom -> base_footprint` when enabled. |
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
 | `rovi_local_joint_states` | `rovi_sim` | Local (stub) publisher for `/joint_states` in `robot_mode=sim` (zeros for non-fixed URDF joints). Exists to avoid a known noisy shutdown race in upstream `joint_state_publisher` on Jazzy. |
-| `viz_downsample` | `ros_ui_bridge` | Downsamples high-rate topics for RViz visualization (publishes to `/viz/*`). |
 | `rplidar_composition` | `rplidar_ros` | Publishes `/scan` (`sensor_msgs/msg/LaserScan`) from an RPLIDAR (only when `lidar_enabled:=true`). |
 | `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan`, `/clock`, and `/imu/data_raw`). |
 | `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_odom_integrator`). |

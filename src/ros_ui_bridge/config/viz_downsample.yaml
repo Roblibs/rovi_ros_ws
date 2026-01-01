@@ -1,6 +1,0 @@
-topics:
-  # Low-rate visualization copies (RViz only). Add entries as needed.
-  - from: "/scan"
-    to: "/viz/scan"
-    type: "sensor_msgs/msg/LaserScan"
-    rate_hz: 2.0

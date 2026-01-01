@@ -2,9 +2,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from ament_index_python.packages import get_package_share_directory
+
+
+def _parse_rate_or_period(section: dict[str, Any], default_rate_hz: float) -> float:
+    """Parse rate_hz or period_s from config, return period in seconds.
+    
+    If period_s is specified, it takes precedence over rate_hz.
+    """
+    period_s = section.get('period_s')
+    rate_hz = section.get('rate_hz')
+    
+    if period_s is not None:
+        val = float(period_s)
+        if val > 0:
+            return val
+    if rate_hz is not None:
+        val = float(rate_hz)
+        if val > 0:
+            return 1.0 / val
+    return 1.0 / default_rate_hz
 
 
 @dataclass(frozen=True)
@@ -32,8 +51,15 @@ class RobotModelConfig:
 
 
 @dataclass(frozen=True)
-class RobotStateConfig:
-    update_hz: float
+class StatusStreamConfig:
+    period_s: float  # Collection/publish period
+    rates: list[TopicRateMetricConfig]
+    tf_rates: list[TfRateMetricConfig]
+
+
+@dataclass(frozen=True)
+class RobotStateStreamConfig:
+    period_s: float  # Max rate cap (forward on arrival, capped)
     odom_topic: str
     joint_states_topic: str
     odom_frame: str
@@ -44,13 +70,20 @@ class RobotStateConfig:
 
 
 @dataclass(frozen=True)
+class LidarStreamConfig:
+    period_s: float  # Max rate cap (forward on arrival, capped)
+    topic: str
+    output_topic: str  # ROS republish destination
+    frame_id: str
+
+
+@dataclass(frozen=True)
 class UiBridgeConfig:
     grpc_bind: str
-    update_period_s: float
     voltage_topic: str
-    topic_rates: list[TopicRateMetricConfig]
-    tf_rates: list[TfRateMetricConfig]
-    robot_state: RobotStateConfig
+    status_stream: StatusStreamConfig
+    robot_state_stream: RobotStateStreamConfig
+    lidar_stream: Optional[LidarStreamConfig]
     robot_model: RobotModelConfig
 
 
@@ -84,28 +117,23 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
 
     grpc = _read_map(data, 'grpc')
     ros = _read_map(data, 'ros')
-    metrics = _read_map(data, 'metrics')
-    robot_state = _read_map(data, 'robot_state')
+    streams = _read_map(data, 'streams')
     robot_model = _read_map(data, 'robot_model')
 
     grpc_bind = str(grpc.get('bind', '0.0.0.0:50051'))
-    update_period_s = float(data.get('update_period_s', 3.0))
     voltage_topic = str(ros.get('voltage_topic', 'voltage'))
-    topic_rates = _parse_topic_rates(metrics.get('rates'))
-    tf_rates = _parse_tf_rates(metrics.get('tf_rates'))
-    robot_state_cfg = _parse_robot_state(robot_state)
-    robot_model_cfg = _parse_robot_model(robot_model)
 
-    if update_period_s <= 0:
-        raise RuntimeError(f"update_period_s must be > 0 (got {update_period_s}) in: {config_path}")
+    status_stream_cfg = _parse_status_stream(streams.get('status'))
+    robot_state_cfg = _parse_robot_state_stream(streams.get('robot_state'))
+    lidar_cfg = _parse_lidar_stream(streams.get('lidar'))
+    robot_model_cfg = _parse_robot_model(robot_model)
 
     return UiBridgeConfig(
         grpc_bind=grpc_bind,
-        update_period_s=update_period_s,
         voltage_topic=voltage_topic,
-        topic_rates=topic_rates,
-        tf_rates=tf_rates,
-        robot_state=robot_state_cfg,
+        status_stream=status_stream_cfg,
+        robot_state_stream=robot_state_cfg,
+        lidar_stream=lidar_cfg,
         robot_model=robot_model_cfg,
     )
 
@@ -123,19 +151,19 @@ def _parse_topic_rates(value: Any) -> list[TopicRateMetricConfig]:
     if value is None:
         return []
     if not isinstance(value, list):
-        raise RuntimeError("Invalid 'metrics.rates' section (expected list)")
+        raise RuntimeError("Invalid 'rates' section (expected list)")
 
     out: list[TopicRateMetricConfig] = []
     for entry in value:
         if not isinstance(entry, dict):
-            raise RuntimeError("Invalid entry in 'metrics.rates' (expected mapping)")
+            raise RuntimeError("Invalid entry in 'rates' (expected mapping)")
 
         metric_id = str(entry.get('id', '')).strip()
         topic = str(entry.get('topic', '')).strip()
         if not metric_id:
-            raise RuntimeError("metrics.rates entry is missing non-empty 'id'")
+            raise RuntimeError("rates entry is missing non-empty 'id'")
         if not topic:
-            raise RuntimeError(f"metrics.rates[{metric_id}] is missing non-empty 'topic'")
+            raise RuntimeError(f"rates[{metric_id}] is missing non-empty 'topic'")
 
         raw_target = entry.get('target_hz')
         target_hz = float(raw_target) if raw_target is not None else None
@@ -170,9 +198,9 @@ def _parse_tf_rates(value: Any) -> list[TfRateMetricConfig]:
         parent = str(entry.get('parent', '')).strip()
         child = str(entry.get('child', '')).strip()
         if not metric_id:
-            raise RuntimeError("metrics.tf_rates entry is missing non-empty 'id'")
+            raise RuntimeError("tf_rates entry is missing non-empty 'id'")
         if not parent or not child:
-            raise RuntimeError(f"metrics.tf_rates[{metric_id}] must define 'parent' and 'child'")
+            raise RuntimeError(f"tf_rates[{metric_id}] must define 'parent' and 'child'")
 
         raw_target = entry.get('target_hz')
         target_hz = float(raw_target) if raw_target is not None else None
@@ -190,10 +218,25 @@ def _parse_tf_rates(value: Any) -> list[TfRateMetricConfig]:
     return out
 
 
-def _parse_robot_state(section: dict[str, Any]) -> RobotStateConfig:
-    update_hz = float(section.get('update_hz', 10.0))
-    if update_hz <= 0.0:
-        update_hz = 10.0
+def _parse_status_stream(value: Any) -> StatusStreamConfig:
+    section = value if isinstance(value, dict) else {}
+
+    period_s = _parse_rate_or_period(section, default_rate_hz=0.333)  # ~3 second default
+
+    rates = _parse_topic_rates(section.get('rates'))
+    tf_rates = _parse_tf_rates(section.get('tf_rates'))
+
+    return StatusStreamConfig(
+        period_s=period_s,
+        rates=rates,
+        tf_rates=tf_rates,
+    )
+
+
+def _parse_robot_state_stream(value: Any) -> RobotStateStreamConfig:
+    section = value if isinstance(value, dict) else {}
+
+    period_s = _parse_rate_or_period(section, default_rate_hz=10.0)  # 10 Hz cap default
 
     odom_topic = str(section.get('odom_topic', '/odom_raw'))
     joint_states_topic = str(section.get('joint_states_topic', '/joint_states'))
@@ -214,10 +257,10 @@ def _parse_robot_state(section: dict[str, Any]) -> RobotStateConfig:
     elif isinstance(wheel_joint_names_raw, list):
         wheel_joint_names = [str(name).strip() for name in wheel_joint_names_raw if str(name).strip()]
     else:
-        raise RuntimeError("Invalid 'robot_state.wheel_joint_names' (expected list)")
+        raise RuntimeError("Invalid 'streams.robot_state.wheel_joint_names' (expected list)")
 
-    return RobotStateConfig(
-        update_hz=update_hz,
+    return RobotStateStreamConfig(
+        period_s=period_s,
         odom_topic=odom_topic,
         joint_states_topic=joint_states_topic,
         odom_frame=odom_frame,
@@ -225,6 +268,27 @@ def _parse_robot_state(section: dict[str, Any]) -> RobotStateConfig:
         map_frame=map_frame,
         wheel_joint_names=wheel_joint_names,
         map_tf_max_age_s=map_tf_max_age_s,
+    )
+
+
+def _parse_lidar_stream(value: Any) -> Optional[LidarStreamConfig]:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise RuntimeError("Invalid 'streams.lidar' section (expected mapping)")
+
+    section = value
+    period_s = _parse_rate_or_period(section, default_rate_hz=2.0)  # 2 Hz cap default
+
+    topic = str(section.get('topic', '/scan'))
+    output_topic = str(section.get('output_topic', '/viz/scan'))
+    frame_id = str(section.get('frame_id', 'laser_link'))
+
+    return LidarStreamConfig(
+        period_s=period_s,
+        topic=topic,
+        output_topic=output_topic,
+        frame_id=frame_id,
     )
 
 

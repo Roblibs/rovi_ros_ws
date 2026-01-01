@@ -25,7 +25,6 @@ setup(
     entry_points={
         'console_scripts': [
             'ui_bridge = ros_ui_bridge.ui_bridge_node:main',
-            'viz_downsample = ros_ui_bridge.viz_downsample_node:main',
         ],
     },
 )

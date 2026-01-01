@@ -9,6 +9,9 @@ service UiBridge {
   // Streams robot pose + wheel joint angles for 3D rendering.
   rpc StreamRobotState(RobotStateRequest) returns (stream RobotStateUpdate);
 
+  // Streams downsampled lidar scans for 3D visualization.
+  rpc StreamLidar(LidarRequest) returns (stream LidarUpdate);
+
   // Returns metadata for the current robot model (no GLB bytes).
   rpc GetRobotModelMeta(RobotModelRequest) returns (RobotModelMeta);
 
@@ -19,6 +22,8 @@ service UiBridge {
 message StatusRequest {}
 
 message RobotStateRequest {}
+
+message LidarRequest {}
 
 message RobotModelRequest {}
 
@@ -118,4 +123,31 @@ message RobotModelChunk {
 
   // Chunk index starting at 0.
   uint32 chunk_index = 3;
+}
+
+message LidarUpdate {
+  // Unix epoch time in milliseconds when this snapshot was produced.
+  int64 timestamp_unix_ms = 1;
+
+  // Monotonic snapshot sequence number (starts at 1).
+  uint64 seq = 2;
+
+  // Frame in which the scan is expressed (e.g. "laser_link").
+  string frame_id = 3;
+
+  // Start angle of the scan in radians.
+  float angle_min = 4;
+
+  // Angular distance between measurements in radians.
+  float angle_increment = 5;
+
+  // Minimum range value in meters (values below are invalid).
+  float range_min = 6;
+
+  // Maximum range value in meters (values above are invalid).
+  float range_max = 7;
+
+  // Range data in meters. Length = floor((angle_max - angle_min) / angle_increment) + 1.
+  // Invalid readings are represented as Inf (no return) or values outside [range_min, range_max].
+  repeated float ranges = 8;
 }

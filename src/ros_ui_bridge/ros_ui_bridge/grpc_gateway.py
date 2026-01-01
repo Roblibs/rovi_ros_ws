@@ -1,21 +1,33 @@
+"""gRPC service implementation for UI bridge.
+
+Uses queue-based streaming (AsyncStreamBroadcaster) for robot_state and lidar.
+Status stream still uses the SnapshotBroadcaster (timer-based collection).
+"""
+
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+from typing import Optional
 
 import grpc
 
 from .api import ui_bridge_pb2, ui_bridge_pb2_grpc
+from .lidar_node import LidarScanData
 from .robot_model_provider import RobotModelProvider
-from .robot_state_store import JointAngleSnapshot, PoseSnapshot, RobotStateBroadcaster, RobotStateSnapshot
+from .robot_state_node import JointAngleSnapshot, PoseSnapshot, RobotStateData
 from .status_store import RateMetricSnapshot, SnapshotBroadcaster, StatusSnapshot
+from .throttled_forwarder import AsyncStreamBroadcaster
 
 
 class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
+    """gRPC service for UI bridge streams."""
+
     def __init__(
         self,
         *,
         status_broadcaster: SnapshotBroadcaster,
-        robot_state_broadcaster: RobotStateBroadcaster,
+        robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
+        lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
         model_provider: RobotModelProvider,
         model_chunk_size_bytes: int,
         odom_frame: str,
@@ -25,6 +37,7 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
     ) -> None:
         self._status_broadcaster = status_broadcaster
         self._robot_state_broadcaster = robot_state_broadcaster
+        self._lidar_broadcaster = lidar_broadcaster
         self._model_provider = model_provider
         self._model_chunk_size_bytes = int(model_chunk_size_bytes)
         self._odom_frame = str(odom_frame)
@@ -37,6 +50,9 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         request: ui_bridge_pb2.StatusRequest,
         context: grpc.aio.ServicerContext,
     ) -> AsyncIterator[ui_bridge_pb2.StatusUpdate]:
+        """Stream status updates. Still uses SnapshotBroadcaster (timer-based collection)."""
+        del request
+
         last_seq = 0
         latest = self._status_broadcaster.latest()
         if latest is not None:
@@ -55,20 +71,34 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         request: ui_bridge_pb2.RobotStateRequest,
         context: grpc.aio.ServicerContext,
     ) -> AsyncIterator[ui_bridge_pb2.RobotStateUpdate]:
+        """Stream robot state updates. Queue-based, no stale data on subscribe."""
         del request
 
-        last_seq = 0
-        latest = self._robot_state_broadcaster.latest()
-        if latest is not None:
-            last_seq = latest.seq
-            yield _robot_state_to_proto(latest)
-
-        while True:
-            snapshot = await self._robot_state_broadcaster.wait_for_next(last_seq)
+        seq = 0
+        async for state in self._robot_state_broadcaster.subscribe():
             if context.cancelled():
                 return
-            last_seq = snapshot.seq
-            yield _robot_state_to_proto(snapshot)
+            seq += 1
+            yield _robot_state_to_proto(state, seq)
+
+    async def StreamLidar(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.LidarRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> AsyncIterator[ui_bridge_pb2.LidarUpdate]:
+        """Stream lidar updates. Queue-based, no stale data on subscribe."""
+        del request
+
+        if self._lidar_broadcaster is None:
+            await context.abort(grpc.StatusCode.UNAVAILABLE, "Lidar stream not configured")
+            return
+
+        seq = 0
+        async for scan in self._lidar_broadcaster.subscribe():
+            if context.cancelled():
+                return
+            seq += 1
+            yield _lidar_to_proto(scan, seq)
 
     async def GetRobotModelMeta(  # noqa: N802 - gRPC interface name
         self,
@@ -126,6 +156,9 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
                 chunk_index += 1
 
 
+# --- Proto conversion helpers ---
+
+
 def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusUpdate:
     msg = ui_bridge_pb2.StatusUpdate(
         timestamp_unix_ms=snapshot.timestamp_unix_ms,
@@ -161,20 +194,33 @@ def _pose_to_proto(pose: PoseSnapshot) -> ui_bridge_pb2.Pose3D:
     )
 
 
-def _joint_angles_to_proto(angles: list[JointAngleSnapshot]) -> list[ui_bridge_pb2.JointAngle]:
+def _joint_angles_to_proto(angles: Sequence[JointAngleSnapshot]) -> list[ui_bridge_pb2.JointAngle]:
     return [
         ui_bridge_pb2.JointAngle(joint_name=angle.joint_name, position_rad=float(angle.position_rad))
         for angle in angles
     ]
 
 
-def _robot_state_to_proto(snapshot: RobotStateSnapshot) -> ui_bridge_pb2.RobotStateUpdate:
+def _robot_state_to_proto(state: RobotStateData, seq: int) -> ui_bridge_pb2.RobotStateUpdate:
     msg = ui_bridge_pb2.RobotStateUpdate(
-        timestamp_unix_ms=snapshot.timestamp_unix_ms,
-        seq=snapshot.seq,
-        pose_odom=_pose_to_proto(snapshot.pose_odom),
+        timestamp_unix_ms=state.timestamp_ms,
+        seq=seq,
+        pose_odom=_pose_to_proto(state.pose_odom),
     )
-    if snapshot.pose_map is not None:
-        msg.pose_map.CopyFrom(_pose_to_proto(snapshot.pose_map))
-    msg.wheel_angles.extend(_joint_angles_to_proto(snapshot.wheel_angles))
+    if state.pose_map is not None:
+        msg.pose_map.CopyFrom(_pose_to_proto(state.pose_map))
+    msg.wheel_angles.extend(_joint_angles_to_proto(state.wheel_angles))
     return msg
+
+
+def _lidar_to_proto(scan: LidarScanData, seq: int) -> ui_bridge_pb2.LidarUpdate:
+    return ui_bridge_pb2.LidarUpdate(
+        timestamp_unix_ms=scan.timestamp_ms,
+        seq=seq,
+        frame_id=scan.frame_id,
+        angle_min=float(scan.angle_min),
+        angle_increment=float(scan.angle_increment),
+        range_min=float(scan.range_min),
+        range_max=float(scan.range_max),
+        ranges=list(scan.ranges),
+    )
