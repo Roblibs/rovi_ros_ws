@@ -11,6 +11,7 @@ from typing import Optional
 import grpc
 import psutil
 import rclpy
+from rclpy.logging import get_logger
 from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 
 from .api import ui_bridge_pb2_grpc
@@ -131,7 +132,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     cfg = load_config(args.config)
 
     rclpy.init(args=ros_args)
-    logger = rclpy.logging.get_logger('ros_ui_bridge')
+    logger = get_logger('ros_ui_bridge')
     voltage_state = VoltageState()
     ros_node = UiBridgeRosNode(
         voltage_state=voltage_state,

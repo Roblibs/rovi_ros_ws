@@ -10,6 +10,7 @@ from typing import Optional
 
 import grpc
 import rclpy
+from rclpy.logging import get_logger
 from serial import Serial, SerialException
 
 from ros_ui_bridge.api import ui_bridge_pb2, ui_bridge_pb2_grpc
@@ -193,7 +194,7 @@ def main(argv: list[str] | None = None) -> None:
     cfg = load_config(args.config)
 
     rclpy.init(args=ros_args)
-    logger = rclpy.logging.get_logger('robot_serial_display')
+    logger = get_logger('robot_serial_display')
 
     stop_event = asyncio.Event()
     loop = asyncio.new_event_loop()
