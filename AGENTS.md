@@ -1,4 +1,4 @@
-# AGENTS.md — rovi_ros_ws (ROVI / Room View Bot)
+# AGENTS.md — rovi_ros_ws (ROVI / Room-View Bot)
 
 ## What this workspace is
 ROS 2 Jazzy workspace for the ROVI robot with three runtime backends:
@@ -25,6 +25,14 @@ Prefer these in order when making changes:
    - `sim` (simulation)
    - `view` / `nav` / `teleop` depending on target
 If you add new dependencies, keep them consistent with the repo’s Jazzy apt-based approach. :contentReference[oaicite:8]{index=8}
+
+## More details (docs)
+This file is intentionally short and focuses on the "golden path". For deeper references, see:
+
+- `docs/nodes.md`: commands, packages, launches, nodes, and key params (good as a quick index / source of truth).
+- `docs/reference.md`: deeper reference notes (robot interface contract, joystick mapping, rosbags helpers, rosmaster driver details, sensor notes).
+- `docs/stereo.md`: stereo camera notes.
+- `docs/TODO.md`: open tasks / ideas.
 
 ## Repo map (where to look first)
 Core packages (owned here): :contentReference[oaicite:9]{index=9}
@@ -77,6 +85,12 @@ Nav/SLAM/RViz typically rely on:
 - Keep `robot_mode:=real|sim|offline` parity: if you add a feature to one backend, either add it to the other or explicitly gate it with a launch arg and document the difference.
 - Don’t “fix” by editing generated artifacts under `install/` / build outputs; change source and rebuild.
 
+### Clarify-first rule (important)
+If there is any ambiguity, missing requirement, or open design choice:
+
+- **Do not change code by default.** Ask for clarification first and propose 1–3 options.
+- Only proceed once the intended behavior and constraints are confirmed.
+
 ## Where configuration usually lives
 - Launch wiring & mode/stack selection: `rovi_bringup`
 - Teleop config (joy mapping): referenced by bringup teleop launch :contentReference[oaicite:20]{index=20}
@@ -89,3 +103,15 @@ Nav/SLAM/RViz typically rely on:
 2) `rg` for the topic/frame/param name.
 3) Make the smallest change that preserves contracts.
 4) `build` + run a smoke launch (`view offline` or `sim`).
+
+## UI bridge (concept + where to look)
+The UI path is intentionally out-of-band from ROS visualization tools:
+- `ros_ui_bridge` exposes low-rate status/metrics and robot state to UI clients via **gRPC** (not ROS topics).
+- `robot_serial_display` consumes the gRPC stream and forwards selected fields over USB serial to the ESP32 display.
+- The UI bridge node is started by `rovi_bringup/robot_bringup.launch.py` by default.
+
+Where to learn more:
+- UI bridge README: `src/ros_ui_bridge/README.md`
+- UI bridge proto: `src/ros_ui_bridge/proto/ui_bridge.proto`
+- UI bridge default config: `src/ros_ui_bridge/config/default.yaml` (installed into the ROS share directory on build)
+- Display client README: `src/robot_serial_display/README.md`
