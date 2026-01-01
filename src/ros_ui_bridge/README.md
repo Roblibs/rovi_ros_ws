@@ -52,11 +52,19 @@ See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/
 Configuration is organized under `streams:`:
 
 - `streams.status` — status stream rate and rate metrics to track
-- `streams.robot_state` — pose/wheel stream rate cap, topics, frames, wheel joints
-- `streams.lidar` — lidar stream rate cap, input/output topics, frame_id (optional; omit to disable)
+- `streams.robot_state` — pose/wheel stream downsampling (optional), topics, frames, wheel joints
+- `streams.lidar` — lidar stream downsampling (optional), input/output topics, frame_id (optional; omit to disable)
 - `robot_model` — GLB path and chunk size
 
-All stream rates use "capped downsampling": data is forwarded on arrival if the rate cap allows, otherwise forwarded on the next timer tick. No stale data is ever duplicated.
+Robot state / lidar / map support optional downsampling via either:
+- `downsampling_rate_hz` (preferred)
+- `downsampling_period_s` (preferred)
+
+For backward compatibility, older `rate_hz` / `period_s` keys still work.
+
+If neither downsampling key is provided, no downsampling is applied (forward 1:1).
+
+When downsampling is enabled, the behavior is "capped downsampling": data is forwarded on arrival if the rate cap allows, otherwise forwarded on the next timer tick. No stale data is ever duplicated.
 
 The lidar stream also republishes throttled scans to `output_topic` (default `/viz/scan`) for RViz visualization.
 

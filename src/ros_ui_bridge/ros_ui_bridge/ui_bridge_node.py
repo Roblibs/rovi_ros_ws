@@ -165,7 +165,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         map_frame=cfg.robot_state_stream.map_frame,
         wheel_joint_names=cfg.robot_state_stream.wheel_joint_names,
         map_tf_max_age_s=cfg.robot_state_stream.map_tf_max_age_s,
-        period_s=cfg.robot_state_stream.period_s,
+        downsampling_period_s=cfg.robot_state_stream.downsampling_period_s,
         grpc_broadcaster=robot_state_broadcaster,
     )
 
@@ -176,7 +176,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             input_topic=cfg.lidar_stream.topic,
             output_topic=cfg.lidar_stream.output_topic,
             frame_id=cfg.lidar_stream.frame_id,
-            period_s=cfg.lidar_stream.period_s,
+            downsampling_period_s=cfg.lidar_stream.downsampling_period_s,
             grpc_broadcaster=lidar_broadcaster,
         )
 
@@ -185,7 +185,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         map_broadcaster = AsyncStreamBroadcaster()
         map_node = UiBridgeMapNode(
             topic=cfg.map_stream.topic,
-            period_s=cfg.map_stream.period_s,
+            downsampling_period_s=cfg.map_stream.downsampling_period_s,
             grpc_broadcaster=map_broadcaster,
         )
 

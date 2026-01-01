@@ -117,7 +117,7 @@ class UiBridgeMapNode(Node):
         self,
         *,
         topic: str,
-        period_s: float,
+        downsampling_period_s: float | None,
         grpc_broadcaster: AsyncStreamBroadcaster[MapData],
     ) -> None:
         super().__init__('ui_bridge_map')
@@ -125,10 +125,14 @@ class UiBridgeMapNode(Node):
         self._topic = self.resolve_topic_name(str(topic))
         self._grpc_broadcaster = grpc_broadcaster
 
-        self._forwarder: ThrottledForwarder[OccupancyGrid] = ThrottledForwarder(
-            period_s=period_s,
-            on_forward=self._on_forward,
-        )
+        self._forwarder: ThrottledForwarder[OccupancyGrid] | None
+        if downsampling_period_s is not None and float(downsampling_period_s) > 0:
+            self._forwarder = ThrottledForwarder(
+                period_s=float(downsampling_period_s),
+                on_forward=self._on_forward,
+            )
+        else:
+            self._forwarder = None
 
         qos_map = QoSProfile(
             depth=1,
@@ -137,15 +141,24 @@ class UiBridgeMapNode(Node):
         )
 
         self._sub = self.create_subscription(OccupancyGrid, self._topic, self._on_map, qos_map)
-        self._timer = self.create_timer(period_s, self._on_timer)
 
-        self.get_logger().info(f"Map stream: {self._topic} @ {1.0/period_s:.2f} Hz cap")
+        self._timer = None
+        if self._forwarder is not None:
+            period_s = self._forwarder.period_s
+            self._timer = self.create_timer(period_s, self._on_timer)
+            self.get_logger().info(f"Map downsampling: {self._topic} @ {1.0/period_s:.2f} Hz cap")
+        else:
+            self.get_logger().info(f"Map downsampling: {self._topic} disabled (forward every update)")
 
     def _on_map(self, msg: OccupancyGrid) -> None:
-        self._forwarder.on_input(msg)
+        if self._forwarder is None:
+            self._on_forward(msg)
+        else:
+            self._forwarder.on_input(msg)
 
     def _on_timer(self) -> None:
-        self._forwarder.on_timer()
+        if self._forwarder is not None:
+            self._forwarder.on_timer()
 
     def _on_forward(self, msg: OccupancyGrid) -> None:
         frame_id = _normalize_frame(msg.header.frame_id) if msg.header.frame_id else ''

@@ -44,7 +44,7 @@ class UiBridgeLidarNode(Node):
         input_topic: str,
         output_topic: str,
         frame_id: str,
-        period_s: float,
+        downsampling_period_s: float | None,
         grpc_broadcaster: AsyncStreamBroadcaster[LidarScanData],
     ) -> None:
         super().__init__('ui_bridge_lidar')
@@ -54,11 +54,15 @@ class UiBridgeLidarNode(Node):
         self._frame_id = _normalize_frame(str(frame_id))
         self._grpc_broadcaster = grpc_broadcaster
 
-        # Throttled forwarder: on forward, republish to ROS + notify gRPC
-        self._forwarder: ThrottledForwarder[LaserScan] = ThrottledForwarder(
-            period_s=period_s,
-            on_forward=self._on_forward,
-        )
+        self._forwarder: ThrottledForwarder[LaserScan] | None
+        if downsampling_period_s is not None and float(downsampling_period_s) > 0:
+            # Throttled forwarder: on forward, republish to ROS + notify gRPC
+            self._forwarder = ThrottledForwarder(
+                period_s=float(downsampling_period_s),
+                on_forward=self._on_forward,
+            )
+        else:
+            self._forwarder = None
 
         qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
@@ -71,12 +75,17 @@ class UiBridgeLidarNode(Node):
         self._scan_pub = self.create_publisher(LaserScan, self._output_topic, qos_best_effort)
 
         # Timer for throttle (fires at period to check for pending)
-        timer_period_s = period_s
-        self._timer = self.create_timer(timer_period_s, self._on_timer)
-
-        self.get_logger().info(
-            f"Lidar throttle: {self._input_topic} -> {self._output_topic} @ {1.0/period_s:.1f} Hz cap"
-        )
+        self._timer = None
+        if self._forwarder is not None:
+            period_s = self._forwarder.period_s
+            self._timer = self.create_timer(period_s, self._on_timer)
+            self.get_logger().info(
+                f"Lidar downsampling: {self._input_topic} -> {self._output_topic} @ {1.0/period_s:.1f} Hz cap"
+            )
+        else:
+            self.get_logger().info(
+                f"Lidar downsampling: {self._input_topic} -> {self._output_topic} disabled (forward all scans)"
+            )
 
     @property
     def frame_id(self) -> str:
@@ -84,11 +93,15 @@ class UiBridgeLidarNode(Node):
 
     def _on_scan(self, msg: LaserScan) -> None:
         """Called on every incoming scan. Passes to throttler."""
-        self._forwarder.on_input(msg)
+        if self._forwarder is None:
+            self._on_forward(msg)
+        else:
+            self._forwarder.on_input(msg)
 
     def _on_timer(self) -> None:
         """Called periodically. Lets throttler send pending if any."""
-        self._forwarder.on_timer()
+        if self._forwarder is not None:
+            self._forwarder.on_timer()
 
     def _on_forward(self, msg: LaserScan) -> None:
         """Called by throttler when it's time to forward a scan."""

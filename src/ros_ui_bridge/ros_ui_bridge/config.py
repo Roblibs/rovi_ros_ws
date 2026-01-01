@@ -7,6 +7,40 @@ from typing import Any, Optional
 from ament_index_python.packages import get_package_share_directory
 
 
+def _parse_downsampling_period_s(section: dict[str, Any]) -> Optional[float]:
+    """Parse downsampling period from config.
+
+    Supported keys (in precedence order):
+    - downsampling_period_s
+    - downsampling_rate_hz
+    - period_s (legacy)
+    - rate_hz (legacy)
+
+    If no keys are provided or if the provided values are <= 0, returns None
+    meaning "no downsampling" (forward 1:1).
+    """
+    period_s = section.get('downsampling_period_s')
+    rate_hz = section.get('downsampling_rate_hz')
+    if period_s is None and rate_hz is None:
+        # Backward compatibility with older configs.
+        period_s = section.get('period_s')
+        rate_hz = section.get('rate_hz')
+
+    if period_s is not None:
+        val = float(period_s)
+        if val > 0:
+            return val
+        return None
+
+    if rate_hz is not None:
+        val = float(rate_hz)
+        if val > 0:
+            return 1.0 / val
+        return None
+
+    return None
+
+
 def _parse_rate_or_period(section: dict[str, Any], default_rate_hz: float) -> float:
     """Parse rate_hz or period_s from config, return period in seconds.
     
@@ -59,7 +93,7 @@ class StatusStreamConfig:
 
 @dataclass(frozen=True)
 class RobotStateStreamConfig:
-    period_s: float  # Max rate cap (forward on arrival, capped)
+    downsampling_period_s: float | None  # Optional max rate cap (forward on arrival, capped)
     odom_topic: str
     joint_states_topic: str
     odom_frame: str
@@ -71,7 +105,7 @@ class RobotStateStreamConfig:
 
 @dataclass(frozen=True)
 class LidarStreamConfig:
-    period_s: float  # Max rate cap (forward on arrival, capped)
+    downsampling_period_s: float | None  # Optional max rate cap (forward on arrival, capped)
     topic: str
     output_topic: str  # ROS republish destination
     frame_id: str
@@ -79,7 +113,7 @@ class LidarStreamConfig:
 
 @dataclass(frozen=True)
 class MapStreamConfig:
-    period_s: float  # Max rate cap (forward on arrival, capped)
+    downsampling_period_s: float | None  # Optional max rate cap (forward on arrival, capped)
     topic: str
 
 
@@ -245,7 +279,7 @@ def _parse_status_stream(value: Any) -> StatusStreamConfig:
 def _parse_robot_state_stream(value: Any) -> RobotStateStreamConfig:
     section = value if isinstance(value, dict) else {}
 
-    period_s = _parse_rate_or_period(section, default_rate_hz=10.0)  # 10 Hz cap default
+    downsampling_period_s = _parse_downsampling_period_s(section)
 
     odom_topic = str(section.get('odom_topic', '/odom_raw'))
     joint_states_topic = str(section.get('joint_states_topic', '/joint_states'))
@@ -269,7 +303,7 @@ def _parse_robot_state_stream(value: Any) -> RobotStateStreamConfig:
         raise RuntimeError("Invalid 'streams.robot_state.wheel_joint_names' (expected list)")
 
     return RobotStateStreamConfig(
-        period_s=period_s,
+        downsampling_period_s=downsampling_period_s,
         odom_topic=odom_topic,
         joint_states_topic=joint_states_topic,
         odom_frame=odom_frame,
@@ -286,9 +320,9 @@ def _parse_map_stream(value: Any) -> Optional[MapStreamConfig]:
     if not isinstance(value, dict):
         raise RuntimeError("Invalid 'streams.map' section (expected mapping)")
 
-    period_s = _parse_rate_or_period(value, default_rate_hz=0.5)  # 0.5 Hz cap default
+    downsampling_period_s = _parse_downsampling_period_s(value)
     topic = str(value.get('topic', '/map'))
-    return MapStreamConfig(period_s=period_s, topic=topic)
+    return MapStreamConfig(downsampling_period_s=downsampling_period_s, topic=topic)
 
 
 def _parse_lidar_stream(value: Any) -> Optional[LidarStreamConfig]:
@@ -298,14 +332,14 @@ def _parse_lidar_stream(value: Any) -> Optional[LidarStreamConfig]:
         raise RuntimeError("Invalid 'streams.lidar' section (expected mapping)")
 
     section = value
-    period_s = _parse_rate_or_period(section, default_rate_hz=2.0)  # 2 Hz cap default
+    downsampling_period_s = _parse_downsampling_period_s(section)
 
     topic = str(section.get('topic', '/scan'))
     output_topic = str(section.get('output_topic', '/viz/scan'))
     frame_id = str(section.get('frame_id', 'laser_link'))
 
     return LidarStreamConfig(
-        period_s=period_s,
+        downsampling_period_s=downsampling_period_s,
         topic=topic,
         output_topic=output_topic,
         frame_id=frame_id,

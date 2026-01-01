@@ -113,7 +113,7 @@ class UiBridgeRobotStateNode(Node):
         map_frame: str,
         wheel_joint_names: list[str],
         map_tf_max_age_s: float,
-        period_s: float,
+        downsampling_period_s: float | None,
         grpc_broadcaster: AsyncStreamBroadcaster[RobotStateData],
     ) -> None:
         super().__init__('ui_bridge_robot_state')
@@ -143,11 +143,15 @@ class UiBridgeRobotStateNode(Node):
         self._wheel_positions: dict[str, float] = {}
         self._map_to_odom: Optional[_TransformSnapshot] = None
 
-        # Throttled forwarder for odom updates
-        self._forwarder: ThrottledForwarder[RobotStateData] = ThrottledForwarder(
-            period_s=period_s,
-            on_forward=self._on_forward,
-        )
+        self._forwarder: ThrottledForwarder[RobotStateData] | None
+        if downsampling_period_s is not None and float(downsampling_period_s) > 0:
+            # Throttled forwarder for odom updates
+            self._forwarder = ThrottledForwarder(
+                period_s=float(downsampling_period_s),
+                on_forward=self._on_forward,
+            )
+        else:
+            self._forwarder = None
 
         qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
@@ -155,10 +159,14 @@ class UiBridgeRobotStateNode(Node):
         self._joint_sub = self.create_subscription(JointState, self._joint_states_topic, self._on_joint_state, qos_best_effort)
         self._tf_sub = self.create_subscription(TFMessage, '/tf', self._on_tf, qos_best_effort)
 
-        # Timer for throttle
-        self._timer = self.create_timer(period_s, self._on_timer)
-
-        self.get_logger().info(f"Robot state throttle: {1.0/period_s:.1f} Hz cap")
+        # Timer for throttle (only when downsampling is enabled)
+        self._timer = None
+        if self._forwarder is not None:
+            period_s = self._forwarder.period_s
+            self._timer = self.create_timer(period_s, self._on_timer)
+            self.get_logger().info(f"Robot state downsampling: {1.0/period_s:.1f} Hz cap")
+        else:
+            self.get_logger().info("Robot state downsampling: disabled (forward on every odom)")
 
     @property
     def odom_frame(self) -> str:
@@ -196,10 +204,13 @@ class UiBridgeRobotStateNode(Node):
             self._have_odom = True
             self._odom_pose = snap
 
-        # Build current state and pass to throttler
+        # Build current state and forward (throttled if enabled)
         state = self._build_state()
         if state is not None:
-            self._forwarder.on_input(state)
+            if self._forwarder is None:
+                self._grpc_broadcaster.publish_sync(state)
+            else:
+                self._forwarder.on_input(state)
 
     def _on_joint_state(self, msg: JointState) -> None:
         if not msg.name or not msg.position:
@@ -238,7 +249,8 @@ class UiBridgeRobotStateNode(Node):
 
     def _on_timer(self) -> None:
         """Called periodically. Lets throttler send pending if any."""
-        self._forwarder.on_timer()
+        if self._forwarder is not None:
+            self._forwarder.on_timer()
 
     def _on_forward(self, state: RobotStateData) -> None:
         """Called by throttler when it's time to forward state."""
