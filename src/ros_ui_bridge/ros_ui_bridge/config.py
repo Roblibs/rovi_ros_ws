@@ -78,12 +78,19 @@ class LidarStreamConfig:
 
 
 @dataclass(frozen=True)
+class MapStreamConfig:
+    period_s: float  # Max rate cap (forward on arrival, capped)
+    topic: str
+
+
+@dataclass(frozen=True)
 class UiBridgeConfig:
     grpc_bind: str
     voltage_topic: str
     status_stream: StatusStreamConfig
     robot_state_stream: RobotStateStreamConfig
     lidar_stream: Optional[LidarStreamConfig]
+    map_stream: Optional[MapStreamConfig]
     robot_model: RobotModelConfig
 
 
@@ -126,6 +133,7 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
     status_stream_cfg = _parse_status_stream(streams.get('status'))
     robot_state_cfg = _parse_robot_state_stream(streams.get('robot_state'))
     lidar_cfg = _parse_lidar_stream(streams.get('lidar'))
+    map_cfg = _parse_map_stream(streams.get('map'))
     robot_model_cfg = _parse_robot_model(robot_model)
 
     return UiBridgeConfig(
@@ -134,6 +142,7 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
         status_stream=status_stream_cfg,
         robot_state_stream=robot_state_cfg,
         lidar_stream=lidar_cfg,
+        map_stream=map_cfg,
         robot_model=robot_model_cfg,
     )
 
@@ -269,6 +278,17 @@ def _parse_robot_state_stream(value: Any) -> RobotStateStreamConfig:
         wheel_joint_names=wheel_joint_names,
         map_tf_max_age_s=map_tf_max_age_s,
     )
+
+
+def _parse_map_stream(value: Any) -> Optional[MapStreamConfig]:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise RuntimeError("Invalid 'streams.map' section (expected mapping)")
+
+    period_s = _parse_rate_or_period(value, default_rate_hz=0.5)  # 0.5 Hz cap default
+    topic = str(value.get('topic', '/map'))
+    return MapStreamConfig(period_s=period_s, topic=topic)
 
 
 def _parse_lidar_stream(value: Any) -> Optional[LidarStreamConfig]:

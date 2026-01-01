@@ -18,6 +18,7 @@ from .api import ui_bridge_pb2_grpc
 from .config import UiBridgeConfig, load_config
 from .grpc_gateway import UiBridgeService
 from .lidar_node import LidarScanData, UiBridgeLidarNode
+from .map_node import MapData, UiBridgeMapNode
 from .robot_model_provider import RobotModelProvider
 from .robot_state_node import RobotStateData, UiBridgeRobotStateNode
 from .ros_metrics_node import UiBridgeRosNode
@@ -76,6 +77,7 @@ async def _run_async(
     ros_node: UiBridgeRosNode,
     robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
     lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
+    map_broadcaster: Optional[AsyncStreamBroadcaster[MapData]],
     logger,
 ) -> None:
     stop_event = asyncio.Event()
@@ -95,6 +97,7 @@ async def _run_async(
         status_broadcaster=status_broadcaster,
         robot_state_broadcaster=robot_state_broadcaster,
         lidar_broadcaster=lidar_broadcaster,
+        map_broadcaster=map_broadcaster,
         model_provider=model_provider,
         model_chunk_size_bytes=cfg.robot_model.chunk_size_bytes,
         odom_frame=cfg.robot_state_stream.odom_frame,
@@ -144,6 +147,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     # Create broadcasters for queue-based gRPC streaming
     robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData] = AsyncStreamBroadcaster()
     lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]] = None
+    map_broadcaster: Optional[AsyncStreamBroadcaster[MapData]] = None
 
     state_node = UiBridgeRobotStateNode(
         odom_topic=cfg.robot_state_stream.odom_topic,
@@ -168,11 +172,22 @@ def main(argv: Optional[list[str]] = None) -> None:
             grpc_broadcaster=lidar_broadcaster,
         )
 
+    map_node: Optional[UiBridgeMapNode] = None
+    if cfg.map_stream is not None:
+        map_broadcaster = AsyncStreamBroadcaster()
+        map_node = UiBridgeMapNode(
+            topic=cfg.map_stream.topic,
+            period_s=cfg.map_stream.period_s,
+            grpc_broadcaster=map_broadcaster,
+        )
+
     executor = SingleThreadedExecutor()
     executor.add_node(ros_node)
     executor.add_node(state_node)
     if lidar_node is not None:
         executor.add_node(lidar_node)
+    if map_node is not None:
+        executor.add_node(map_node)
 
     spin_thread = threading.Thread(target=executor.spin, name='ros_ui_bridge_ros_spin', daemon=True)
     spin_thread.start()
@@ -189,6 +204,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     ros_node=ros_node,
                     robot_state_broadcaster=robot_state_broadcaster,
                     lidar_broadcaster=lidar_broadcaster,
+                    map_broadcaster=map_broadcaster,
                     logger=logger,
                 )
             )
@@ -213,6 +229,12 @@ def main(argv: Optional[list[str]] = None) -> None:
         if lidar_node is not None:
             try:
                 lidar_node.destroy_node()
+            except Exception:
+                pass
+
+        if map_node is not None:
+            try:
+                map_node.destroy_node()
             except Exception:
                 pass
 

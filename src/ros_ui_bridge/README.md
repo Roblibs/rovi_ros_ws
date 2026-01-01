@@ -11,6 +11,7 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 | Periodic status snapshots (CPU, voltage, configurable rate metrics) | `GetStatus` | Low-rate stream (~0.3 Hz default) for UI dashboards. |
 | Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Always emits `pose_odom`; emits `pose_map` when `map->odom` is available. |
 | Downsampled lidar scans for 3D visualization | `StreamLidar` | Low-rate (2 Hz default) LaserScan stream; optional. |
+| Occupancy grid map (`/map`) as an encoded image | `StreamMap` | Grayscale PNG stream (0=occupied, 255=free, 127=unknown); optional. |
 | Robot model metadata (cache key / sha256, size) | `GetRobotModelMeta` | Use this as an ETag-like key to decide whether to refresh cached assets. |
 | Robot model asset (GLB / binary glTF) | `GetRobotModel` | Chunked stream to avoid gRPC message size limits. |
 

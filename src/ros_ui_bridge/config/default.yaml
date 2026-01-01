@@ -26,7 +26,7 @@ streams:
         target_hz: 50
 
   robot_state:
-    rate_hz: 10.0
+    rate_hz: 100.0
     odom_topic: "/odom_raw"
     joint_states_topic: "/joint_states"
     odom_frame: "odom"
@@ -44,6 +44,10 @@ streams:
     topic: "/scan"
     output_topic: "/viz/scan"  # Throttled scan for RViz
     frame_id: "laser_link"
+
+  map:
+    rate_hz: 0.5
+    topic: "/map"
 
 robot_model:
   # Path to a pre-generated GLB (binary glTF). Examples:

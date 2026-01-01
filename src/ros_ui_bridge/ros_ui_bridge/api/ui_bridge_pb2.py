@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fui_bridge.proto\x12\x14roblibs.ui_bridge.v1\"\x0f\n\rStatusRequest\"\x13\n\x11RobotStateRequest\"\x0e\n\x0cLidarRequest\"\x13\n\x11RobotModelRequest\"C\n\nRateMetric\x12\n\n\x02id\x18\x01 \x01(\t\x12\n\n\x02hz\x18\x02 \x01(\x02\x12\x13\n\ttarget_hz\x18\x03 \x01(\x02H\x00\x42\x08\n\x06target\"\x9c\x01\n\x0cStatusUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x13\n\x0b\x63pu_percent\x18\x03 \x01(\x02\x12\x13\n\tvoltage_v\x18\x04 \x01(\x02H\x00\x12/\n\x05rates\x18\x05 \x03(\x0b\x32 .roblibs.ui_bridge.v1.RateMetricB\t\n\x07voltage\"k\n\x06Pose3D\x12\x10\n\x08\x66rame_id\x18\x01 \x01(\t\x12\t\n\x01x\x18\x02 \x01(\x01\x12\t\n\x01y\x18\x03 \x01(\x01\x12\t\n\x01z\x18\x04 \x01(\x01\x12\n\n\x02qx\x18\x05 \x01(\x01\x12\n\n\x02qy\x18\x06 \x01(\x01\x12\n\n\x02qz\x18\x07 \x01(\x01\x12\n\n\x02qw\x18\x08 \x01(\x01\"6\n\nJointAngle\x12\x12\n\njoint_name\x18\x01 \x01(\t\x12\x14\n\x0cposition_rad\x18\x02 \x01(\x01\"\xe1\x01\n\x10RobotStateUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12/\n\tpose_odom\x18\x03 \x01(\x0b\x32\x1c.roblibs.ui_bridge.v1.Pose3D\x12\x30\n\x08pose_map\x18\x04 \x01(\x0b\x32\x1c.roblibs.ui_bridge.v1.Pose3DH\x00\x12\x36\n\x0cwheel_angles\x18\x05 \x03(\x0b\x32 .roblibs.ui_bridge.v1.JointAngleB\n\n\x08map_pose\"\x8a\x01\n\x0eRobotModelMeta\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x04\x12\x19\n\x11wheel_joint_names\x18\x03 \x03(\t\x12\x12\n\nodom_frame\x18\x04 \x01(\t\x12\x12\n\nbase_frame\x18\x05 \x01(\t\x12\x11\n\tmap_frame\x18\x06 \x01(\t\";\n\x0fRobotModelChunk\x12\r\n\x05\x63hunk\x18\x02 \x01(\x0c\x12\x13\n\x0b\x63hunk_index\x18\x03 \x01(\rJ\x04\x08\x01\x10\x02\"\xa9\x01\n\x0bLidarUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x10\n\x08\x66rame_id\x18\x03 \x01(\t\x12\x11\n\tangle_min\x18\x04 \x01(\x02\x12\x17\n\x0f\x61ngle_increment\x18\x05 \x01(\x02\x12\x11\n\trange_min\x18\x06 \x01(\x02\x12\x11\n\trange_max\x18\x07 \x01(\x02\x12\x0e\n\x06ranges\x18\x08 \x03(\x02\x32\xe8\x03\n\x08UiBridge\x12V\n\tGetStatus\x12#.roblibs.ui_bridge.v1.StatusRequest\x1a\".roblibs.ui_bridge.v1.StatusUpdate0\x01\x12\x65\n\x10StreamRobotState\x12\'.roblibs.ui_bridge.v1.RobotStateRequest\x1a&.roblibs.ui_bridge.v1.RobotStateUpdate0\x01\x12V\n\x0bStreamLidar\x12\".roblibs.ui_bridge.v1.LidarRequest\x1a!.roblibs.ui_bridge.v1.LidarUpdate0\x01\x12\x62\n\x11GetRobotModelMeta\x12\'.roblibs.ui_bridge.v1.RobotModelRequest\x1a$.roblibs.ui_bridge.v1.RobotModelMeta\x12\x61\n\rGetRobotModel\x12\'.roblibs.ui_bridge.v1.RobotModelRequest\x1a%.roblibs.ui_bridge.v1.RobotModelChunk0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fui_bridge.proto\x12\x14roblibs.ui_bridge.v1\"\x0f\n\rStatusRequest\"\x13\n\x11RobotStateRequest\"\x0e\n\x0cLidarRequest\"\x0c\n\nMapRequest\"\x13\n\x11RobotModelRequest\"C\n\nRateMetric\x12\n\n\x02id\x18\x01 \x01(\t\x12\n\n\x02hz\x18\x02 \x01(\x02\x12\x13\n\ttarget_hz\x18\x03 \x01(\x02H\x00\x42\x08\n\x06target\"\x9c\x01\n\x0cStatusUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x13\n\x0b\x63pu_percent\x18\x03 \x01(\x02\x12\x13\n\tvoltage_v\x18\x04 \x01(\x02H\x00\x12/\n\x05rates\x18\x05 \x03(\x0b\x32 .roblibs.ui_bridge.v1.RateMetricB\t\n\x07voltage\"k\n\x06Pose3D\x12\x10\n\x08\x66rame_id\x18\x01 \x01(\t\x12\t\n\x01x\x18\x02 \x01(\x01\x12\t\n\x01y\x18\x03 \x01(\x01\x12\t\n\x01z\x18\x04 \x01(\x01\x12\n\n\x02qx\x18\x05 \x01(\x01\x12\n\n\x02qy\x18\x06 \x01(\x01\x12\n\n\x02qz\x18\x07 \x01(\x01\x12\n\n\x02qw\x18\x08 \x01(\x01\"6\n\nJointAngle\x12\x12\n\njoint_name\x18\x01 \x01(\t\x12\x14\n\x0cposition_rad\x18\x02 \x01(\x01\"\xe1\x01\n\x10RobotStateUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12/\n\tpose_odom\x18\x03 \x01(\x0b\x32\x1c.roblibs.ui_bridge.v1.Pose3D\x12\x30\n\x08pose_map\x18\x04 \x01(\x0b\x32\x1c.roblibs.ui_bridge.v1.Pose3DH\x00\x12\x36\n\x0cwheel_angles\x18\x05 \x03(\x0b\x32 .roblibs.ui_bridge.v1.JointAngleB\n\n\x08map_pose\"\x8a\x01\n\x0eRobotModelMeta\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x04\x12\x19\n\x11wheel_joint_names\x18\x03 \x03(\t\x12\x12\n\nodom_frame\x18\x04 \x01(\t\x12\x12\n\nbase_frame\x18\x05 \x01(\t\x12\x11\n\tmap_frame\x18\x06 \x01(\t\";\n\x0fRobotModelChunk\x12\r\n\x05\x63hunk\x18\x02 \x01(\x0c\x12\x13\n\x0b\x63hunk_index\x18\x03 \x01(\rJ\x04\x08\x01\x10\x02\"\xa9\x01\n\x0bLidarUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x10\n\x08\x66rame_id\x18\x03 \x01(\t\x12\x11\n\tangle_min\x18\x04 \x01(\x02\x12\x17\n\x0f\x61ngle_increment\x18\x05 \x01(\x02\x12\x11\n\trange_min\x18\x06 \x01(\x02\x12\x11\n\trange_max\x18\x07 \x01(\x02\x12\x0e\n\x06ranges\x18\x08 \x03(\x02\"\xbc\x01\n\tMapUpdate\x12\x19\n\x11timestamp_unix_ms\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12\x10\n\x08\x66rame_id\x18\x03 \x01(\t\x12\x1b\n\x13resolution_m_per_px\x18\x04 \x01(\x02\x12\r\n\x05width\x18\x05 \x01(\r\x12\x0e\n\x06height\x18\x06 \x01(\r\x12,\n\x06origin\x18\x07 \x01(\x0b\x32\x1c.roblibs.ui_bridge.v1.Pose3D\x12\x0b\n\x03png\x18\x08 \x01(\x0c\x32\xba\x04\n\x08UiBridge\x12V\n\tGetStatus\x12#.roblibs.ui_bridge.v1.StatusRequest\x1a\".roblibs.ui_bridge.v1.StatusUpdate0\x01\x12\x65\n\x10StreamRobotState\x12\'.roblibs.ui_bridge.v1.RobotStateRequest\x1a&.roblibs.ui_bridge.v1.RobotStateUpdate0\x01\x12V\n\x0bStreamLidar\x12\".roblibs.ui_bridge.v1.LidarRequest\x1a!.roblibs.ui_bridge.v1.LidarUpdate0\x01\x12P\n\tStreamMap\x12 .roblibs.ui_bridge.v1.MapRequest\x1a\x1f.roblibs.ui_bridge.v1.MapUpdate0\x01\x12\x62\n\x11GetRobotModelMeta\x12\'.roblibs.ui_bridge.v1.RobotModelRequest\x1a$.roblibs.ui_bridge.v1.RobotModelMeta\x12\x61\n\rGetRobotModel\x12\'.roblibs.ui_bridge.v1.RobotModelRequest\x1a%.roblibs.ui_bridge.v1.RobotModelChunk0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,24 +37,28 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ROBOTSTATEREQUEST']._serialized_end=77
   _globals['_LIDARREQUEST']._serialized_start=79
   _globals['_LIDARREQUEST']._serialized_end=93
-  _globals['_ROBOTMODELREQUEST']._serialized_start=95
-  _globals['_ROBOTMODELREQUEST']._serialized_end=114
-  _globals['_RATEMETRIC']._serialized_start=116
-  _globals['_RATEMETRIC']._serialized_end=183
-  _globals['_STATUSUPDATE']._serialized_start=186
-  _globals['_STATUSUPDATE']._serialized_end=342
-  _globals['_POSE3D']._serialized_start=344
-  _globals['_POSE3D']._serialized_end=451
-  _globals['_JOINTANGLE']._serialized_start=453
-  _globals['_JOINTANGLE']._serialized_end=507
-  _globals['_ROBOTSTATEUPDATE']._serialized_start=510
-  _globals['_ROBOTSTATEUPDATE']._serialized_end=735
-  _globals['_ROBOTMODELMETA']._serialized_start=738
-  _globals['_ROBOTMODELMETA']._serialized_end=876
-  _globals['_ROBOTMODELCHUNK']._serialized_start=878
-  _globals['_ROBOTMODELCHUNK']._serialized_end=937
-  _globals['_LIDARUPDATE']._serialized_start=940
-  _globals['_LIDARUPDATE']._serialized_end=1109
-  _globals['_UIBRIDGE']._serialized_start=1112
-  _globals['_UIBRIDGE']._serialized_end=1600
+  _globals['_MAPREQUEST']._serialized_start=95
+  _globals['_MAPREQUEST']._serialized_end=107
+  _globals['_ROBOTMODELREQUEST']._serialized_start=109
+  _globals['_ROBOTMODELREQUEST']._serialized_end=128
+  _globals['_RATEMETRIC']._serialized_start=130
+  _globals['_RATEMETRIC']._serialized_end=197
+  _globals['_STATUSUPDATE']._serialized_start=200
+  _globals['_STATUSUPDATE']._serialized_end=356
+  _globals['_POSE3D']._serialized_start=358
+  _globals['_POSE3D']._serialized_end=465
+  _globals['_JOINTANGLE']._serialized_start=467
+  _globals['_JOINTANGLE']._serialized_end=521
+  _globals['_ROBOTSTATEUPDATE']._serialized_start=524
+  _globals['_ROBOTSTATEUPDATE']._serialized_end=749
+  _globals['_ROBOTMODELMETA']._serialized_start=752
+  _globals['_ROBOTMODELMETA']._serialized_end=890
+  _globals['_ROBOTMODELCHUNK']._serialized_start=892
+  _globals['_ROBOTMODELCHUNK']._serialized_end=951
+  _globals['_LIDARUPDATE']._serialized_start=954
+  _globals['_LIDARUPDATE']._serialized_end=1123
+  _globals['_MAPUPDATE']._serialized_start=1126
+  _globals['_MAPUPDATE']._serialized_end=1314
+  _globals['_UIBRIDGE']._serialized_start=1317
+  _globals['_UIBRIDGE']._serialized_end=1887
 # @@protoc_insertion_point(module_scope)

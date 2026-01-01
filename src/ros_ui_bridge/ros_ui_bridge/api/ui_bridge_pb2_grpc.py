@@ -49,6 +49,11 @@ class UiBridgeStub(object):
                 request_serializer=ui__bridge__pb2.LidarRequest.SerializeToString,
                 response_deserializer=ui__bridge__pb2.LidarUpdate.FromString,
                 _registered_method=True)
+        self.StreamMap = channel.unary_stream(
+                '/roblibs.ui_bridge.v1.UiBridge/StreamMap',
+                request_serializer=ui__bridge__pb2.MapRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.MapUpdate.FromString,
+                _registered_method=True)
         self.GetRobotModelMeta = channel.unary_unary(
                 '/roblibs.ui_bridge.v1.UiBridge/GetRobotModelMeta',
                 request_serializer=ui__bridge__pb2.RobotModelRequest.SerializeToString,
@@ -85,6 +90,13 @@ class UiBridgeServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StreamMap(self, request, context):
+        """Streams an encoded occupancy grid map suitable for UI rendering.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetRobotModelMeta(self, request, context):
         """Returns metadata for the current robot model (no GLB bytes).
         """
@@ -116,6 +128,11 @@ def add_UiBridgeServicer_to_server(servicer, server):
                     servicer.StreamLidar,
                     request_deserializer=ui__bridge__pb2.LidarRequest.FromString,
                     response_serializer=ui__bridge__pb2.LidarUpdate.SerializeToString,
+            ),
+            'StreamMap': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamMap,
+                    request_deserializer=ui__bridge__pb2.MapRequest.FromString,
+                    response_serializer=ui__bridge__pb2.MapUpdate.SerializeToString,
             ),
             'GetRobotModelMeta': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRobotModelMeta,
@@ -209,6 +226,33 @@ class UiBridge(object):
             '/roblibs.ui_bridge.v1.UiBridge/StreamLidar',
             ui__bridge__pb2.LidarRequest.SerializeToString,
             ui__bridge__pb2.LidarUpdate.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamMap(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/StreamMap',
+            ui__bridge__pb2.MapRequest.SerializeToString,
+            ui__bridge__pb2.MapUpdate.FromString,
             options,
             channel_credentials,
             insecure,

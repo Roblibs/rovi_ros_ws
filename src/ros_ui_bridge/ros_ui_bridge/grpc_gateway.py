@@ -13,6 +13,7 @@ import grpc
 
 from .api import ui_bridge_pb2, ui_bridge_pb2_grpc
 from .lidar_node import LidarScanData
+from .map_node import MapData
 from .robot_model_provider import RobotModelProvider
 from .robot_state_node import JointAngleSnapshot, PoseSnapshot, RobotStateData
 from .status_store import RateMetricSnapshot, SnapshotBroadcaster, StatusSnapshot
@@ -28,6 +29,7 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         status_broadcaster: SnapshotBroadcaster,
         robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
         lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
+        map_broadcaster: Optional[AsyncStreamBroadcaster[MapData]],
         model_provider: RobotModelProvider,
         model_chunk_size_bytes: int,
         odom_frame: str,
@@ -38,6 +40,7 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         self._status_broadcaster = status_broadcaster
         self._robot_state_broadcaster = robot_state_broadcaster
         self._lidar_broadcaster = lidar_broadcaster
+        self._map_broadcaster = map_broadcaster
         self._model_provider = model_provider
         self._model_chunk_size_bytes = int(model_chunk_size_bytes)
         self._odom_frame = str(odom_frame)
@@ -99,6 +102,25 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
                 return
             seq += 1
             yield _lidar_to_proto(scan, seq)
+
+    async def StreamMap(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.MapRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> AsyncIterator[ui_bridge_pb2.MapUpdate]:
+        """Stream map updates. Queue-based, no stale data on subscribe."""
+        del request
+
+        if self._map_broadcaster is None:
+            await context.abort(grpc.StatusCode.UNAVAILABLE, "Map stream not configured")
+            return
+
+        seq = 0
+        async for m in self._map_broadcaster.subscribe():
+            if context.cancelled():
+                return
+            seq += 1
+            yield _map_to_proto(m, seq)
 
     async def GetRobotModelMeta(  # noqa: N802 - gRPC interface name
         self,
@@ -223,4 +245,26 @@ def _lidar_to_proto(scan: LidarScanData, seq: int) -> ui_bridge_pb2.LidarUpdate:
         range_min=float(scan.range_min),
         range_max=float(scan.range_max),
         ranges=list(scan.ranges),
+    )
+
+
+def _map_to_proto(m: MapData, seq: int) -> ui_bridge_pb2.MapUpdate:
+    return ui_bridge_pb2.MapUpdate(
+        timestamp_unix_ms=m.timestamp_ms,
+        seq=seq,
+        frame_id=m.frame_id,
+        resolution_m_per_px=float(m.resolution_m_per_px),
+        width=int(m.width),
+        height=int(m.height),
+        origin=ui_bridge_pb2.Pose3D(
+            frame_id=m.frame_id,
+            x=float(m.origin.x),
+            y=float(m.origin.y),
+            z=float(m.origin.z),
+            qx=float(m.origin.qx),
+            qy=float(m.origin.qy),
+            qz=float(m.origin.qz),
+            qw=float(m.origin.qw),
+        ),
+        png=bytes(m.png),
     )

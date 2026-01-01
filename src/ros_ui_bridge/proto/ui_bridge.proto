@@ -12,6 +12,9 @@ service UiBridge {
   // Streams downsampled lidar scans for 3D visualization.
   rpc StreamLidar(LidarRequest) returns (stream LidarUpdate);
 
+  // Streams an encoded occupancy grid map suitable for UI rendering.
+  rpc StreamMap(MapRequest) returns (stream MapUpdate);
+
   // Returns metadata for the current robot model (no GLB bytes).
   rpc GetRobotModelMeta(RobotModelRequest) returns (RobotModelMeta);
 
@@ -24,6 +27,8 @@ message StatusRequest {}
 message RobotStateRequest {}
 
 message LidarRequest {}
+
+message MapRequest {}
 
 message RobotModelRequest {}
 
@@ -150,4 +155,29 @@ message LidarUpdate {
   // Range data in meters. Length = floor((angle_max - angle_min) / angle_increment) + 1.
   // Invalid readings are represented as Inf (no return) or values outside [range_min, range_max].
   repeated float ranges = 8;
+}
+
+message MapUpdate {
+  // Unix epoch time in milliseconds when this snapshot was produced.
+  int64 timestamp_unix_ms = 1;
+
+  // Monotonic snapshot sequence number (starts at 1).
+  uint64 seq = 2;
+
+  // Frame in which the map is expressed (typically "map").
+  string frame_id = 3;
+
+  // Map resolution (meters per pixel).
+  float resolution_m_per_px = 4;
+
+  // Map dimensions in pixels.
+  uint32 width = 5;
+  uint32 height = 6;
+
+  // Origin pose of the map.
+  Pose3D origin = 7;
+
+  // Grayscale PNG-encoded occupancy image.
+  // Convention: 0=occupied, 255=free, 127=unknown.
+  bytes png = 8;
 }
