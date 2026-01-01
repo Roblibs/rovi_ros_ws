@@ -156,6 +156,10 @@ view() {
   esac
 }
 
+log(){
+  ros2 run rqt_console rqt_console "$@"
+}
+
 foxglove() {
   ros2 launch foxglove_bridge foxglove_bridge_launch.xml "$@"
 }

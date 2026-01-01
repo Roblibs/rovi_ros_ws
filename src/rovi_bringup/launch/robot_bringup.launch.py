@@ -368,7 +368,6 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(LaunchConfiguration('ui_bridge_enabled')),
         package='ros_ui_bridge',
         executable='ui_bridge',
-        name='ros_ui_bridge',
         output='screen',
         arguments=['--config', LaunchConfiguration('ui_bridge_config')],
     )
