@@ -3,8 +3,8 @@ All commands in this section are provided by `rovi_env.sh`
 
 | Command | Description |
 |---|---|
-| `sim` | PC Simulation: `sim` (default mapping) or `sim teleop / mapping / nav`,...|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
-| `view` | PC view of the real robot: `view` (default `nav`) or `view teleop / mapping / nav`. Use `view offline` for local URDF inspection (no hardware). |
+| `sim` | PC simulation: `sim` (default `mapping`) or `sim teleop|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
+| `view` | PC visualization: `view` (default `nav`) or `view teleop|mapping|nav`. Use `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
@@ -48,7 +48,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-rplidar-ros` | Used by `rovi_bringup/robot_bringup.launch.py` (robot_mode=real, `lidar_enabled:=true`) to publish `/scan` for SLAM and Nav2. |
 | `ros-jazzy-ros-gz-sim` | Used by `rovi_sim/gazebo_sim.launch.py` to start Gazebo Sim and spawn the simulated robot + world. |
 | `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo topics (e.g., LiDAR + `/clock`) into ROS 2 topics like `/scan` and `/clock`. |
-| `ros-jazzy-foxglove-bridge` | Optional WebSocket bridge for Foxglove Studio (run via the `bridge` command). |
+| `ros-jazzy-foxglove-bridge` | Optional WebSocket bridge for Foxglove Studio (run via the `foxglove` command). |
 | `python3-psutil` | Used by `ros_ui_bridge` to read CPU utilization. |
 | `pyserial` | Used by `robot_serial_display` to talk to the ESP32-S3 display over USB serial. |
 | `ros-jazzy-slam-toolbox` | Used via `rovi_slam/slam_toolbox.launch.py` (included by `mapping`, `localization`, and `nav`) to publish `/map` and TF `map -> odom`. |
@@ -75,7 +75,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `nav.launch.py` | `rovi_nav` | Component launch: Nav2 servers + lifecycle manager |
 
 # Nodes
-ROS nodes started by the launches above (some are conditional based on params).
+ROS nodes started by the launches above (some are conditional based on params). For per-node notes and hardware details, see [docs/nodes.md](./nodes.md).
 
 | Node | Package | Description |
 |---|---|---|
@@ -107,7 +107,7 @@ ROS nodes started by the launches above (some are conditional based on params).
 | `serial_display` | `robot_serial_display` | Serial display client: consumes `ros_ui_bridge` gRPC status stream and pushes JSON lines to the ESP32-S3 display over USB serial. |
 
 # Params
-Only the parameters toggeling nodes activation are listed here
+Only the parameters toggling node activation are listed here.
 
 | Param | Package | Launch | Default | Explanation |
 |---|---|---|---|---|

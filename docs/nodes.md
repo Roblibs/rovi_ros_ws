@@ -1,4 +1,4 @@
-# Rosbags record play
+# Rosbags record/play
 
 `record` and `play` are lightweight helpers around `ros2 bag`.
 
@@ -46,7 +46,7 @@ All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` top
 - `robot_mode=offline`: URDF inspection (RViz default on)
 
 # rosmaster driver
-![packafe_flow](./docs/rosmaster.drawio.svg)
+![package_flow](./rosmaster.drawio.svg)
 
 | Movement | ros axis | rosmaster Axis |
 |----------|----------|----------------|
@@ -54,27 +54,29 @@ All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` top
 | left/right        | Y | -X  |
 | Rotation          | Z | Z  |
 
-MPU Axis
+MPU axis
 
-![axis](./docs/MPU9250-axis.png)
-- chip orientation : pin1 pointing to buzzer edge of rosmaster control board
-- buzzer edge of rosmaster control board : is pointing to Robot Front Left corner
+![axis](./MPU9250-axis.png)
+- Chip orientation: pin1 pointing to the buzzer edge of the rosmaster control board.
+- Buzzer edge of the rosmaster control board points to the robot front-left corner.
 
-From raw board measurement, the sensor reveals a 180° flip on its X axis 
-| Robot |IMU | ros axis |
-|-----|------|----------|
+From raw board measurement, the sensor reveals a 180° flip on its X axis.
+
+| Robot | IMU | ROS axis |
+|-------|-----|----------|
 | Right | X  | -Y |
 | Front | -Y  | X |
 | Up    | -Z  | Z |
 
-This rotation will be compensated in the driver so that output of `/imu/data_raw` imu.linear_acceleration should be as follows
-Position | axis | value |
---------|-----|----|
-|back with the front facing up | x | 9.8 |
-|on right side left facing up : | y  | 9.8 |
-|up facing up : | z | 9.8 |
+This rotation will be compensated in the driver so that output of `/imu/data_raw` `imu.linear_acceleration` should be as follows.
 
-# wheels
+| Position | Axis | Value |
+|----------|------|-------|
+| Back with the front facing up | X | 9.8 |
+| On right side, left facing up | Y | 9.8 |
+| Up facing up | Z | 9.8 |
+
+# Wheels
 
 - `ROS-Driver-Board\1.Code\Factory STM32 firmware\Rosmaster_V3.5.1\ControlBoard_Rosmaster\Source\APP\app_mecanum.h`
 - `ROS-Driver-Board\1.Code\Factory STM32 firmware\Rosmaster_V3.5.1\V3.5.1\Source\APP\app_motion.h`
@@ -113,7 +115,7 @@ typedef enum _car_type
 | Right stick up    | axis 4  | -     | move front          | axis_linear.x    | - |
 
 
-![Joystick Control](./docs/joystick_control.drawio.svg)
+![Joystick Control](./joystick_control.drawio.svg)
 
 Check your joystick before starting:
 ```bash
@@ -134,35 +136,35 @@ ros2 topic echo /cmd_vel_joy
 - Override `joy_params_file` or `teleop_params_file` if you keep custom YAMLs elsewhere.
 
 
-# ELP Stereo camera
+# ELP stereo camera
 
 ```bash
 v4l2-ctl --list-devices
 v4l2-ctl -d /dev/video0 --list-formats-ext
 ```
-see more details in [stereo camera](./docs/stereo.md)
+See more details in [stereo camera](./stereo.md).
 
 # rplidar
-where testing the rpilidar alone, it is necessary to add a transform for vosulazation
+When testing the rplidar alone, it is necessary to add a transform for visualization.
 
-Steps :
-- run the simple rplidar launch with
+Steps:
+- Run the simple rplidar launch with
 
 ```bash
 ros2 launch rplidar_ros rplidar.launch.py
 ```
-- add a transform for visualization
+- Add a transform for visualization
 ```bash
 ros2 run tf2_ros static_transform_publisher \
   0 0 0 0 0 0 \
   map laser
 ```
-- then on windows open rviz
+- Then on Windows open RViz
 ```cmd
 >ros2 run rviz2 rviz2
 ```
-- select default `map` on `Global Options/Fixed Frame` add a LaserScan and configure its topic to `/scan`
+- Select default `map` on `Global Options/Fixed Frame`, add a LaserScan, and configure its topic to `/scan`
 
-# wifi adapter
+# WiFi adapter
 * using AX1800 from BrosTrend model No.: AX4L
-* linux install doc https://linux.brostrend.com/
+* Linux install doc https://linux.brostrend.com/

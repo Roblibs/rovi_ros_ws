@@ -1,11 +1,11 @@
 # rovi_ros_ws
-ROVI is the short name of 'Room View Bot' a ROS robot platform for indoor virtual presence in Home, rooms, mostly flat ground. Rovi is based on Yahboom X3+ chassis and control board equiped with mecanum wheels, lidar depth camera and a stereo camera. Videos, Gallery and more details about the robot hardware are available on this wiki page https://homesmartmesh.github.io/robotics/room-view-bot/
+ROVI is the short name of "Room View Bot", a ROS robot platform for indoor virtual presence in homes and rooms, mostly flat ground. ROVI is based on the Yahboom X3+ chassis and control board equipped with mecanum wheels, a lidar depth camera, and a stereo camera. Videos, gallery, and more details about the robot hardware are available on this wiki page https://homesmartmesh.github.io/robotics/room-view-bot/
 
 This repo provides a ROS2 Jazzy software stack that covers multiple run modes including simulation.
 
-This project is still in development, current stage is a functional navigation witl Lidar on real robot and simulaiton.
+This project is still in development; the current stage is functional navigation with LiDAR on the real robot and in simulation.
 
-related projects:
+Related projects:
 * webapp : https://github.com/MicroWebStacks/tanstack-robot-space
 * LCD monitor firmware : https://github.com/ESP32Home/robot_serial_display
 
@@ -36,17 +36,19 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 * clone this repo under `~/dev/Roblibs/rovi_ros_ws` change it then run `uv sync`
 
-* Install all the needed depedencies ros packages
+* Install the required ROS packages
 
 ```bash
 sudo apt install -y \
+  libsdformat14 \
   ros-jazzy-joy \
   ros-jazzy-teleop-twist-joy \
   ros-jazzy-twist-mux \
+  ros-jazzy-rosbag2 \
+  ros-jazzy-rosbag2-compression-zstd \
   ros-jazzy-diagnostic-updater \
   python3-psutil \
   ros-jazzy-robot-state-publisher \
-  ros-jazzy-joint-state-publisher \
   ros-jazzy-joint-state-publisher-gui \
   ros-jazzy-rviz2 \
   ros-jazzy-foxglove-bridge \
@@ -55,9 +57,7 @@ sudo apt install -y \
   ros-jazzy-robot-localization \
   ros-jazzy-nav2-bringup \
   ros-jazzy-nav2-rviz-plugins \
-  ros-jazzy-imu-filter-madgwick \
-  ros-jazzy-ros-gz-sim \
-  ros-jazzy-ros-gz-bridge
+  ros-jazzy-imu-filter-madgwick
 ```
 
 ## Config in `~/.bashrc`
@@ -71,8 +71,8 @@ source "$ROVI_ROS_WS_DIR/rovi_env.sh"
 ```
 
 ## wsl
-When using Windows Subsystem for Linux, it is necessary to ensure the following :
-- Windwos Network: network is private, not public.
+When using Windows Subsystem for Linux, it is necessary to ensure the following:
+- Windows Network: network is private, not public.
 - WSL Settings: Networking, Networking mode 'Mirrored'
 - Firewall config :
 
@@ -84,7 +84,7 @@ New-NetFirewallRule -DisplayName "Allow ICMPv4 Echo from robot" -Direction Inbou
 New-NetFirewallRule -DisplayName "Allow ROS2 DDS UDP from robot" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 7400-7600 -RemoteAddress 10.0.0.180 -Profile Private
 ```
 
-usb management in wsl:
+USB management in WSL:
 
 - install https://github.com/dorssel/usbipd-win/releases
 
@@ -93,7 +93,7 @@ usbipd bind --busid 2-4
 usbipd attach --wsl --busid 2-4
 usbipd detach --busid 2-4
 ```
-in wsl or linux
+In WSL or Linux:
 ```bash
 sudo usermod -a -G dialout "$USER"
 ```
@@ -101,7 +101,7 @@ sudo usermod -a -G dialout "$USER"
 # Diagrams
 
 ## Unified Robot Interface
-Command Interface and Feedback Interface are the contractual topics used by both the real robot and the simulaiton.
+Command Interface and Feedback Interface are the contractual topics used by both the real robot and the simulation.
 
 ```mermaid
 flowchart TB
@@ -197,7 +197,7 @@ flowchart TD
 ## Gazebo Simulation
 `robot_mode=sim`
 
-In this mode, the real robot is replaced by a gazebo simulaiton while `rovi_localization` / `rovi_slam` / `rovi_nav` remain unchanged.
+In this mode, the real robot is replaced by a Gazebo simulation while `rovi_localization` / `rovi_slam` / `rovi_nav` remain unchanged.
 
 ```mermaid
 flowchart TD
