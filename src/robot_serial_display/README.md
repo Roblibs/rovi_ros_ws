@@ -12,9 +12,9 @@ Key options:
 
 - `gateway.address`: gRPC server address (default `127.0.0.1:50051`)
 - `serial.port` / `serial.baudrate`: serial device (e.g. `/dev/robot_display`)
-- `display.selected_ids`: ordered list of IDs to forward to the display (e.g. `cpu`, `voltage`, `hz_driver`, `hz_slam`)
+- `display.selected_ids`: ordered list of status field IDs to forward to the display (e.g. `cpu_percent`, `battery_voltage_v`, `hz_driver`, `hz_slam`)
 
-Only the selected IDs are forwarded (if the list is empty, nothing is sent). Rate metrics come from `ros_ui_bridge` (`rates[]`) and are formatted as `{id,value,text}` like `40/50Hz` when a target is provided.
+The node calls `GetStatus` once to fetch metadata (unit/min/max/target) and the latest non-stale values, then subscribes to `StreamStatus` for ongoing updates. Only selected IDs with a current value are forwarded; values disappear when stale upstream.
 
 If the gRPC bridge isn’t up yet, the node logs a single “waiting” line and keeps retrying until it can connect.
 

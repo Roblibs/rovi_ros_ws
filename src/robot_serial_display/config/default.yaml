@@ -7,8 +7,8 @@ serial:
 
 display:
   selected_ids:
-    - "cpu"
-    - "voltage"
+    - "cpu_percent"
+    - "battery_voltage_v"
     - "hz_driver"
     - "hz_slam"
 

@@ -3,7 +3,10 @@
 import grpc
 import warnings
 
-import ui_bridge_pb2 as ui__bridge__pb2
+try:
+    from . import ui_bridge_pb2 as ui__bridge__pb2
+except ImportError:  # pragma: no cover - fallback for editable installs
+    import ui_bridge_pb2 as ui__bridge__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
