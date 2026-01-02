@@ -2,28 +2,69 @@ grpc:
   bind: "0.0.0.0:50051"
 
 ros:
-  voltage_topic: "voltage"
+  tf_demux:
+    enabled: true
+    prefix: "/viz/tf"
 
 streams:
   status:
     period_s: 3
-    rates:
+    stale_after_s: 7
+    fields:
+      - id: "cpu_percent"
+        unit: "%"
+        min: 0
+        max: 100
+        source:
+          provider: "system"
+          type: "cpu_percent"
+
+      - id: "battery_voltage_v"
+        unit: "V"
+        min: 9.0
+        max: 12.6
+        source:
+          provider: "ros"
+          type: "topic_value"
+          topic: "/voltage"
+          msg_type: "std_msgs/msg/Float32"
+          value_key: "data"
+
       - id: "hz_driver"
-        topic: "/voltage"
-        target_hz: 10
+        unit: "Hz"
+        target: 10
+        source:
+          provider: "ros"
+          type: "topic_rate"
+          topic: "/voltage"
+          msg_type: "std_msgs/msg/Float32"
+
       - id: "hz_odom"
-        topic: "/odom_raw"
-        type: "nav_msgs/msg/Odometry"
-        target_hz: 10
+        unit: "Hz"
+        target: 10
+        source:
+          provider: "ros"
+          type: "topic_rate"
+          topic: "/odom_raw"
+          msg_type: "nav_msgs/msg/Odometry"
+
       - id: "hz_lidar"
-        topic: "/scan"
-        type: "sensor_msgs/msg/LaserScan"
-        target_hz: 10
-    tf_rates:
+        unit: "Hz"
+        target: 10
+        source:
+          provider: "ros"
+          type: "topic_rate"
+          topic: "/scan"
+          msg_type: "sensor_msgs/msg/LaserScan"
+
       - id: "hz_slam"
-        parent: "map"
-        child: "odom"
-        target_hz: 50
+        unit: "Hz"
+        target: 50
+        source:
+          provider: "ros"
+          type: "tf_rate"
+          parent: "map"
+          child: "odom"
 
   robot_state:
     #downsampling_rate_hz: 1.0

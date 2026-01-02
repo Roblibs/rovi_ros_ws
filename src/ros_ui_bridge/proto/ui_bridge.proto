@@ -3,8 +3,11 @@ syntax = "proto3";
 package roblibs.ui_bridge.v1;
 
 service UiBridge {
-  // Streams periodic status snapshots at a globally-configured cadence.
-  rpc GetStatus(StatusRequest) returns (stream StatusUpdate);
+  // Returns a single status snapshot (includes metadata).
+  rpc GetStatus(StatusRequest) returns (StatusSnapshot);
+
+  // Streams status updates (values only; no metadata).
+  rpc StreamStatus(StatusRequest) returns (stream StatusUpdate);
 
   // Streams robot pose + wheel joint angles for 3D rendering.
   rpc StreamRobotState(RobotStateRequest) returns (stream RobotStateUpdate);
@@ -24,6 +27,67 @@ service UiBridge {
 
 message StatusRequest {}
 
+message Time {
+  int32 sec = 1;
+  uint32 nanosec = 2;
+}
+
+message StatusFieldMeta {
+  // Stable identifier for this field.
+  string id = 1;
+
+  // Unit string for display (e.g., "V", "%", "Hz").
+  string unit = 2;
+
+  // Optional ranges (display / validation only).
+  optional float min = 3;
+  optional float max = 4;
+
+  // Optional target value (e.g., target Hz for rate fields).
+  optional float target = 5;
+}
+
+message StatusFieldValue {
+  string id = 1;
+  float value = 2;
+
+  // Timestamp of the sample in ROS time (prefers message header stamp; falls back to node clock).
+  Time stamp = 3;
+}
+
+// Returned by GetStatus (includes metadata and values).
+message StatusSnapshot {
+  Time stamp = 1; // ROS time when the snapshot was assembled.
+  uint64 seq = 2;
+
+  // Optional wall-clock timestamp (milliseconds since Unix epoch).
+  optional int64 wall_time_unix_ms = 3;
+
+  repeated StatusFieldMeta fields = 4;
+  repeated StatusFieldValue values = 5; // Only non-stale values.
+
+  // Session context (best-effort; may be empty if the launcher didn't set it).
+  string current_launch_ref = 6;
+  string stack = 7;
+  string fixed_frame = 8;
+}
+
+// Streamed status updates (values only).
+message StatusUpdate {
+  Time stamp = 1; // ROS time when the snapshot was assembled.
+  uint64 seq = 2;
+
+  // Optional wall-clock timestamp (milliseconds since Unix epoch).
+  optional int64 wall_time_unix_ms = 3;
+
+  repeated StatusFieldValue values = 4; // Only non-stale values.
+
+  // Session context (best-effort; may be empty if the launcher didn't set it).
+  string current_launch_ref = 5;
+  string stack = 6;
+  string fixed_frame = 7;
+}
+
 message RobotStateRequest {}
 
 message LidarRequest {}
@@ -31,42 +95,6 @@ message LidarRequest {}
 message MapRequest {}
 
 message RobotModelRequest {}
-
-message RateMetric {
-  // Stable identifier for this rate metric; clients should treat it as a key.
-  // Example ids (default config): "hz_driver", "hz_odom", "hz_lidar", "hz_slam".
-  string id = 1;
-  float hz = 2;
-
-  // Optional target frequency for display purposes.
-  oneof target {
-    float target_hz = 3;
-  }
-}
-
-message StatusUpdate {
-  // Unix epoch time in milliseconds when this snapshot was produced.
-  int64 timestamp_unix_ms = 1;
-
-  // Monotonic snapshot sequence number (starts at 1).
-  uint64 seq = 2;
-
-  // CPU utilization percentage [0..100].
-  float cpu_percent = 3;
-
-  // Present only after at least one voltage sample has been received from ROS.
-  oneof voltage {
-    float voltage_v = 4;
-  }
-
-  // Periodic rates for configured topics/transforms.
-  repeated RateMetric rates = 5;
-
-  // Session context (best-effort; may be empty if the launcher didn't set it).
-  string current_launch_ref = 6;
-  string stack = 7;
-  string fixed_frame = 8;
-}
 
 message Pose3D {
   // Frame in which this pose is expressed (e.g. "odom", "map").

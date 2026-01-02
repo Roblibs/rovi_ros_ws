@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from . import ui_bridge_pb2 as ui__bridge__pb2
+import ui_bridge_pb2 as ui__bridge__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
@@ -34,8 +34,13 @@ class UiBridgeStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.GetStatus = channel.unary_stream(
+        self.GetStatus = channel.unary_unary(
                 '/roblibs.ui_bridge.v1.UiBridge/GetStatus',
+                request_serializer=ui__bridge__pb2.StatusRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.StatusSnapshot.FromString,
+                _registered_method=True)
+        self.StreamStatus = channel.unary_stream(
+                '/roblibs.ui_bridge.v1.UiBridge/StreamStatus',
                 request_serializer=ui__bridge__pb2.StatusRequest.SerializeToString,
                 response_deserializer=ui__bridge__pb2.StatusUpdate.FromString,
                 _registered_method=True)
@@ -70,7 +75,14 @@ class UiBridgeServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def GetStatus(self, request, context):
-        """Streams periodic status snapshots at a globally-configured cadence.
+        """Returns a single status snapshot (includes metadata).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StreamStatus(self, request, context):
+        """Streams status updates (values only; no metadata).
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -114,8 +126,13 @@ class UiBridgeServicer(object):
 
 def add_UiBridgeServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'GetStatus': grpc.unary_stream_rpc_method_handler(
+            'GetStatus': grpc.unary_unary_rpc_method_handler(
                     servicer.GetStatus,
+                    request_deserializer=ui__bridge__pb2.StatusRequest.FromString,
+                    response_serializer=ui__bridge__pb2.StatusSnapshot.SerializeToString,
+            ),
+            'StreamStatus': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamStatus,
                     request_deserializer=ui__bridge__pb2.StatusRequest.FromString,
                     response_serializer=ui__bridge__pb2.StatusUpdate.SerializeToString,
             ),
@@ -166,10 +183,37 @@ class UiBridge(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(
+        return grpc.experimental.unary_unary(
             request,
             target,
             '/roblibs.ui_bridge.v1.UiBridge/GetStatus',
+            ui__bridge__pb2.StatusRequest.SerializeToString,
+            ui__bridge__pb2.StatusSnapshot.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/StreamStatus',
             ui__bridge__pb2.StatusRequest.SerializeToString,
             ui__bridge__pb2.StatusUpdate.FromString,
             options,

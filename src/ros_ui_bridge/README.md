@@ -8,7 +8,7 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 
 | Capability | gRPC RPC | Notes |
 | --- | --- | --- |
-| Periodic status snapshots (CPU, voltage, configurable rate metrics) | `GetStatus` | Low-rate stream (~0.3 Hz default) for UI dashboards. |
+| Status fields (values + Hz) with metadata | `GetStatus` (single) / `StreamStatus` | Fields carry unit/min/max/target from config. Stream omits metadata and is event-driven (no empty spam). |
 | Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Emits a single fixed-frame `pose` chosen by the bridge from the current launch session (teleop=odom, mapping/localization/nav=map). |
 | Downsampled lidar scans for 3D visualization | `StreamLidar` | Low-rate (2 Hz default) LaserScan stream; optional. |
 | Occupancy grid map (`/map`) as an encoded image | `StreamMap` | Grayscale PNG stream (0=occupied, 255=free, 127=unknown); optional. |
@@ -19,20 +19,17 @@ Proto: `proto/ui_bridge.proto` (`package roblibs.ui_bridge.v1`)
 
 ## ROS inputs (high level)
 
-- Voltage is read from a `std_msgs/Float32` topic (configurable).
-- Rate metrics can be collected from arbitrary topics and TF pairs (configurable).
+- Status fields are configurable: CPU (`system` provider), ROS topic values (`topic_value`), topic Hz (`topic_rate`), and TF Hz (`tf_rate`). Staleness is enforced in the bridge using ROS time; stale fields simply disappear from the stream.
 - Robot pose is derived from `/odom_raw` (`nav_msgs/Odometry`) and optionally projected into `map` using the `map->odom` TF transform.
 - Wheel angles are read from `/joint_states` (`sensor_msgs/JointState`) using the configured wheel joint names.
 - Lidar scans are read from `/scan` (`sensor_msgs/LaserScan`) and downsampled to the configured rate.
 
 ### Timestamp note (important for UI rendering)
 
-The gRPC streams include `timestamp_unix_ms` fields, but clients should treat them as a **monotonic-ish timebase in milliseconds** that is consistent across streams.
+- **Status** uses ROS time: field samples prefer message header stamps; otherwise the bridge's ROS clock. The snapshot stamp is also ROS time. A `wall_time_unix_ms` helper is included for debugging.
+- **RobotState / Lidar / Map** currently expose `timestamp_unix_ms` fields; treat them as a consistent monotonic-ish timebase (sim time when `use_sim_time:=true`).
 
-- In simulation (`use_sim_time:=true`), timestamps are derived from ROS message header stamps / ROS time (driven by `/clock`).
-- On real hardware, timestamps typically track wall-clock time.
-
-If you need strict Unix epoch time, add it on the client side; for visualization, the key requirement is that robot pose and sensor samples share the same time base.
+UI clients should not invent staleness: the bridge drops stale fields before sending. For initial hydration, call `GetStatus` (metadata + latest non-stale values); then subscribe to `StreamStatus` (values only, event-driven).
 
 ## Run
 
@@ -60,7 +57,12 @@ See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/
 
 Configuration is organized under `streams:`:
 
-- `streams.status` — status stream rate and rate metrics to track
+- `streams.status` — cadence, default staleness window (`stale_after_s`), and `fields` (unit/min/max/target + source). Supported sources:
+  - `system` / `cpu_percent`
+  - `ros` / `topic_value` (topic + msg_type + value_key, optional downsample_period_s)
+  - `ros` / `topic_rate` (topic, optional msg_type)
+  - `ros` / `tf_rate` (parent, child)
+  - Optional per-field staleness override via `source.stale_after_s`.
 - `streams.robot_state` — pose/wheel stream downsampling (optional), topics, frames, wheel joints
 - `streams.lidar` — lidar stream downsampling (optional), input/output topics, frame_id (optional; omit to disable)
 - `robot_model` — GLB path and chunk size
@@ -81,6 +83,12 @@ In this repo, `rovi_description` generates and installs a model at `package://ro
 
 `GetRobotModelMeta` expects a sidecar meta file next to the GLB at `<glb_path>.meta.json` (generated during build); it reads this file (no runtime hashing).
 
+### UI client hints
+
+- Call `GetStatus` once on connect to get the field metadata (unit/min/max/target) plus the latest non-stale values. No client-side buffering is needed.
+- Subscribe to `StreamStatus` for ongoing values (no metadata). Fields disappear from the stream when stale; do not synthesize zeros.
+- Staleness is computed in the bridge using ROS time; timestamps are forwarded from message headers when available.
+
 ## TF demux topics (plot-friendly)
 
 Some tools make it hard to plot a specific transform inside `/tf` because `/tf` is a `tf2_msgs/TFMessage` containing an array of transforms.
@@ -91,7 +99,7 @@ When `ui_bridge` is running, it republishes each dynamic `/tf` transform into it
 
 Frame ids are normalized (leading `/` removed) and sanitized for topic safety.
 
-ROS parameters (on node `ui_bridge_metrics`):
+YAML config (in `ros.tf_demux`):
 
-- `tf_demux_enabled` (bool, default: `true`)
-- `tf_demux_prefix` (string, default: `/viz/tf`)
+- `enabled` (bool, default: `true`)
+- `prefix` (string, default: `/viz/tf`)

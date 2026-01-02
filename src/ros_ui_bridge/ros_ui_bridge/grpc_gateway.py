@@ -1,7 +1,7 @@
 """gRPC service implementation for UI bridge.
 
 Uses queue-based streaming (AsyncStreamBroadcaster) for robot_state and lidar.
-Status stream still uses the SnapshotBroadcaster (timer-based collection).
+Status stream uses StatusBroadcaster (timer-based collection with staleness filtering done upstream).
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from .lidar_node import LidarScanData
 from .map_node import MapData
 from .robot_model_provider import RobotModelProvider
 from .robot_state_node import JointAngleSnapshot, PoseSnapshot, RobotStateData
-from .status_store import RateMetricSnapshot, SnapshotBroadcaster, StatusSnapshot
+from .status_store import StatusBroadcaster, StatusSnapshot
 from .throttled_forwarder import AsyncStreamBroadcaster
 
 
@@ -26,7 +26,7 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
     def __init__(
         self,
         *,
-        status_broadcaster: SnapshotBroadcaster,
+        status_broadcaster: StatusBroadcaster,
         robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
         lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
         map_broadcaster: Optional[AsyncStreamBroadcaster[MapData]],
@@ -52,22 +52,48 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         self,
         request: ui_bridge_pb2.StatusRequest,
         context: grpc.aio.ServicerContext,
+    ) -> ui_bridge_pb2.StatusSnapshot:
+        del request
+
+        snapshot = self._status_broadcaster.latest()
+        if snapshot is None:
+            snapshot = self._build_empty_snapshot()
+        return _snapshot_to_proto(snapshot)
+
+    async def StreamStatus(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.StatusRequest,
+        context: grpc.aio.ServicerContext,
     ) -> AsyncIterator[ui_bridge_pb2.StatusUpdate]:
-        """Stream status updates. Still uses SnapshotBroadcaster (timer-based collection)."""
+        """Stream status updates (values only)."""
         del request
 
         last_seq = 0
         latest = self._status_broadcaster.latest()
         if latest is not None:
             last_seq = latest.seq
-            yield _snapshot_to_proto(latest)
+            yield _snapshot_to_update_proto(latest)
 
         while True:
             snapshot = await self._status_broadcaster.wait_for_next(last_seq)
             if context.cancelled():
                 return
             last_seq = snapshot.seq
-            yield _snapshot_to_proto(snapshot)
+            yield _snapshot_to_update_proto(snapshot)
+
+    def _build_empty_snapshot(self) -> StatusSnapshot:
+        from builtin_interfaces.msg import Time as RosTime  # Local import to avoid ROS overhead on module load.
+
+        return StatusSnapshot(
+            seq=0,
+            stamp=RosTime(),
+            wall_time_unix_ms=None,
+            fields=self._status_broadcaster.fields,
+            values=[],
+            current_launch_ref=self._status_broadcaster.current_launch_ref,
+            stack=self._status_broadcaster.stack,
+            fixed_frame=self._status_broadcaster.fixed_frame,
+        )
 
     async def StreamRobotState(  # noqa: N802 - gRPC interface name
         self,
@@ -181,15 +207,38 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
 # --- Proto conversion helpers ---
 
 
-def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusUpdate:
-    msg = ui_bridge_pb2.StatusUpdate(
-        timestamp_unix_ms=snapshot.timestamp_unix_ms,
-        seq=snapshot.seq,
-        cpu_percent=snapshot.cpu_percent,
+def _time_to_proto(stamp) -> ui_bridge_pb2.Time:
+    return ui_bridge_pb2.Time(sec=int(stamp.sec), nanosec=int(stamp.nanosec))
+
+
+def _field_meta_to_proto(meta) -> ui_bridge_pb2.StatusFieldMeta:
+    msg = ui_bridge_pb2.StatusFieldMeta(id=meta.id, unit=meta.unit)
+    if meta.min is not None:
+        msg.min = meta.min
+    if meta.max is not None:
+        msg.max = meta.max
+    if meta.target is not None:
+        msg.target = meta.target
+    return msg
+
+
+def _field_value_to_proto(value) -> ui_bridge_pb2.StatusFieldValue:
+    return ui_bridge_pb2.StatusFieldValue(
+        id=value.id,
+        value=value.value,
+        stamp=_time_to_proto(value.stamp),
     )
-    if snapshot.voltage_v is not None:
-        msg.voltage_v = snapshot.voltage_v
-    msg.rates.extend(_rate_metrics_to_proto(snapshot.rates))
+
+
+def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusSnapshot:
+    msg = ui_bridge_pb2.StatusSnapshot(
+        stamp=_time_to_proto(snapshot.stamp),
+        seq=snapshot.seq,
+    )
+    if snapshot.wall_time_unix_ms is not None:
+        msg.wall_time_unix_ms = snapshot.wall_time_unix_ms
+    msg.fields.extend(_field_meta_to_proto(meta) for meta in snapshot.fields)
+    msg.values.extend(_field_value_to_proto(val) for val in snapshot.values)
     if getattr(snapshot, 'current_launch_ref', None):
         msg.current_launch_ref = str(snapshot.current_launch_ref)
     if getattr(snapshot, 'stack', None):
@@ -199,14 +248,21 @@ def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusUpdate:
     return msg
 
 
-def _rate_metrics_to_proto(metrics: list[RateMetricSnapshot]) -> list[ui_bridge_pb2.RateMetric]:
-    out: list[ui_bridge_pb2.RateMetric] = []
-    for metric in metrics:
-        m = ui_bridge_pb2.RateMetric(id=metric.id, hz=metric.hz)
-        if metric.target_hz is not None:
-            m.target_hz = metric.target_hz
-        out.append(m)
-    return out
+def _snapshot_to_update_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusUpdate:
+    msg = ui_bridge_pb2.StatusUpdate(
+        stamp=_time_to_proto(snapshot.stamp),
+        seq=snapshot.seq,
+    )
+    if snapshot.wall_time_unix_ms is not None:
+        msg.wall_time_unix_ms = snapshot.wall_time_unix_ms
+    msg.values.extend(_field_value_to_proto(val) for val in snapshot.values)
+    if getattr(snapshot, 'current_launch_ref', None):
+        msg.current_launch_ref = str(snapshot.current_launch_ref)
+    if getattr(snapshot, 'stack', None):
+        msg.stack = str(snapshot.stack)
+    if getattr(snapshot, 'fixed_frame', None):
+        msg.fixed_frame = str(snapshot.fixed_frame)
+    return msg
 
 
 def _pose_to_proto(pose: PoseSnapshot) -> ui_bridge_pb2.Pose3D:

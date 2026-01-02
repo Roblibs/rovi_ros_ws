@@ -30,7 +30,7 @@ Packages of this repo are listed in this table
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
-| `ros_ui_bridge` | UI bridge: low-rate status/metrics collector + gRPC streaming server (CPU, voltage, topic/TF hz metrics, …) |
+| `ros_ui_bridge` | UI bridge: status fields (CPU + ROS topic values/rates + TF rates) with ROS-time staleness filtering and gRPC streaming; also serves robot pose, lidar, map, and model metadata |
 | `robot_serial_display` | Serial UI client: consumes `ros_ui_bridge` gRPC status stream and pushes JSON lines to the ESP32-S3 display |
 
 External ROS packages installed via apt (and a couple of local tools) and how they are used in this workspace:
@@ -101,7 +101,7 @@ ROS nodes started by the launches above (some are conditional based on params). 
 | `controller_server` | `nav2_controller` | Nav2 local controller that publishes velocity commands on `/cmd_vel_nav`. |
 | `behavior_server` | `nav2_behaviors` | Nav2 recovery/behavior actions (spin, backup, wait) used by the BT. |
 | `lifecycle_manager_navigation` | `nav2_lifecycle_manager` | Configures and activates the Nav2 lifecycle nodes (autostart). |
-| `ui_bridge_metrics` | `ros_ui_bridge` | Metrics node: collects topic/TF rate metrics, voltage, CPU; supports TF demux republishing to `/viz/tf/<parent>_<child>`. |
+| `ui_bridge_metrics` | `ros_ui_bridge` | Metrics node: collects configured status fields (CPU, ROS topic values, topic Hz, TF Hz), enforces ROS-time staleness, and supports TF demux republishing to `/viz/tf/<parent>_<child>`. |
 | `ui_bridge_robot_state` | `ros_ui_bridge` | Robot state node: subscribes to `/odom_raw`, `/joint_states`, and TF; throttle-forwards robot pose/wheels to gRPC clients. |
 | `ui_bridge_lidar` | `ros_ui_bridge` | Lidar node: subscribes to `/scan`, throttle-forwards to gRPC clients, and republishes to `/viz/scan`. |
 | `serial_display` | `robot_serial_display` | Serial display client: consumes `ros_ui_bridge` gRPC status stream and pushes JSON lines to the ESP32-S3 display over USB serial. |

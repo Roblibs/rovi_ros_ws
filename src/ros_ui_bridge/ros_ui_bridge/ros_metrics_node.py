@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import threading
 import time
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Optional
 
+from builtin_interfaces.msg import Time as RosTime
+from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
-from std_msgs.msg import Float32
+from rclpy.time import Time
 from tf2_msgs.msg import TFMessage
 
-from .config import TfRateMetricConfig, TopicRateMetricConfig
+from .config import StatusFieldConfig, StatusFieldSource, TfDemuxConfig
 from .rate_tracker import RateTracker
-from .voltage_state import VoltageState
 
 
 def _normalize_frame(frame_id: str) -> str:
@@ -40,49 +43,58 @@ def _sanitize_topic_segment(value: str) -> str:
     return out
 
 
+@dataclass
+class _ValueState:
+    last_value: Optional[float] = None
+    last_stamp: Optional[Time] = None
+    next_accept_after: Optional[Time] = None
+
+
 class UiBridgeRosNode(Node):
+    """ROS-facing collector for status fields (rates + values + TF demux)."""
+
     def __init__(
         self,
         *,
-        voltage_state: VoltageState,
-        voltage_topic: str,
-        topic_rates: list[TopicRateMetricConfig],
-        tf_rates: list[TfRateMetricConfig],
+        status_fields: list[StatusFieldConfig],
+        tf_demux: TfDemuxConfig,
     ) -> None:
         super().__init__('ui_bridge_metrics')
 
-        # TF "demux" topics for visualization tools (e.g. Foxglove) that don't easily
-        # filter individual transforms inside a TFMessage array.
-        self.declare_parameter('tf_demux_enabled', True)
-        self.declare_parameter('tf_demux_prefix', '/viz/tf')
-        self._tf_demux_enabled = bool(self.get_parameter('tf_demux_enabled').value)
-        self._tf_demux_prefix = str(self.get_parameter('tf_demux_prefix').value).strip() or '/viz/tf'
+        self._qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+
+        # TF demux for visualization tools that can't filter individual transforms in a TFMessage.
+        self._tf_demux_enabled = bool(tf_demux.enabled)
+        self._tf_demux_prefix = str(tf_demux.prefix).strip() or '/viz/tf'
         if not self._tf_demux_prefix.startswith('/'):
             self._tf_demux_prefix = '/' + self._tf_demux_prefix
         self._tf_demux_pub_by_pair: dict[tuple[str, str], Any] = {}
 
-        self._voltage_state = voltage_state
-        self._qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+        self._fields_by_id: dict[str, StatusFieldConfig] = {f.id: f for f in status_fields}
+        self._lock = threading.Lock()
 
-        self._topic_metrics_by_topic: dict[str, list[str]] = {}
-        self._topic_type_by_topic: dict[str, str] = {}
-        self._topic_trackers: dict[str, RateTracker] = {}
-        self._tf_trackers: dict[str, RateTracker] = {}
-        self._tf_metric_by_pair: dict[tuple[str, str], str] = {}
-        self._metric_order: list[str] = []
+        # ROS topics to subscribe for values and rates.
+        self._value_fields_by_topic: dict[str, list[StatusFieldConfig]] = {}
+        self._value_state_by_id: dict[str, _ValueState] = {}
 
-        self._pending_topics: set[str] = set()
+        self._rate_fields_by_topic: dict[str, list[StatusFieldConfig]] = {}
+        self._rate_tracker_by_id: dict[str, RateTracker] = {}
+        self._rate_last_ros_stamp: dict[str, Optional[Time]] = {}
+
+        # TF rate trackers keyed by (parent, child).
+        self._tf_rate_field_by_pair: dict[tuple[str, str], StatusFieldConfig] = {}
+        self._tf_rate_tracker_by_id: dict[str, RateTracker] = {}
+        self._tf_rate_last_ros_stamp: dict[str, Optional[Time]] = {}
+        self._tf_sub = None
+
+        self._topic_type_by_topic: dict[str, Optional[str]] = {}
         self._topic_subscriptions: list[Any] = []
+        self._pending_topics: set[str] = set()
 
-        self._voltage_topic = self.resolve_topic_name(str(voltage_topic))
-        self._voltage_sub = self.create_subscription(Float32, self._voltage_topic, self._on_voltage, self._qos_best_effort)
+        self._configure_fields(status_fields)
 
-        self._configure_topic_rates(topic_rates)
-        self._configure_tf_rates(tf_rates)
-
-        # Ensure we subscribe to /tf when TF demux is enabled, even if no tf-rate metrics
-        # are configured.
-        if self._tf_demux_enabled and self._tf_sub is None:
+        # Subscribe to TF if needed for rates or demux.
+        if self._tf_rate_field_by_pair or self._tf_demux_enabled:
             self._tf_sub = self.create_subscription(TFMessage, '/tf', self._on_tf, self._qos_best_effort)
 
         if self._pending_topics:
@@ -90,100 +102,143 @@ class UiBridgeRosNode(Node):
         else:
             self._resolve_timer = None
 
-    def _configure_topic_rates(self, configs: list[TopicRateMetricConfig]) -> None:
-        # Treat voltage as a normal topic-rate metric too; the voltage subscription updates all trackers for that topic.
-        for cfg in configs:
-            metric_id = cfg.id
-            if metric_id in self._topic_trackers:
-                raise RuntimeError(f"Duplicate topic-rate metric id: {metric_id}")
+    # Public API -----------------------------------------------------
 
-            tracker = RateTracker(target_hz=cfg.target_hz, emit_zero_when_unseen=cfg.emit_zero_when_unseen)
-            self._topic_trackers[metric_id] = tracker
-            self._metric_order.append(metric_id)
+    def collect_ros_values(self, *, now_ros: Time) -> list[tuple[str, float, RosTime]]:
+        """Return non-stale ROS-derived status values."""
+        out: list[tuple[str, float, RosTime]] = []
 
-            topic = self.resolve_topic_name(str(cfg.topic))
-            self._topic_metrics_by_topic.setdefault(topic, []).append(metric_id)
-            if cfg.type:
-                existing = self._topic_type_by_topic.get(topic)
-                if existing and existing != cfg.type:
-                    raise RuntimeError(f"Topic {topic} has conflicting message types in config: {existing} vs {cfg.type}")
-                self._topic_type_by_topic[topic] = cfg.type
+        with self._lock:
+            # Topic value fields
+            for field_id, state in self._value_state_by_id.items():
+                stamp = state.last_stamp
+                field = self._fields_by_id[field_id]
+                if state.last_value is None or stamp is None:
+                    continue
+                if self._is_stale(now_ros, stamp, field.source.stale_after_s):
+                    continue
+                out.append((field_id, float(state.last_value), stamp.to_msg()))
 
-        # Create subscriptions for non-voltage topics (voltage is already subscribed for value + rate).
-        if not self._topic_metrics_by_topic:
-            return
+            # Topic rate fields
+            for field_id, tracker in self._rate_tracker_by_id.items():
+                hz = tracker.sample_hz(now_monotonic=time.monotonic())
+                stamp = self._rate_last_ros_stamp.get(field_id)
+                field = self._fields_by_id[field_id]
+                if hz is None or stamp is None:
+                    continue
+                if self._is_stale(now_ros, stamp, field.source.stale_after_s):
+                    continue
+                out.append((field_id, float(hz), stamp.to_msg()))
 
+            # TF rate fields
+            for field_id, tracker in self._tf_rate_tracker_by_id.items():
+                hz = tracker.sample_hz(now_monotonic=time.monotonic())
+                stamp = self._tf_rate_last_ros_stamp.get(field_id)
+                field = self._fields_by_id[field_id]
+                if hz is None or stamp is None:
+                    continue
+                if self._is_stale(now_ros, stamp, field.source.stale_after_s):
+                    continue
+                out.append((field_id, float(hz), stamp.to_msg()))
+
+        return out
+
+    # Internal wiring -----------------------------------------------
+
+    def _configure_fields(self, fields: list[StatusFieldConfig]) -> None:
+        for field in fields:
+            source = field.source
+            if source.provider != 'ros':
+                continue
+
+            if source.type == 'topic_value':
+                topic = self.resolve_topic_name(str(source.topic))
+                self._value_fields_by_topic.setdefault(topic, []).append(field)
+                self._value_state_by_id[field.id] = _ValueState()
+                self._topic_type_by_topic.setdefault(topic, source.msg_type)
+            elif source.type == 'topic_rate':
+                topic = self.resolve_topic_name(str(source.topic))
+                self._rate_fields_by_topic.setdefault(topic, []).append(field)
+                self._rate_tracker_by_id[field.id] = RateTracker(target_hz=field.target, emit_zero_when_unseen=False)
+                self._rate_last_ros_stamp[field.id] = None
+                self._topic_type_by_topic.setdefault(topic, source.msg_type)
+            elif source.type == 'tf_rate':
+                parent = _normalize_frame(str(source.parent))
+                child = _normalize_frame(str(source.child))
+                key = (parent, child)
+                if key in self._tf_rate_field_by_pair:
+                    raise RuntimeError(f"Duplicate tf_rate for {parent}->{child}")
+                self._tf_rate_field_by_pair[key] = field
+                self._tf_rate_tracker_by_id[field.id] = RateTracker(target_hz=field.target, emit_zero_when_unseen=False)
+                self._tf_rate_last_ros_stamp[field.id] = None
+            else:
+                raise RuntimeError(f"Unsupported ROS source type: {source.type}")
+
+        # Create subscriptions for topics we know the type for; others go pending.
         try:
             from rosidl_runtime_py.utilities import get_message  # type: ignore
         except ModuleNotFoundError:
             get_message = None
 
-        for topic in sorted(set(self._topic_metrics_by_topic.keys())):
-            if topic == self._voltage_topic:
-                continue
-
-            type_str = self._topic_type_by_topic.get(topic)
-            if type_str and get_message is not None:
+        for topic, type_hint in self._topic_type_by_topic.items():
+            if type_hint and get_message is not None:
                 try:
-                    msg_cls = get_message(type_str)
+                    msg_cls = get_message(type_hint)
                 except Exception as exc:  # noqa: BLE001
-                    self.get_logger().warn(f"Failed to import message type {type_str} for {topic}: {exc}")
+                    self.get_logger().warn(f"Failed to import message type {type_hint} for {topic}: {exc}")
                     self._pending_topics.add(topic)
                     continue
 
-                sub = self.create_subscription(
-                    msg_cls,
-                    topic,
-                    lambda _msg, t=topic: self._on_generic_topic(t),
-                    self._qos_best_effort,
-                )
+                sub = self.create_subscription(msg_cls, topic, lambda msg, t=topic: self._on_topic_message(t, msg), self._qos_best_effort)
                 self._topic_subscriptions.append(sub)
-                self.get_logger().info(f"Subscribed for hz metric topic={topic} type={type_str} (configured)")
+                self.get_logger().info(f"Subscribed for topic={topic} type={type_hint} (configured)")
             else:
                 self._pending_topics.add(topic)
 
-    def _configure_tf_rates(self, configs: list[TfRateMetricConfig]) -> None:
-        self._tf_sub = None
-        if not configs:
-            return
+    def _on_topic_message(self, topic: str, msg: Any) -> None:
+        now_ros = self.get_clock().now()
+        msg_stamp = _resolve_msg_stamp(msg, now_ros)
 
-        for cfg in configs:
-            metric_id = cfg.id
-            if metric_id in self._tf_trackers:
-                raise RuntimeError(f"Duplicate tf-rate metric id: {metric_id}")
+        with self._lock:
+            for field in self._rate_fields_by_topic.get(topic, []):
+                tracker = self._rate_tracker_by_id[field.id]
+                tracker.on_event(time.monotonic())
+                self._rate_last_ros_stamp[field.id] = msg_stamp
 
-            parent = _normalize_frame(cfg.parent)
-            child = _normalize_frame(cfg.child)
-            key = (parent, child)
-            if key in self._tf_metric_by_pair:
-                raise RuntimeError(f"Duplicate tf-rate (parent,child): {parent}->{child}")
+            for field in self._value_fields_by_topic.get(topic, []):
+                state = self._value_state_by_id[field.id]
+                if field.source.downsample_period_s is not None and state.next_accept_after is not None:
+                    if msg_stamp < state.next_accept_after:
+                        continue
 
-            tracker = RateTracker(target_hz=cfg.target_hz, emit_zero_when_unseen=cfg.emit_zero_when_unseen)
-            self._tf_trackers[metric_id] = tracker
-            self._tf_metric_by_pair[key] = metric_id
-            self._metric_order.append(metric_id)
+                value = _extract_value(msg, field.source.value_key or 'data')
+                if value is None:
+                    self.get_logger().warn(f"Could not extract value for field {field.id} from topic {topic} using key '{field.source.value_key or 'data'}'")
+                    continue
 
-        self._tf_sub = self.create_subscription(TFMessage, '/tf', self._on_tf, self._qos_best_effort)
-
-    def _on_voltage(self, msg: Float32) -> None:
-        now = time.monotonic()
-        self._voltage_state.update(float(msg.data))
-        for metric_id in self._topic_metrics_by_topic.get(self._voltage_topic, []):
-            self._topic_trackers[metric_id].on_event(now)
+                state.last_value = value
+                state.last_stamp = msg_stamp
+                if field.source.downsample_period_s:
+                    state.next_accept_after = msg_stamp + Duration(seconds=field.source.downsample_period_s)
+                else:
+                    state.next_accept_after = None
 
     def _on_tf(self, msg: TFMessage) -> None:
-        now = time.monotonic()
+        now_ros = self.get_clock().now()
+        now_monotonic = time.monotonic()
         for transform in msg.transforms:
             parent = _normalize_frame(transform.header.frame_id)
             child = _normalize_frame(transform.child_frame_id)
-            metric_id = self._tf_metric_by_pair.get((parent, child))
-            if metric_id is not None:
-                self._tf_trackers[metric_id].on_event(now)
+            field = self._tf_rate_field_by_pair.get((parent, child))
+            if field is not None:
+                with self._lock:
+                    tracker = self._tf_rate_tracker_by_id[field.id]
+                    tracker.on_event(now_monotonic)
+                    self._tf_rate_last_ros_stamp[field.id] = Time.from_msg(transform.header.stamp) if transform.header.stamp else now_ros
 
             if not self._tf_demux_enabled:
                 continue
 
-            # Publish a per-(parent,child) TFMessage with a single transform.
             key = (parent, child)
             pub = self._tf_demux_pub_by_pair.get(key)
             if pub is None:
@@ -197,11 +252,6 @@ class UiBridgeRosNode(Node):
             out.transforms.append(transform)
             pub.publish(out)
 
-    def _on_generic_topic(self, topic: str) -> None:
-        now = time.monotonic()
-        for metric_id in self._topic_metrics_by_topic.get(topic, []):
-            self._topic_trackers[metric_id].on_event(now)
-
     def _try_resolve_pending_topics(self) -> None:
         if not self._pending_topics:
             return
@@ -213,16 +263,14 @@ class UiBridgeRosNode(Node):
             return
 
         name_and_types = dict(self.get_topic_names_and_types())
-
         resolved: list[str] = []
+
         for topic in sorted(self._pending_topics):
             types = name_and_types.get(topic)
             if not types:
                 continue
-            if len(types) != 1:
-                self.get_logger().warn(f"Topic {topic} has multiple types {types}; cannot subscribe for hz metrics.")
-                continue
 
+            # Take the first advertised type.
             type_str = types[0]
             try:
                 msg_cls = get_message(type_str)
@@ -230,31 +278,49 @@ class UiBridgeRosNode(Node):
                 self.get_logger().warn(f"Failed to import message type {type_str} for {topic}: {exc}")
                 continue
 
-            sub = self.create_subscription(
-                msg_cls,
-                topic,
-                lambda _msg, t=topic: self._on_generic_topic(t),
-                self._qos_best_effort,
-            )
+            sub = self.create_subscription(msg_cls, topic, lambda msg, t=topic: self._on_topic_message(t, msg), self._qos_best_effort)
             self._topic_subscriptions.append(sub)
+            self._topic_type_by_topic[topic] = type_str
             resolved.append(topic)
-            self.get_logger().info(f"Subscribed for hz metric topic={topic} type={type_str}")
+            self.get_logger().info(f"Subscribed for topic={topic} type={type_str} (resolved)")
 
         for topic in resolved:
             self._pending_topics.discard(topic)
 
-    def sample_rate_metrics(self) -> list[tuple[str, float, float | None]]:
-        """Returns (id, hz, target_hz) in config order, resetting counters each call."""
-        now = time.monotonic()
-        out: list[tuple[str, float, float | None]] = []
+        if not self._pending_topics and self._resolve_timer is not None:
+            self._resolve_timer.cancel()
+            self._resolve_timer = None
 
-        for metric_id in self._metric_order:
-            tracker = self._topic_trackers.get(metric_id) or self._tf_trackers.get(metric_id)
-            if tracker is None:
-                continue
-            hz = tracker.sample_hz(now_monotonic=now)
-            if hz is None:
-                continue
-            out.append((metric_id, hz, tracker.target_hz))
+    @staticmethod
+    def _is_stale(now_ros: Time, stamp: Time, stale_after_s: float) -> bool:
+        if stale_after_s <= 0:
+            return False
+        return (now_ros - stamp) > Duration(seconds=stale_after_s)
 
-        return out
+
+def _extract_value(msg: Any, key: str) -> Optional[float]:
+    """Extract a numeric value from a message using a dotted key path."""
+    parts = key.split('.')
+    cur: Any = msg
+    try:
+        for part in parts:
+            cur = getattr(cur, part)
+    except AttributeError:
+        return None
+    try:
+        return float(cur)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_msg_stamp(msg: Any, fallback: Time) -> Time:
+    try:
+        stamp = msg.header.stamp  # type: ignore[attr-defined]
+    except Exception:
+        stamp = None
+    if stamp:
+        try:
+            return Time.from_msg(stamp)
+        except Exception:
+            pass
+    return fallback

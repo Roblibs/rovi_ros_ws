@@ -22,33 +22,56 @@ from .map_node import MapData, UiBridgeMapNode
 from .robot_model_provider import RobotModelProvider
 from .robot_state_node import RobotStateData, UiBridgeRobotStateNode
 from .ros_metrics_node import UiBridgeRosNode
-from .status_store import RateMetricSnapshot, SnapshotBroadcaster
+from .status_store import StatusBroadcaster, StatusFieldMeta, StatusFieldValue
 from .throttled_forwarder import AsyncStreamBroadcaster
-from .voltage_state import VoltageState
 from .session_info import resolve_session
 
 
 async def _publish_status_loop(
     *,
     cfg: UiBridgeConfig,
-    voltage_state: VoltageState,
     ros_node: UiBridgeRosNode,
-    broadcaster: SnapshotBroadcaster,
+    broadcaster: StatusBroadcaster,
     stop_event: asyncio.Event,
+    system_fields: list,
 ) -> None:
-    """Status stream still uses timer-based collection (legacy SnapshotBroadcaster)."""
+    """Collect status fields on a fixed cadence and publish when they change."""
+
     period_s = cfg.status_stream.period_s
     if period_s <= 0.0:
         period_s = 3.0
 
+    last_signature: Optional[tuple[tuple[str, float, int, int], ...]] = None
+    seq = 0
+
     while not stop_event.is_set():
-        cpu_percent = float(psutil.cpu_percent(interval=None))
-        voltage_v, _last_update = voltage_state.read()
-        rates = [
-            RateMetricSnapshot(id=metric_id, hz=hz, target_hz=target_hz)
-            for metric_id, hz, target_hz in ros_node.sample_rate_metrics()
-        ]
-        await broadcaster.publish(cpu_percent=cpu_percent, voltage_v=voltage_v, rates=rates)
+        now_ros = ros_node.get_clock().now()
+
+        values: list[StatusFieldValue] = []
+
+        # System providers (e.g., cpu_percent) are computed here.
+        for field in system_fields:
+            if field.source.type == 'cpu_percent':
+                cpu_percent = float(psutil.cpu_percent(interval=None))
+                values.append(StatusFieldValue(id=field.id, value=cpu_percent, stamp=now_ros.to_msg()))
+
+        # ROS-derived fields (topic values + rates).
+        for field_id, value, stamp in ros_node.collect_ros_values(now_ros=now_ros):
+            values.append(StatusFieldValue(id=field_id, value=value, stamp=stamp))
+
+        signature = tuple(sorted((v.id, v.value, v.stamp.sec, v.stamp.nanosec) for v in values))
+
+        # If we've never sent anything and have no values yet, stay quiet to avoid empty spam.
+        if last_signature is None and not signature:
+            await asyncio.sleep(period_s)
+            continue
+
+        if signature != last_signature:
+            seq += 1
+            snapshot = broadcaster.build_snapshot(seq=seq, stamp=now_ros.to_msg(), values=values)
+            await broadcaster.publish(snapshot)
+            last_signature = signature
+
         await asyncio.sleep(period_s)
 
 
@@ -74,7 +97,6 @@ async def _serve_grpc(
 async def _run_async(
     *,
     cfg: UiBridgeConfig,
-    voltage_state: VoltageState,
     ros_node: UiBridgeRosNode,
     robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
     lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
@@ -97,9 +119,14 @@ async def _run_async(
         except NotImplementedError:
             pass
 
-    # Status still uses SnapshotBroadcaster (timer-based collection)
     session = resolve_session()
-    status_broadcaster = SnapshotBroadcaster(
+    fields_meta = [
+        StatusFieldMeta(id=f.id, unit=f.unit, min=f.min, max=f.max, target=f.target)
+        for f in cfg.status_stream.fields
+    ]
+    system_fields = [f for f in cfg.status_stream.fields if f.source.provider == 'system']
+    status_broadcaster = StatusBroadcaster(
+        fields=fields_meta,
         current_launch_ref=session.current_launch_ref,
         stack=session.stack,
         fixed_frame=session.fixed_frame,
@@ -126,10 +153,10 @@ async def _run_async(
     tasks.append(asyncio.create_task(
         _publish_status_loop(
             cfg=cfg,
-            voltage_state=voltage_state,
             ros_node=ros_node,
             broadcaster=status_broadcaster,
             stop_event=stop_event,
+            system_fields=system_fields,
         )
     ))
     tasks.append(asyncio.create_task(_serve_grpc(bind=cfg.grpc_bind, service=service, stop_event=stop_event, logger=logger)))
@@ -150,12 +177,9 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     rclpy.init(args=ros_args)
     logger = get_logger('ros_ui_bridge')
-    voltage_state = VoltageState()
     ros_node = UiBridgeRosNode(
-        voltage_state=voltage_state,
-        voltage_topic=cfg.voltage_topic,
-        topic_rates=cfg.status_stream.rates,
-        tf_rates=cfg.status_stream.tf_rates,
+        status_fields=cfg.status_stream.fields,
+        tf_demux=cfg.tf_demux,
     )
 
     # Create broadcasters for queue-based gRPC streaming
@@ -214,7 +238,6 @@ def main(argv: Optional[list[str]] = None) -> None:
             asyncio.run(
                 _run_async(
                     cfg=cfg,
-                    voltage_state=voltage_state,
                     ros_node=ros_node,
                     robot_state_broadcaster=robot_state_broadcaster,
                     lidar_broadcaster=lidar_broadcaster,

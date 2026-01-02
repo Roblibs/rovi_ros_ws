@@ -1,3 +1,14 @@
+# 2026-01-02
+
+## Status stream unification (fields + metadata, ROS-time staleness)
+
+Reworked `ros_ui_bridge` status into a single fields model with metadata (unit/min/max/target) and explicit `GetStatus`/`StreamStatus` RPCs. Status now uses ROS time stamps, drops stale fields in the bridge (no client-side buffering), and merges voltage/CPU/rate metrics into configurable sources (`system`, `ros.topic_value`, `ros.topic_rate`, `ros.tf_rate`).
+
+**Key changes:**
+- New proto shape: `GetStatus` returns schema + latest non-stale values; `StreamStatus` is values-only, event-driven.
+- Config reshaped to `streams.status.fields` with per-field staleness/downsample; removed legacy `voltage_topic`/rates blocks.
+- ROS metrics node rewritten to collect values/rates/TF rates from config, enforce staleness with ROS time, and keep TF demux.
+
 # 2026-01-01
 
 ## Lidar gRPC + Capped Downsampling Refactor
