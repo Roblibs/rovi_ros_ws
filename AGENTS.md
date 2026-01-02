@@ -85,6 +85,15 @@ Nav/SLAM/RViz typically rely on:
 - Keep `robot_mode:=real|sim|offline` parity: if you add a feature to one backend, either add it to the other or explicitly gate it with a launch arg and document the difference.
 - Don’t “fix” by editing generated artifacts under `install/` / build outputs; change source and rebuild.
 
+## Diagrams (on-demand)
+- Diagrams are **on-demand only**: suggest them during planning, and **get confirmation before adding/updating** any diagram in the repo.
+- Preferred format is **Mermaid** (unless the user requests something else or there’s a clear reason to justify a different format).
+- Keep a consistent Mermaid convention:
+  - ROS nodes use **rounded rectangles**: `node_id("node_name")`
+  - ROS topics use **cylinders** (database shape): `topic_id[("topic_name")]` (i.e. `topic_id[(...)]`)
+  - Direction is explicit: `node --> topic` (publishes), `topic --> node` (subscribes)
+- Quoting rule: if a label contains any special characters (e.g. `/`, `-`, `:`, `.`, `(`, `)`, `[`, `]`), **wrap the label in double quotes** (e.g. `topic_cmd_vel[("/cmd_vel")]`, `node_twist_mux("twist_mux")`).
+
 ### Clarify-first rule (important)
 If there is any ambiguity, missing requirement, or open design choice:
 

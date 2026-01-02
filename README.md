@@ -148,6 +148,80 @@ flowchart TB
 
 ```
 
+## UI bridge (gRPC)
+`ros_ui_bridge` subscribes to ROS topics for robot state/telemetry and exposes them over gRPC (plus a few ROS viz helper topics). Topics shown match `src/ros_ui_bridge/config/default.yaml`.
+
+```mermaid
+flowchart LR
+
+  subgraph ROS["ROS 2 graph (real robot)"]
+    direction TB
+    TOPIC_SCAN[("/scan<br/>(LaserScan)")]
+    TOPIC_ODOM[("/odom_raw<br/>(Odometry)")]
+    TOPIC_JOINTS[("/joint_states<br/>(JointState)")]
+    TOPIC_TF[("/tf<br/>(TFMessage)")]
+    TOPIC_MAP[("/map<br/>(OccupancyGrid)")]
+    TOPIC_VOLTAGE[("/voltage<br/>(Float32)")]
+    TOPIC_VIZ_SCAN[("/viz/scan<br/>(LaserScan)")]
+    TOPIC_VIZ_TF[("/viz/tf/{parent}_{child}<br/>(TFMessage)")]
+  end
+
+  subgraph BRIDGE["ros_ui_bridge (single process)"]
+    direction TB
+    NODE_LIDAR("ui_bridge_lidar")
+    NODE_MAP("ui_bridge_map")
+    NODE_STATE("ui_bridge_robot_state")
+    NODE_METRICS("ui_bridge_metrics")
+    NODE_STATUS("ui_bridge_node (status publish loop)")
+    NODE_MODEL("RobotModelProvider")
+    NODE_GRPC("gRPC: UiBridge service")
+    SYS_CPU("system: cpu_percent (psutil)")
+    MODEL_GLB("robot model: package://rovi_description/models/rovi.glb (+ .meta.json)")
+  end
+
+  subgraph CONSUMERS["Consumers"]
+    direction TB
+    RVIZ("rviz2 (optional)")
+    UI_CLIENTS("UI clients (web/desktop)")
+    DISPLAY_CLIENT("robot_serial_display (ESP32 display)")
+  end
+
+  %% Lidar: ROS -> (throttle) -> ROS + gRPC
+  TOPIC_SCAN -->|subscribe| NODE_LIDAR
+  NODE_LIDAR -->|"publish (throttled)"| TOPIC_VIZ_SCAN
+  NODE_LIDAR -->|StreamLidar| NODE_GRPC
+  TOPIC_VIZ_SCAN -->|subscribe| RVIZ
+
+  %% Map: ROS -> gRPC
+  TOPIC_MAP -->|subscribe| NODE_MAP
+  NODE_MAP -->|StreamMap| NODE_GRPC
+
+  %% Robot state: ROS -> gRPC
+  TOPIC_ODOM -->|subscribe| NODE_STATE
+  TOPIC_JOINTS -->|subscribe| NODE_STATE
+  TOPIC_TF -->|"subscribe (map->odom)"| NODE_STATE
+  NODE_STATE -->|StreamRobotState| NODE_GRPC
+
+  %% Status: system + ROS metrics -> gRPC
+  SYS_CPU -->|sample| NODE_STATUS
+  TOPIC_VOLTAGE -->|"subscribe (value + rate)"| NODE_METRICS
+  TOPIC_ODOM -->|"subscribe (rate)"| NODE_METRICS
+  TOPIC_SCAN -->|"subscribe (rate)"| NODE_METRICS
+  TOPIC_TF -->|"subscribe (tf_rate + demux)"| NODE_METRICS
+  NODE_METRICS -->|"publish (demux)"| TOPIC_VIZ_TF
+  NODE_METRICS -->|values + rates| NODE_STATUS
+  NODE_STATUS -->|GetStatus + StreamStatus| NODE_GRPC
+  TOPIC_VIZ_TF -->|subscribe| RVIZ
+
+  %% Robot model: file -> gRPC
+  MODEL_GLB -->|load| NODE_MODEL
+  NODE_MODEL -->|GetRobotModelMeta + GetRobotModel| NODE_GRPC
+
+  %% gRPC: server -> clients
+  NODE_GRPC -->|gRPC| UI_CLIENTS
+  NODE_GRPC -->|gRPC| DISPLAY_CLIENT
+```
+
 ## Real robot
 `robot_mode=real`
 
