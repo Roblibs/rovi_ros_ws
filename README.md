@@ -154,17 +154,15 @@ flowchart TB
 ```mermaid
 flowchart LR
 
-  subgraph ROS["ROS 2 graph (real robot)"]
-    direction TB
-    TOPIC_SCAN[("/scan<br/>(LaserScan)")]
-    TOPIC_ODOM[("/odom_raw<br/>(Odometry)")]
-    TOPIC_JOINTS[("/joint_states<br/>(JointState)")]
-    TOPIC_TF[("/tf<br/>(TFMessage)")]
-    TOPIC_MAP[("/map<br/>(OccupancyGrid)")]
-    TOPIC_VOLTAGE[("/voltage<br/>(Float32)")]
-    TOPIC_VIZ_SCAN[("/viz/scan<br/>(LaserScan)")]
-    TOPIC_VIZ_TF[("/viz/tf/{parent}_{child}<br/>(TFMessage)")]
-  end
+  SYS_CPU("system: cpu_percent (psutil)")
+  TOPIC_SCAN[("/scan<br/>(LaserScan)")]
+  TOPIC_ODOM[("/odom_raw<br/>(Odometry)")]
+  TOPIC_JOINTS[("/joint_states<br/>(JointState)")]
+  TOPIC_TF[("/tf<br/>(TFMessage)")]
+  TOPIC_MAP[("/map<br/>(OccupancyGrid)")]
+  TOPIC_VOLTAGE[("/voltage<br/>(Float32)")]
+  TOPIC_VIZ_SCAN[("/viz/scan<br/>(LaserScan)")]
+  TOPIC_VIZ_TF[("/viz/tf/{parent}_{child}<br/>(TFMessage)")]
 
   subgraph BRIDGE["ros_ui_bridge (single process)"]
     direction TB
@@ -175,15 +173,15 @@ flowchart LR
     NODE_STATUS("ui_bridge_node (status publish loop)")
     NODE_MODEL("RobotModelProvider")
     NODE_GRPC("gRPC: UiBridge service")
-    SYS_CPU("system: cpu_percent (psutil)")
     MODEL_GLB("robot model: package://rovi_description/models/rovi.glb (+ .meta.json)")
   end
 
   subgraph CONSUMERS["Consumers"]
     direction TB
-    RVIZ("rviz2 (optional)")
+    RVIZ(rviz2)
     UI_CLIENTS("UI clients (web/desktop)")
     DISPLAY_CLIENT("robot_serial_display (ESP32 display)")
+    Plot
   end
 
   %% Lidar: ROS -> (throttle) -> ROS + gRPC
@@ -211,7 +209,7 @@ flowchart LR
   NODE_METRICS -->|"publish (demux)"| TOPIC_VIZ_TF
   NODE_METRICS -->|values + rates| NODE_STATUS
   NODE_STATUS -->|GetStatus + StreamStatus| NODE_GRPC
-  TOPIC_VIZ_TF -->|subscribe| RVIZ
+  TOPIC_VIZ_TF -->|subscribe| Plot
 
   %% Robot model: file -> gRPC
   MODEL_GLB -->|load| NODE_MODEL
