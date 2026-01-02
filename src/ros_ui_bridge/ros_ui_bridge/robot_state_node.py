@@ -142,6 +142,7 @@ class UiBridgeRobotStateNode(Node):
         self._have_odom = False
         self._odom_pose: Optional[PoseSnapshot] = None
         self._odom_stamp_ns: int = 0
+        self._joint_stamp_ns: int = 0
         self._wheel_positions: dict[str, float] = {}
         self._map_to_odom: Optional[_TransformSnapshot] = None
 
@@ -228,13 +229,29 @@ class UiBridgeRobotStateNode(Node):
         if not msg.name or not msg.position:
             return
 
+        stamp_ns = Time.from_msg(msg.header.stamp).nanoseconds if msg.header.stamp else 0
+        any_updated = False
         with self._lock:
+            if stamp_ns > 0:
+                self._joint_stamp_ns = int(stamp_ns)
             for i, name in enumerate(msg.name):
                 if i >= len(msg.position):
                     break
                 joint_name = str(name)
                 if joint_name in self._wheel_joint_names:
                     self._wheel_positions[joint_name] = float(msg.position[i])
+                    any_updated = True
+
+        if not any_updated:
+            return
+
+        # Build current state and forward (throttled if enabled)
+        state = self._build_state()
+        if state is not None:
+            if self._forwarder is None:
+                self._grpc_broadcaster.publish_sync(state)
+            else:
+                self._forwarder.on_input(state)
 
     def _on_tf(self, msg: TFMessage) -> None:
         now = time.monotonic()
@@ -269,18 +286,32 @@ class UiBridgeRobotStateNode(Node):
         self._grpc_broadcaster.publish_sync(state)
 
     def _build_state(self) -> Optional[RobotStateData]:
-        """Build current robot state snapshot. Returns None if no odom yet."""
+        """Build current robot state snapshot.
+
+        If no odom has been received yet (e.g., offline mode), uses an origin pose in odom
+        so wheel updates can still be forwarded to UI clients.
+        """
         now = time.monotonic()
 
         with self._lock:
             have_odom = self._have_odom
             odom_pose = self._odom_pose
             odom_stamp_ns = int(self._odom_stamp_ns)
+            joint_stamp_ns = int(self._joint_stamp_ns)
             map_to_odom = self._map_to_odom
             wheel_positions = dict(self._wheel_positions)
 
         if odom_pose is None:
-            return None
+            odom_pose = PoseSnapshot(
+                frame_id=self._odom_frame,
+                x=0.0,
+                y=0.0,
+                z=0.0,
+                qx=0.0,
+                qy=0.0,
+                qz=0.0,
+                qw=1.0,
+            )
 
         # Deterministic fixed frame choice is resolved from the launch session.
         # We never publish a mix of odom/map poses in the same stream.
@@ -333,8 +364,8 @@ class UiBridgeRobotStateNode(Node):
             for name in self._wheel_joint_names
         )
 
-        # Use odom header time if present; otherwise fall back to node clock.
-        stamp_ns = odom_stamp_ns
+        # Prefer timestamps from ROS messages; fall back to node clock.
+        stamp_ns = max(odom_stamp_ns, joint_stamp_ns)
         if stamp_ns <= 0:
             stamp_ns = self.get_clock().now().nanoseconds
 
@@ -343,4 +374,3 @@ class UiBridgeRobotStateNode(Node):
             pose=pose_fixed,
             wheel_angles=wheel_angles,
         )
-
