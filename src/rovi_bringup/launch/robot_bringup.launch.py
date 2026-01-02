@@ -370,6 +370,7 @@ def generate_launch_description() -> LaunchDescription:
         executable='ui_bridge',
         output='screen',
         arguments=['--config', LaunchConfiguration('ui_bridge_config')],
+        parameters=[{'use_sim_time': use_sim_time_param}],
     )
 
     serial_display_node = Node(
