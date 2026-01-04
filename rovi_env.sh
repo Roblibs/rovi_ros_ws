@@ -34,10 +34,10 @@ ensure_ros2_daemon() {
 
 # Default DDS mode for this workspace:
 rovi_dds_default
-ensure_ros2_daemon
+#ensure_ros2_daemon
 
 clean() {
-  rm -rf build/ install/ log/
+  rm -rf "${ROVI_ROS_WS_DIR}/build" "${ROVI_ROS_WS_DIR}/install" "${ROVI_ROS_WS_DIR}/log"
 }
 
 stop() {
@@ -45,7 +45,7 @@ stop() {
 }
 
 build() {
-  colcon build "$@"
+  (cd "${ROVI_ROS_WS_DIR}" && colcon build "$@")
 }
 
 setup() {
@@ -135,13 +135,13 @@ view() {
 
   case "${mode}" in
     nav)
-      rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_nav.rviz" "$@"
+      rviz2 -d "${ROVI_ROS_WS_DIR}/install/rovi_description/share/rovi_description/rviz/rovi_nav.rviz" "$@"
       ;;
     mapping)
-      rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
+      rviz2 -d "${ROVI_ROS_WS_DIR}/install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
       ;;
     teleop)
-      rviz2 -d "install/rovi_description/share/rovi_description/rviz/rovi_odom.rviz" "$@"
+      rviz2 -d "${ROVI_ROS_WS_DIR}/install/rovi_description/share/rovi_description/rviz/rovi_odom.rviz" "$@"
       ;;
     offline)
       ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_bringup rovi.launch.py \
