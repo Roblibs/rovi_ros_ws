@@ -76,6 +76,10 @@ This rotation will be compensated in the driver so that output of `/imu/data_raw
 | On right side, left facing up | Y | 9.8 |
 | Up facing up | Z | 9.8 |
 
+# Power control
+
+![design](./power.drawio.svg)
+
 # Wheels
 
 - `ROS-Driver-Board\1.Code\Factory STM32 firmware\Rosmaster_V3.5.1\ControlBoard_Rosmaster\Source\APP\app_mecanum.h`
