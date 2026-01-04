@@ -174,10 +174,11 @@ listen() {
 
 install_ros_deps() {
   local -a pkgs=(
-    libsdformat14
     ros-jazzy-joy
     ros-jazzy-teleop-twist-joy
     ros-jazzy-twist-mux
+    ros-jazzy-ros-gz-sim
+    ros-jazzy-ros-gz-bridge
     ros-jazzy-rosbag2
     ros-jazzy-rosbag2-compression-zstd
     ros-jazzy-diagnostic-updater
