@@ -10,8 +10,10 @@ streams:
   status:
     period_s: 3
     stale_after_s: 7
+    debug_log: false
+    always_publish: false
     fields:
-      - id: "cpu_percent"
+      - id: "cpu"
         unit: "%"
         min: 0
         max: 100
@@ -19,7 +21,7 @@ streams:
           provider: "system"
           type: "cpu_percent"
 
-      - id: "battery_voltage_v"
+      - id: "voltage"
         unit: "V"
         min: 9.0
         max: 12.6

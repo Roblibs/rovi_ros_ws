@@ -20,9 +20,10 @@ setup(
     maintainer_email='wassim.filali@gmail.com',
     description='Serial display client for ros_ui_bridge.',
     license='Apache-2.0',
-entry_points={
+    entry_points={
         'console_scripts': [
             'serial_display = robot_serial_display.serial_display_node:main',
+            'serial_display_test = robot_serial_display.serial_display_test:main',
         ],
     },
 )

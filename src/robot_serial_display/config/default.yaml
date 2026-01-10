@@ -7,9 +7,10 @@ serial:
 
 display:
   selected_ids:
-    - "cpu_percent"
-    - "battery_voltage_v"
-    - "hz_driver"
-    - "hz_slam"
+    - id: "cpu"
+    - id: "voltage"
+      scale: 10
+    - id: "hz_driver"
+    - id: "hz_slam"
 
 reconnect_delay_s: 2.0

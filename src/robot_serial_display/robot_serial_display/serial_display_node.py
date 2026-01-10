@@ -55,7 +55,7 @@ class _SerialWriter:
         if ser is None:
             return
 
-        line = json.dumps(payload, separators=(',', ':')) + '\n'
+        line = _encode_payload(payload)
         try:
             ser.write(line.encode('utf-8'))
         except SerialException:
@@ -75,9 +75,14 @@ def _format_value(val: float, unit: str) -> str:
     return f"{val:.2f}"
 
 
+def _encode_payload(payload: list[dict]) -> str:
+    return json.dumps(payload, separators=(',', ':')) + '\n'
+
+
 def _build_payload(
     *,
     selected_ids: list[str],
+    selected_scales: dict[str, float],
     meta_by_id: dict[str, ui_bridge_pb2.StatusFieldMeta],
     values_by_id: dict[str, float],
 ) -> list[dict]:
@@ -88,7 +93,13 @@ def _build_payload(
         if meta is None or val is None:
             continue
 
-        text = _format_value(val, meta.unit)
+        encoded_value: float | int
+        display_val = val
+        scale = selected_scales.get(field_id, 1.0)
+        scaled_val = val * scale
+        encoded_value = int(round(scaled_val))
+
+        text = _format_value(display_val, meta.unit)
         if meta.HasField('target'):
             target_text = _format_value(meta.target, meta.unit)
             text = f"{text}/{target_text}"
@@ -96,7 +107,7 @@ def _build_payload(
         payload.append(
             {
                 'id': field_id,
-                'value': val,
+                'value': encoded_value,
                 'text': text,
             }
         )
@@ -114,7 +125,7 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
     return out
 
 
-async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger) -> None:
+async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, debug: bool) -> None:
     serial_writer = _SerialWriter(port=cfg.serial_port, baudrate=cfg.baudrate, logger=logger)
     request = ui_bridge_pb2.StatusRequest()
     grpc_connected = False
@@ -138,10 +149,15 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger) -
                 last_grpc_log_key = None
             initial_payload = _build_payload(
                 selected_ids=cfg.selected_ids,
+                selected_scales=cfg.selected_scales,
                 meta_by_id=meta_by_id,
                 values_by_id=values_by_id,
             )
+            if debug:
+                logger.info(f"Initial status payload: {initial_payload or '(empty)'}")
             if initial_payload:
+                if debug:
+                    logger.info(f"Serial write line: {_encode_payload(initial_payload).strip()}")
                 try:
                     serial_writer.write_json_line(initial_payload)
                 except SerialException as exc:
@@ -156,11 +172,19 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger) -
 
                 payload = _build_payload(
                     selected_ids=cfg.selected_ids,
+                    selected_scales=cfg.selected_scales,
                     meta_by_id=meta_by_id,
                     values_by_id=values_by_id,
                 )
+                if debug:
+                    received_ids = sorted(values_by_id.keys())
+                    logger.info(
+                        f"Status update received (ids={received_ids}): {payload or '(empty)'}"
+                    )
                 if not payload:
                     continue
+                if debug:
+                    logger.info(f"Serial write line: {_encode_payload(payload).strip()}")
                 try:
                     serial_writer.write_json_line(payload)
                 except SerialException as exc:
@@ -205,6 +229,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger) -
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description='Robot serial display (gRPC client).')
     parser.add_argument('--config', default=None, help='Path to YAML config (defaults to package config/default.yaml).')
+    parser.add_argument('--debug', action='store_true', help='Log each status update and payload.')
     args, ros_args = parser.parse_known_args(argv)
 
     cfg = load_config(args.config)
@@ -223,7 +248,7 @@ def main(argv: list[str] | None = None) -> None:
             pass
 
     try:
-        loop.run_until_complete(_run(cfg, stop_event=stop_event, logger=logger))
+        loop.run_until_complete(_run(cfg, stop_event=stop_event, logger=logger, debug=args.debug))
     finally:
         loop.close()
         try:

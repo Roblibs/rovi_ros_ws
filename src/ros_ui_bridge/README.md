@@ -44,11 +44,13 @@ ros2 run ros_ui_bridge ui_bridge -- --config /path/to/ui_bridge.yaml
 To verify the gRPC streams (server reflection is not enabled):
 
 ```bash
+sudo snap install --edge grpcurl
+
 # Robot state stream
-grpcurl -plaintext -import-path /home/wassi/dev/Roblibs/rovi_ros_ws/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamRobotState
+grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamRobotState
 
 # Lidar stream
-grpcurl -plaintext -import-path /home/wassi/dev/Roblibs/rovi_ros_ws/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamLidar
+grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamLidar
 ```
 
 ## Configuration
@@ -57,7 +59,7 @@ See `config/default.yaml` (installed at `$(ros2 pkg prefix ros_ui_bridge)/share/
 
 Configuration is organized under `streams:`:
 
-- `streams.status` — cadence, default staleness window (`stale_after_s`), and `fields` (unit/min/max/target + source). Supported sources:
+- `streams.status` — cadence, default staleness window (`stale_after_s`), optional `debug_log`/`always_publish`, and `fields` (unit/min/max/target + source). Supported sources:
   - `system` / `cpu_percent`
   - `ros` / `topic_value` (topic + msg_type + value_key, optional downsample_period_s)
   - `ros` / `topic_rate` (topic, optional msg_type)

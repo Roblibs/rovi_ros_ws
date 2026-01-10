@@ -157,6 +157,11 @@ def generate_launch_description() -> LaunchDescription:
         default_value=default_ui_bridge_config,
         description='Path to ros_ui_bridge YAML config.',
     )
+    ui_bridge_log_level_arg = DeclareLaunchArgument(
+        'ui_bridge_log_level',
+        default_value='info',
+        description='ROS log level for ros_ui_bridge (e.g., debug, info, warn, error).',
+    )
     serial_display_enabled_arg = DeclareLaunchArgument(
         'serial_display_enabled',
         default_value='true',
@@ -166,6 +171,16 @@ def generate_launch_description() -> LaunchDescription:
         'serial_display_config',
         default_value=default_serial_display_config,
         description='Path to robot_serial_display YAML config.',
+    )
+    serial_display_log_level_arg = DeclareLaunchArgument(
+        'serial_display_log_level',
+        default_value='info',
+        description='ROS log level for robot_serial_display (e.g., debug, info, warn, error).',
+    )
+    serial_display_debug_arg = DeclareLaunchArgument(
+        'serial_display_debug',
+        default_value='false',
+        description='Enable verbose robot_serial_display payload logging.',
     )
 
     # Simulation backend (sim)
@@ -371,15 +386,39 @@ def generate_launch_description() -> LaunchDescription:
         output='screen',
         arguments=['--config', LaunchConfiguration('ui_bridge_config')],
         parameters=[{'use_sim_time': use_sim_time_param}],
+        ros_arguments=['--ros-args', '--log-level', LaunchConfiguration('ui_bridge_log_level')],
     )
 
     serial_display_node = Node(
-        condition=IfCondition(LaunchConfiguration('serial_display_enabled')),
+        condition=IfCondition(PythonExpression([
+            "'",
+            LaunchConfiguration('serial_display_enabled'),
+            "' == 'true' and '",
+            LaunchConfiguration('serial_display_debug'),
+            "' != 'true'",
+        ])),
         package='robot_serial_display',
         executable='serial_display',
         name='robot_serial_display',
         output='screen',
         arguments=['--config', LaunchConfiguration('serial_display_config')],
+        ros_arguments=['--ros-args', '--log-level', LaunchConfiguration('serial_display_log_level')],
+    )
+
+    serial_display_debug_node = Node(
+        condition=IfCondition(PythonExpression([
+            "'",
+            LaunchConfiguration('serial_display_enabled'),
+            "' == 'true' and '",
+            LaunchConfiguration('serial_display_debug'),
+            "' == 'true'",
+        ])),
+        package='robot_serial_display',
+        executable='serial_display',
+        name='robot_serial_display',
+        output='screen',
+        arguments=['--config', LaunchConfiguration('serial_display_config'), '--debug'],
+        ros_arguments=['--ros-args', '--log-level', LaunchConfiguration('serial_display_log_level')],
     )
 
     return LaunchDescription([
@@ -401,8 +440,11 @@ def generate_launch_description() -> LaunchDescription:
         lidar_angle_comp_arg,
         ui_bridge_enabled_arg,
         ui_bridge_config_arg,
+        ui_bridge_log_level_arg,
         serial_display_enabled_arg,
         serial_display_config_arg,
+        serial_display_log_level_arg,
+        serial_display_debug_arg,
         world_arg,
         gazebo_gui_arg,
         *venv_env_actions,
@@ -415,6 +457,7 @@ def generate_launch_description() -> LaunchDescription:
         lidar_node,
         ui_bridge_node,
         serial_display_node,
+        serial_display_debug_node,
         sim_backend,
         sim_base,
         sim_odom,

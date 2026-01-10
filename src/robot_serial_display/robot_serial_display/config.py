@@ -13,6 +13,7 @@ class SerialDisplayConfig:
     serial_port: str
     baudrate: int
     selected_ids: list[str]
+    selected_scales: dict[str, float]
     reconnect_delay_s: float
 
 
@@ -51,7 +52,7 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
     gateway_address = str(gateway.get('address', '127.0.0.1:50051'))
     serial_port = str(serial.get('port', '/dev/robot_display'))
     baudrate = int(serial.get('baudrate', 256000))
-    selected_ids = _read_string_list(display.get('selected_ids'))
+    selected_ids, selected_scales = _read_selected_ids(display.get('selected_ids'))
     reconnect_delay_s = float(data.get('reconnect_delay_s', 2.0))
 
     if reconnect_delay_s <= 0:
@@ -62,6 +63,7 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
         serial_port=serial_port,
         baudrate=baudrate,
         selected_ids=selected_ids,
+        selected_scales=selected_scales,
         reconnect_delay_s=reconnect_delay_s,
     )
 
@@ -75,16 +77,31 @@ def _read_map(parent: dict[str, Any], key: str) -> dict[str, Any]:
     return value
 
 
-def _read_string_list(value: Any) -> list[str]:
+def _read_selected_ids(value: Any) -> tuple[list[str], dict[str, float]]:
     if value is None:
-        return []
+        return [], {}
     if not isinstance(value, list):
         raise RuntimeError("Invalid 'display.selected_ids' (expected list)")
     out: list[str] = []
+    scales: dict[str, float] = {}
     for item in value:
         if item is None:
+            continue
+        if isinstance(item, dict):
+            raw_id = item.get('id')
+            if raw_id is None:
+                continue
+            field_id = str(raw_id).strip()
+            if not field_id:
+                continue
+            out.append(field_id)
+            if 'scale' in item and item['scale'] is not None:
+                try:
+                    scales[field_id] = float(item['scale'])
+                except (TypeError, ValueError) as exc:
+                    raise RuntimeError(f"Invalid scale for display.selected_ids id='{field_id}'") from exc
             continue
         s = str(item).strip()
         if s:
             out.append(s)
-    return out
+    return out, scales

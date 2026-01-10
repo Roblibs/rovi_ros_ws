@@ -99,6 +99,8 @@ class RobotModelConfig:
 class StatusStreamConfig:
     period_s: float  # Collection/publish period
     stale_after_s: float  # Default staleness window for all fields
+    debug_log: bool  # Log status publish events
+    always_publish: bool  # Publish every period, even if values unchanged
     fields: list[StatusFieldConfig]
 
 
@@ -311,12 +313,16 @@ def _parse_status_stream(value: Any) -> StatusStreamConfig:
     stale_after_s = float(section.get('stale_after_s', 7.0))
     if stale_after_s <= 0:
         stale_after_s = 7.0
+    debug_log = bool(section.get('debug_log', False))
+    always_publish = bool(section.get('always_publish', False))
 
     fields = _parse_status_fields(section.get('fields'), default_stale_after_s=stale_after_s)
 
     return StatusStreamConfig(
         period_s=period_s,
         stale_after_s=stale_after_s,
+        debug_log=debug_log,
+        always_publish=always_publish,
         fields=fields,
     )
 

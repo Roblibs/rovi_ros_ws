@@ -40,6 +40,8 @@ async def _publish_status_loop(
     period_s = cfg.status_stream.period_s
     if period_s <= 0.0:
         period_s = 3.0
+    debug_log = cfg.status_stream.debug_log
+    always_publish = cfg.status_stream.always_publish
 
     last_signature: Optional[tuple[tuple[str, float, int, int], ...]] = None
     seq = 0
@@ -62,15 +64,20 @@ async def _publish_status_loop(
         signature = tuple(sorted((v.id, v.value, v.stamp.sec, v.stamp.nanosec) for v in values))
 
         # If we've never sent anything and have no values yet, stay quiet to avoid empty spam.
-        if last_signature is None and not signature:
+        if last_signature is None and not signature and not always_publish:
             await asyncio.sleep(period_s)
             continue
 
-        if signature != last_signature:
+        if always_publish or signature != last_signature:
             seq += 1
             snapshot = broadcaster.build_snapshot(seq=seq, stamp=now_ros.to_msg(), values=values)
             await broadcaster.publish(snapshot)
             last_signature = signature
+            if debug_log:
+                ids = sorted({v.id for v in values})
+                ros_node.get_logger().info(
+                    f"Status publish seq={seq} ids={ids} values={len(values)}"
+                )
 
         await asyncio.sleep(period_s)
 

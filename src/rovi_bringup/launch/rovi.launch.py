@@ -51,6 +51,7 @@ def generate_launch_description() -> LaunchDescription:
     desc_share = get_package_share_directory('rovi_description')
     sim_share = get_package_share_directory('rovi_sim')
     ui_bridge_share = get_package_share_directory('ros_ui_bridge')
+    serial_display_share = get_package_share_directory('robot_serial_display')
 
     robot_bringup_launch = os.path.join(bringup_share, 'launch', 'robot_bringup.launch.py')
     teleop_stack_launch = os.path.join(bringup_share, 'launch', 'teleop.launch.py')
@@ -63,6 +64,8 @@ def generate_launch_description() -> LaunchDescription:
     default_rviz_nav = os.path.join(desc_share, 'rviz', 'rovi_nav.rviz')
     default_rviz_odom = os.path.join(desc_share, 'rviz', 'rovi_odom.rviz')
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
+    default_ui_bridge_config = os.path.join(ui_bridge_share, 'config', 'default.yaml')
+    default_serial_display_config = os.path.join(serial_display_share, 'config', 'default.yaml')
 
     robot_mode = DeclareLaunchArgument(
         'robot_mode',
@@ -112,6 +115,31 @@ def generate_launch_description() -> LaunchDescription:
         'cmd_vel_topic',
         default_value='cmd_vel',
         description='Final /cmd_vel topic produced by twist_mux and consumed by the robot backend.',
+    )
+    ui_bridge_config = DeclareLaunchArgument(
+        'ui_bridge_config',
+        default_value=default_ui_bridge_config,
+        description='Path to ros_ui_bridge YAML config.',
+    )
+    ui_bridge_log_level = DeclareLaunchArgument(
+        'ui_bridge_log_level',
+        default_value='info',
+        description='ROS log level for ros_ui_bridge (debug/info/warn/error).',
+    )
+    serial_display_config = DeclareLaunchArgument(
+        'serial_display_config',
+        default_value=default_serial_display_config,
+        description='Path to robot_serial_display YAML config.',
+    )
+    serial_display_log_level = DeclareLaunchArgument(
+        'serial_display_log_level',
+        default_value='info',
+        description='ROS log level for robot_serial_display (debug/info/warn/error).',
+    )
+    serial_display_debug = DeclareLaunchArgument(
+        'serial_display_debug',
+        default_value='false',
+        description='Enable verbose robot_serial_display payload logging.',
     )
 
     # Common robot/backend args (passed to robot_bringup).
@@ -185,6 +213,11 @@ def generate_launch_description() -> LaunchDescription:
             'gazebo_gui': LaunchConfiguration('gazebo_gui'),
             'odom_integrator_publish_tf': odom_integrator_publish_tf,
             'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
+            'ui_bridge_config': LaunchConfiguration('ui_bridge_config'),
+            'ui_bridge_log_level': LaunchConfiguration('ui_bridge_log_level'),
+            'serial_display_config': LaunchConfiguration('serial_display_config'),
+            'serial_display_log_level': LaunchConfiguration('serial_display_log_level'),
+            'serial_display_debug': LaunchConfiguration('serial_display_debug'),
         }.items(),
     )
 
@@ -255,6 +288,11 @@ def generate_launch_description() -> LaunchDescription:
         OpaqueFunction(function=_write_current_launch),
         joy_enabled,
         cmd_vel_topic,
+        ui_bridge_config,
+        ui_bridge_log_level,
+        serial_display_config,
+        serial_display_log_level,
+        serial_display_debug,
         model,
         world,
         gazebo_gui,
