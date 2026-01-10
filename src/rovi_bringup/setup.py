@@ -20,8 +20,7 @@ setup(
     maintainer_email='wassim.filali@gmail.com',
     description='Bringup launch files for Room View Bot teleoperation.',
     license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={
+entry_points={
         'console_scripts': [
             'rovi_session = rovi_bringup.cli.session:main',
             'rovi_bag = rovi_bringup.cli.bag:main',

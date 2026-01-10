@@ -21,7 +21,6 @@ setup(
     maintainer_email='wassim.filali@gmail.com',
     description='Nav2 integration (launch + configuration) for Room View Bot.',
     license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={},
+entry_points={},
 )
 

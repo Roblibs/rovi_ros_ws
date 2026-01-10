@@ -22,8 +22,7 @@ setup(
     maintainer_email='wassim.filali@gmail.com',
     description='Gazebo Sim integration for Room View Bot (Rovi).',
     license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={
+entry_points={
         'console_scripts': [
             'rovi_sim_base = rovi_sim.sim_base_node:main',
             'rovi_gz_odom = rovi_sim.gz_odom_node:main',

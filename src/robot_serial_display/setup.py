@@ -20,8 +20,7 @@ setup(
     maintainer_email='wassim.filali@gmail.com',
     description='Serial display client for ros_ui_bridge.',
     license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={
+entry_points={
         'console_scripts': [
             'serial_display = robot_serial_display.serial_display_node:main',
         ],

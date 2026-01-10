@@ -45,7 +45,12 @@ stop() {
 }
 
 build() {
-  (cd "${ROVI_ROS_WS_DIR}" && colcon build "$@")
+  ensure_venv || return 1
+  if [ ! -x "${ROVI_ROS_WS_DIR}/.venv/bin/colcon" ]; then
+    echo "[rovi_env] Missing ${ROVI_ROS_WS_DIR}/.venv/bin/colcon (run: uv sync)" >&2
+    return 1
+  fi
+  "${ROVI_ROS_WS_DIR}/.venv/bin/colcon" build "$@"
 }
 
 setup() {
@@ -66,13 +71,21 @@ activate() {
   source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
 }
 
+ensure_venv() {
+  if [ ! -f "${ROVI_ROS_WS_DIR}/.venv/bin/activate" ]; then
+    echo "[rovi_env] Missing ${ROVI_ROS_WS_DIR}/.venv/bin/activate (run: uv sync)" >&2
+    return 1
+  fi
+  if [ "${VIRTUAL_ENV:-}" != "${ROVI_ROS_WS_DIR}/.venv" ]; then
+    # shellcheck disable=SC1091
+    source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
+  fi
+}
+
 ws() {
   cd "${ROVI_ROS_WS_DIR}" || return
   setup
-  #optioanl activate, silent skip
-  #if [ -f "${ROVI_ROS_WS_DIR}/.venv/bin/activate" ]; then
-  #  source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
-  #fi
+  ensure_venv
 }
 
 record() {

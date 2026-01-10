@@ -21,8 +21,7 @@ setup(
     maintainer_email='wassim.filali@gmail.com',
     description='ROS UI bridge: gRPC status/metrics streaming.',
     license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={
+entry_points={
         'console_scripts': [
             'ui_bridge = ros_ui_bridge.ui_bridge_node:main',
         ],

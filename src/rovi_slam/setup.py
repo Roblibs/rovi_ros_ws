@@ -20,7 +20,6 @@ setup(
     maintainer_email='wassim.filali@gmail.com',
     description='SLAM toolbox launch and configuration for Room View Bot.',
     license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={},
+entry_points={},
 )
 

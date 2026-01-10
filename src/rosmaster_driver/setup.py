@@ -22,8 +22,7 @@ setup(
     maintainer_email='todo@example.com',
     description='Minimal Rosmaster driver: subscribes to cmd_vel and publishes IMU, mag, voltage, edition, joint_states, and vel_raw.',
     license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={
+entry_points={
         'console_scripts': [
             'rosmaster_driver_node = rosmaster_driver.driver_node:main',
         ],

@@ -6,10 +6,13 @@ requires-python = ">=3.12"
 dependencies = [
     "pyserial>=3.5",
     "psutil>=5.9",
+    "colcon-common-extensions>=0.3",
     "grpcio>=1.60",
     "protobuf>=4.25",
     "PyYAML>=6.0",
+    "catkin_pkg>=0.5",
     "rosmaster-lib",
+    "numpy>=2.4.1",
 ]
 
 [tool.uv.sources]

@@ -9,11 +9,11 @@ All commands in this section are provided by `rovi_env.sh`
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
-| `ws` | Changes to `$ROVI_ROS_WS_DIR`, runs `setup`, and (if present) activates `.venv`. |
-| `build` | Runs `colcon build` in this workspace. This generates/updates the `install/` overlay used by `ros2 launch`. |
+| `ws` | Changes to `$ROVI_ROS_WS_DIR`, runs `setup`, and activates `.venv`. |
+| `build` | Runs `colcon build` from the workspace `.venv`. This generates/updates the `install/` overlay used by `ros2 launch`. |
 | `stop` | Stops ROS/Gazebo/RViz processes that belong to this workspace (use `stop --all` for an aggressive full user hard-stop). |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
-| `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack (notably `rosmaster_driver`). |
+| `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack and Python nodes. |
 | `keyboard` | Runs `tools/rovi_keyboard.py` in the current terminal and publishes `/cmd_vel_keyboard` for `twist_mux` (run in its own terminal). |
 | `foxglove` | PC only: runs `ros2 launch foxglove_bridge foxglove_bridge_launch.xml` (Foxglove WebSocket bridge). |
 

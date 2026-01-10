@@ -1,3 +1,14 @@
+# 2026-01-10
+
+## Venv-first build/runtime policy
+
+Standardized the workspace to build and run Python ROS nodes with the `.venv` interpreter to keep runtime and build dependencies consistent (e.g., `grpc`, `catkin_pkg`, `colcon`), and avoid system Python drift.
+
+**Key changes:**
+- `rovi_env.sh` activates the venv for `ws`/`build` and uses venv `colcon`.
+- `pyproject.toml` includes `colcon-common-extensions` and `catkin_pkg` for venv builds.
+- Docs updated to reflect venv-first build/run flow.
+
 # 2026-01-02
 
 ## Status stream unification (fields + metadata, ROS-time staleness)
