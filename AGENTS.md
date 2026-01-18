@@ -3,8 +3,8 @@
 ## workflow traceability
 Three types of documents shall be maintained at all times to keep track of past, present and future developmet :
 - present : in `README.md` in any folder with hirerchical scope, always suggest changes to keep readme content up to date but keep it minimal without too much details.
-- past : log all important impactful decisions in `gen.md` which should have the generation log and reasons why design decision was taken and changes made, these are important to know so that design does not keep being changed looping in circles and learn lessons to avoid in future concepts.
-- future is noted in `plan.md` which is an open log for ideas and handing over to future agents, there we can coordinate conflicts avoidance when designing something that it does not fundamentally contradict future plans otherwise it should be mentioned and revised.
+- past : log all important impactful decisions in `gen.md` which should have the generation log and reasons why design decision was taken and changes made, these are important to know so that design does not keep being changed looping in circles and learn lessons to avoid in future concepts. Additions in `gen.md` are always on demand or subject to confirmations, can be suggested by an agent at the end of the change but never updated spontaneously.
+- future is noted in `plan.md` which is an open log for ideas and handing over to future agents, there we can coordinate conflicts avoidance when designing something that it does not fundamentally contradict future plans otherwise it should be mentioned and revised. Changes in `plan.md` are always on demand.
 
 ## What this workspace is
 ROS 2 Jazzy workspace for the ROVI robot with three runtime backends:
