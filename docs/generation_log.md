@@ -1,3 +1,17 @@
+# 2026-01-18
+
+## Ctrl-C shutdown idempotency (rclpy + launch)
+
+ROS 2 `launch` propagates SIGINT (Ctrl-C) to all node processes. For `rclpy` nodes, shutdown may be initiated by rclpy’s signal handler and/or by application code (e.g., a `finally:` block). This means calling `rclpy.shutdown()` unconditionally can raise `RCLError: rcl_shutdown already called` and cause a non-zero exit during otherwise-normal bringup teardown.
+
+**Design guidance:**
+- Treat shutdown as **idempotent**: prefer `rclpy.try_shutdown()` (or guard with `rclpy.ok()`).
+- Catch `ExternalShutdownException` alongside `KeyboardInterrupt` when spinning/executing.
+- Keep teardown robust: wrap `destroy_node()` in a best-effort `try/except` so signal timing doesn’t turn into “process died” noise.
+
+**Applied fix:**
+- `rosmaster_driver` now uses `rclpy.try_shutdown()` and handles external shutdown to avoid exit code 1 on Ctrl-C.
+
 # 2026-01-10
 
 ## Venv-first build/runtime policy
