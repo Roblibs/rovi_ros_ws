@@ -1,5 +1,15 @@
 # 2026-01-18
 
+## USB device identity + udev mapping
+A lesson learned with CH340.
+
+We hit intermittent failures because the Rosmaster control board and RPLidar both enumerate as identical CH340 USB-serial devices (`1a86:7523`), so `/dev/serial/by-id` is not reliable (no unique serial; “last one wins”). The fix is to avoid `/dev/ttyUSB*` and instead install stable symlinks using `ENV{ID_PATH}` (physical port path) plus an active probe to decide which CH340 is the Rosmaster.
+
+**Design guidance:**
+- Prefer stable names in the stack: `/dev/robot_control`, `/dev/robot_lidar`, `/dev/robot_display`.
+- Use a single installer (`tools/rovi_usb_setup.py`) that in case of duplicated ids, requires all devices attached, to identify them in install time e.g. via `get_version()` (expects `3.5`), and writes udev rules keyed by `ID_PATH`.
+- Manual debug are available for override (`ROVI_ROSMASTER_PORT`, `ROVI_LIDAR_PORT`, `ROVI_DISPLAY_PORT`), but treat them as temporary; clear them to avoid confusion.
+
 ## Ctrl-C shutdown idempotency (rclpy + launch)
 
 ROS 2 `launch` propagates SIGINT (Ctrl-C) to all node processes. For `rclpy` nodes, shutdown may be initiated by rclpy’s signal handler and/or by application code (e.g., a `finally:` block). This means calling `rclpy.shutdown()` unconditionally can raise `RCLError: rcl_shutdown already called` and cause a non-zero exit during otherwise-normal bringup teardown.
