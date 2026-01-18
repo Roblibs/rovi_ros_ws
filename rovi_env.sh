@@ -148,13 +148,16 @@ view() {
 
   case "${mode}" in
     nav)
-      rviz2 -d "${ROVI_ROS_WS_DIR}/install/rovi_description/share/rovi_description/rviz/rovi_nav.rviz" "$@"
+      rviz_cfg="${ROVI_ROS_WS_DIR}/src/rovi_description/rviz/rovi_nav.rviz"
+      rviz2 -d "${rviz_cfg}" "$@"
       ;;
     mapping)
-      rviz2 -d "${ROVI_ROS_WS_DIR}/install/rovi_description/share/rovi_description/rviz/rovi_map.rviz" "$@"
+      rviz_cfg="${ROVI_ROS_WS_DIR}/src/rovi_description/rviz/rovi_map.rviz"
+      rviz2 -d "${rviz_cfg}" "$@"
       ;;
     teleop)
-      rviz2 -d "${ROVI_ROS_WS_DIR}/install/rovi_description/share/rovi_description/rviz/rovi_odom.rviz" "$@"
+      rviz_cfg="${ROVI_ROS_WS_DIR}/src/rovi_description/rviz/rovi_odom.rviz"
+      rviz2 -d "${rviz_cfg}" "$@"
       ;;
     offline)
       ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_bringup rovi.launch.py \
