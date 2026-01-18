@@ -68,7 +68,7 @@ Parameters:
 - `imu_link` (string, default `imu_link`)
 - `prefix` (string, default empty) — prepended to joint names
 - `publish_rate` (double, default `10.0` Hz)
-- `port` (string, default `/dev/my_ros_board`) — serial device for the controller
+- `port` (string, default `/dev/robot_control`) — serial device for the controller
 - `debug` (bool, default `False`) — enable Rosmaster debug logging
 - `rot90` (bool, default `True`): swap/negate X/Y so ROS topics follow REP-103 (x forward, y left)
 

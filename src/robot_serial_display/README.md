@@ -14,6 +14,8 @@ Key options:
 - `serial.port` / `serial.baudrate`: serial device (e.g. `/dev/robot_display`)
 - `display.selected_ids`: ordered list of status field IDs to forward to the display (supports optional per-ID `scale`, e.g. `voltage` at x10)
 
+Override the serial port at runtime with `ROVI_DISPLAY_PORT` (useful for debugging without udev rules).
+
 The node calls `GetStatus` once to fetch metadata (unit/min/max/target) and the latest non-stale values, then subscribes to `StreamStatus` for ongoing updates. Only selected IDs with a current value are forwarded; values disappear when stale upstream.
 
 If the gRPC bridge isn’t up yet, the node logs a single “waiting” line and keeps retrying until it can connect.

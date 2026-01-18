@@ -1,5 +1,5 @@
 rosmaster_driver:
   ros__parameters:
     publish_rate: 10.0
-    port: /dev/my_ros_board
+    port: /dev/robot_control
     rot90: true

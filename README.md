@@ -22,7 +22,6 @@ Tables with the full list of packages, launches, nodes and params are also avail
 | `view` | PC view: `view` (default `nav`) or `view teleop|mapping|nav`; `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
-| `tools/robot_display_setup.py` | One-time (run with sudo): installs udev rule `/dev/robot_display` for the ESP32-S3 display. |
 
 # Install
 
@@ -66,6 +65,44 @@ sudo apt install -y \
   ros-jazzy-nav2-rviz-plugins \
   ros-jazzy-imu-filter-madgwick
 ```
+
+## USB device setup (robot)
+Connect the Rosmaster control board, RPLidar, and the ESP32-S3 display, then run:
+
+```bash
+sudo python3 tools/rovi_usb_setup.py
+```
+
+This creates stable symlinks:
+- `/dev/robot_control` (Rosmaster board)
+- `/dev/robot_lidar` (RPLidar)
+- `/dev/robot_display` (ESP32-S3 display)
+
+Manual overrides (no udev install) are available for debugging:
+
+```bash
+export ROVI_ROSMASTER_PORT=/dev/ttyUSB0
+export ROVI_LIDAR_PORT=/dev/ttyUSB1
+export ROVI_DISPLAY_PORT=/dev/ttyACM0
+```
+
+Verify the mapping (recommended after setup):
+
+```bash
+ls -l /dev/robot_control /dev/robot_lidar /dev/robot_display
+env | rg "ROVI_.*_PORT"
+unset ROVI_ROSMASTER_PORT ROVI_LIDAR_PORT ROVI_DISPLAY_PORT
+```
+
+With `teleop` running in another terminal:
+
+```bash
+ros2 param get /rplidar_composition serial_port
+ros2 topic echo /scan --once
+ros2 topic echo /voltage --once
+```
+
+If you still see `/dev/ttyUSB0` or `/dev/ttyACM0` in logs, an override is active.
 
 ## Config in `~/.bashrc`
 Add these lines to your real `~/.bashrc`:

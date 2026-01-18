@@ -110,7 +110,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     rosmaster_port_arg = DeclareLaunchArgument(
         'rosmaster_port',
-        default_value='/dev/my_ros_board',
+        default_value=EnvironmentVariable('ROVI_ROSMASTER_PORT', default_value='/dev/robot_control'),
         description='Serial device exposed by the Rosmaster base board',
     )
     rosmaster_debug_arg = DeclareLaunchArgument(
@@ -127,8 +127,8 @@ def generate_launch_description() -> LaunchDescription:
     )
     lidar_port_arg = DeclareLaunchArgument(
         'lidar_serial_port',
-        default_value='/dev/ttyUSB0',
-        description='Serial device for RPLIDAR (e.g., /dev/ttyUSB0)',
+        default_value=EnvironmentVariable('ROVI_LIDAR_PORT', default_value='/dev/robot_lidar'),
+        description='Serial device for RPLIDAR (e.g., /dev/robot_lidar)',
     )
     lidar_frame_arg = DeclareLaunchArgument(
         'lidar_frame',

@@ -48,7 +48,7 @@ def apply_rot90_xyz(x: float, y: float, z: float, *, rot90: bool, reverse: bool)
 class RosmasterAdapter:
     """Thin wrapper around Rosmaster library using your GitHub dependency."""
 
-    def __init__(self, node: Node, port: str = '/dev/my_ros_board', debug: bool = False) -> None:
+    def __init__(self, node: Node, port: str = '/dev/robot_control', debug: bool = False) -> None:
         self._node = node
         self._node.get_logger().info(f"[init] Creating Rosmaster(com={port}, debug={debug})")
         # Instantiate hardware using provided port and debug flag
@@ -100,7 +100,7 @@ class RosmasterDriverNode(Node):
         self.declare_parameter('imu_link', 'imu_link')
         self.declare_parameter('prefix', '')
         self.declare_parameter('publish_rate', 10.0)  # Hz
-        self.declare_parameter('port', '/dev/my_ros_board')
+        self.declare_parameter('port', '/dev/robot_control')
         self.declare_parameter('debug', False)
         self.declare_parameter('encoder_ticks_per_rev', 2464.0)
         self.declare_parameter('rot90', True)

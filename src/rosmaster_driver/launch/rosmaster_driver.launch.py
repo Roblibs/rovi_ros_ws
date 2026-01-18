@@ -41,7 +41,7 @@ def generate_launch_description() -> LaunchDescription:
                 'imu_link': 'imu_link',
                 'publish_rate': 10.0,
                 'prefix': '',
-                'port': '/dev/my_ros_board',
+                'port': EnvironmentVariable('ROVI_ROSMASTER_PORT', default_value='/dev/robot_control'),
                 'debug': False,
                 'rot90': True,
             }],

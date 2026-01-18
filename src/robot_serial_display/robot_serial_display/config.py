@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,9 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
 
     gateway_address = str(gateway.get('address', '127.0.0.1:50051'))
     serial_port = str(serial.get('port', '/dev/robot_display'))
+    env_port = os.environ.get('ROVI_DISPLAY_PORT')
+    if env_port:
+        serial_port = env_port
     baudrate = int(serial.get('baudrate', 256000))
     selected_ids, selected_scales = _read_selected_ids(display.get('selected_ids'))
     reconnect_delay_s = float(data.get('reconnect_delay_s', 2.0))
