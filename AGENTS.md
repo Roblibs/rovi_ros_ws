@@ -1,5 +1,11 @@
 # AGENTS.md — rovi_ros_ws (ROVI / Room-View Bot)
 
+## workflow traceability
+Three types of documents shall be maintained at all times to keep track of past, present and future developmet :
+- present : in `README.md` in any folder with hirerchical scope, always suggest changes to keep readme content up to date but keep it minimal without too much details.
+- past : log all important impactful decisions in `gen.md` which should have the generation log and reasons why design decision was taken and changes made, these are important to know so that design does not keep being changed looping in circles and learn lessons to avoid in future concepts.
+- future is noted in `plan.md` which is an open log for ideas and handing over to future agents, there we can coordinate conflicts avoidance when designing something that it does not fundamentally contradict future plans otherwise it should be mentioned and revised.
+
 ## What this workspace is
 ROS 2 Jazzy workspace for the ROVI robot with three runtime backends:
 - `robot_mode:=real` (hardware)
@@ -32,7 +38,6 @@ This file is intentionally short and focuses on the "golden path". For deeper re
 - `docs/nodes.md`: commands, packages, launches, nodes, and key params (good as a quick index / source of truth).
 - `docs/reference.md`: deeper reference notes (robot interface contract, joystick mapping, rosbags helpers, rosmaster driver details, sensor notes).
 - `docs/stereo.md`: stereo camera notes.
-- `docs/TODO.md`: open tasks / ideas.
 
 ## Repo map (where to look first)
 Core packages (owned here): :contentReference[oaicite:9]{index=9}
@@ -79,7 +84,7 @@ When changing behavior, start from these:
 Nav/SLAM/RViz typically rely on:
 `map -> odom -> base_footprint -> base_link -> laser_link` (+ imu link) :contentReference[oaicite:17]{index=17}
 
-## Change policy (for agents and humans)
+## Change policy
 - Prefer **small, reviewable commits** over sweeping refactors.
 - Before renaming/remapping topics/frames/launch args, search for consumers (Nav2 configs, RViz configs, UI bridge).
 - Keep `robot_mode:=real|sim|offline` parity: if you add a feature to one backend, either add it to the other or explicitly gate it with a launch arg and document the difference.
