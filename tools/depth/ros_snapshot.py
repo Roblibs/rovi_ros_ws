@@ -203,18 +203,19 @@ def main() -> int:
     parser.add_argument(
         "--topic",
         action="append",
-        default=["/depth_raw/image", "/ir/image_raw"],
-        help="Image topic to capture (repeatable). Default: /depth_raw/image and /ir/image_raw",
+        default=None,
+        help="Image topic to capture (repeatable). Default: /depth_raw/image",
     )
     parser.add_argument("--out-dir", default="output/cam_snapshot_ros", help="Output directory (gitignored).")
     parser.add_argument("--timeout-s", type=float, default=5.0, help="Timeout in seconds.")
     args = parser.parse_args()
 
+    topics = args.topic or ["/depth_raw/image"]
     out_dir = os.path.abspath(args.out_dir)
     os.makedirs(out_dir, exist_ok=True)
 
     rclpy.init(args=None)
-    node = SnapshotNode(args.topic)
+    node = SnapshotNode(topics)
     start = time.time()
     try:
         while rclpy.ok() and not node.all_received():
@@ -227,7 +228,7 @@ def main() -> int:
 
     received = node.received()
     if not received:
-        print(f"No images received within {args.timeout_s}s. Topics tried: {', '.join(args.topic)}", file=sys.stderr)
+        print(f"No images received within {args.timeout_s}s. Topics tried: {', '.join(topics)}", file=sys.stderr)
         return 2
 
     for topic, msg in received.items():
@@ -237,7 +238,7 @@ def main() -> int:
         except Exception as e:
             print(f"{topic} -> ERROR: {e}", file=sys.stderr)
 
-    missing = [t for t in args.topic if t not in received]
+    missing = [t for t in topics if t not in received]
     if missing:
         print(f"Missing topics (no messages in time): {', '.join(missing)}", file=sys.stderr)
         return 1

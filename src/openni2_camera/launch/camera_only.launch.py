@@ -58,6 +58,18 @@ def generate_launch_description():
     ir_mode = LaunchConfiguration(ir_mode_param_name)
     ir_mode_launch_arg = DeclareLaunchArgument(ir_mode_param_name, default_value='ORBBEC_640x400_30Hz')
 
+    enable_ir_param_name = "enable_ir"
+    enable_ir = LaunchConfiguration(enable_ir_param_name)
+    enable_ir_launch_arg = DeclareLaunchArgument(enable_ir_param_name, default_value='false')
+
+    enable_color_param_name = "enable_color"
+    enable_color = LaunchConfiguration(enable_color_param_name)
+    enable_color_launch_arg = DeclareLaunchArgument(enable_color_param_name, default_value='false')
+
+    enable_depth_param_name = "enable_depth"
+    enable_depth = LaunchConfiguration(enable_depth_param_name)
+    enable_depth_launch_arg = DeclareLaunchArgument(enable_depth_param_name, default_value='true')
+
     container = launch_ros.actions.ComposableNodeContainer(
             name='container',
             namespace=namespace,
@@ -69,10 +81,13 @@ def generate_launch_description():
                     package='openni2_camera',
                     plugin='openni2_wrapper::OpenNI2Driver',
                     name='driver',
-                    parameters=[{'depth_registration': True},
+                    parameters=[{'depth_registration': False},
                                 {'use_device_time': True},
                                 {depth_mode_param_name: depth_mode},
                                 {ir_mode_param_name: ir_mode},
+                                {enable_ir_param_name: enable_ir},
+                                {enable_color_param_name: enable_color},
+                                {enable_depth_param_name: enable_depth},
                                 {'rgb_frame_id': [namespace,"_rgb_optical_frame"]},
                                 {'depth_frame_id': [namespace,"_depth_optical_frame"]},
                                 {'ir_frame_id': [namespace,"_ir_optical_frame"]},],
@@ -92,6 +107,9 @@ def generate_launch_description():
       tf_prefix_launch_arg,
       depth_mode_launch_arg,
       ir_mode_launch_arg,
+      enable_ir_launch_arg,
+      enable_color_launch_arg,
+      enable_depth_launch_arg,
       container,
       tfs,
     ])

@@ -28,7 +28,6 @@ Save a single snapshot from ROS image topics (no OpenCV; writes `.pgm`/`.ppm`/`.
 
 Default topics:
 - `/depth_raw/image`
-- `/ir/image_raw`
 
 Run:
 

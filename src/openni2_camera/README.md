@@ -17,7 +17,15 @@ In practice this can lead to “streaming” topics that are black/invalid.
   - `ORBBEC_320x200_{15,30,60}Hz`
   - `ORBBEC_1280x800_{15,30}Hz`
 - Default `ir_mode` and `depth_mode` to `ORBBEC_640x400_30Hz` so `ros2 run openni2_camera openni2_camera_driver` works out-of-the-box on this robot.
+- Default `enable_ir:=false` and `enable_color:=false` to avoid publishing confusing/non-working topics on this robot. Depth stays enabled by default.
 - Skip trying to configure color video modes if the device has no OpenNI2 color sensor (this camera’s RGB is a separate UVC device, not OpenNI2).
+
+## Device selection (`device_id`)
+
+By default `openni2_camera_driver` uses `device_id:="#1"` which means “first device in the OpenNI2 enumerated list”.
+If you have multiple OpenNI2 devices connected, set `device_id` explicitly using the URI from:
+
+`ros2 run openni2_camera list_devices`
 
 ## How it is used
 

@@ -186,6 +186,10 @@ private:
   bool projector_info_subscribers_;
 
   bool use_device_time_;
+
+  bool enable_ir_;
+  bool enable_color_;
+  bool enable_depth_;
 };
 
 }

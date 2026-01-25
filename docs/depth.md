@@ -58,6 +58,8 @@ Notes:
 - If the driver prints “Unsupported * video mode …”, it’s usually non-fatal if topics are streaming. Confirm with:
   - `ros2 topic hz /depth_raw/image`
   - `ros2 topic echo /depth_raw/image --once` (check `encoding`, `width`, `height`)
+- This workspace’s `openni2_camera` overlay defaults to depth-only publishing (`enable_ir:=false`, `enable_color:=false`) to keep the topic list clean.
+- `device_id:="#1"` means “first OpenNI2 enumerated device”. If you ever plug multiple OpenNI2 cameras, set `device_id` using the URI from `ros2 run openni2_camera list_devices`.
 
 # Native
 ## Install
