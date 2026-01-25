@@ -22,6 +22,22 @@ Optional: pass a different SDK config path as arg1:
 
 `./ob_list /path/to/OrbbecSDKConfig.xml`
 
+## ros_snapshot
+
+Save a single snapshot from ROS image topics (no OpenCV; writes `.pgm`/`.ppm`/`.pfm`).
+
+Default topics:
+- `/depth_raw/image`
+- `/ir/image_raw`
+
+Run:
+
+`python3 tools/depth/ros_snapshot.py`
+
+Custom topics/output:
+
+`python3 tools/depth/ros_snapshot.py --topic /depth_raw/image --out-dir output/cam_snapshot_ros`
+
 runlog
 ```bash
 (rovi-ros-ws) wass@rovi:~/dev/rovi_ros_ws/tools/depth$ ./ob_list

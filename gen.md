@@ -22,6 +22,18 @@ ROS 2 `launch` propagates SIGINT (Ctrl-C) to all node processes. For `rclpy` nod
 **Applied fix:**
 - `rosmaster_driver` now uses `rclpy.try_shutdown()` and handles external shutdown to avoid exit code 1 on Ctrl-C.
 
+# 2026-01-25
+
+## Orbbec depth camera integration (Astra Stereo S U3 / Yahboom AI View Depth Camera)
+
+The camera’s depth stream works via OpenNI2, but OpenOrbbecSDK (used by `ros-jazzy-orbbec-camera`) does not accept the device on this robot: it enumerates USB but returns an empty device list (`deviceCount=0`), so the ROS driver never publishes real image topics.
+
+**Decision:**
+- Prefer ROS `openni2_camera` for depth/IR on Jazzy; treat RGB as a separate UVC camera if needed.
+
+**Gotchas:**
+- `openni2_camera` links against `libOpenNI2.so.0`, but the Orbbec OpenNI2 SDK ships `libOpenNI2.so`; a symlink + `LD_LIBRARY_PATH` are needed so ROS uses the Orbbec OpenNI2 driver (`liborbbec.so`) instead of the system OpenNI2.
+
 # 2026-01-10
 
 ## Venv-first build/runtime policy

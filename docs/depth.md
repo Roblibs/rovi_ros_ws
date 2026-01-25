@@ -1,54 +1,55 @@
 # ROS
 
-## Install (Jazzy apt)
+## Preferred driver: `openni2_camera` (Jazzy apt)
+
+This camera works reliably via OpenNI2 on this robot, so the preferred ROS path is `openni2_camera`.
+
+### Install
 
 ```bash
 sudo apt update
-sudo apt install -y ros-jazzy-orbbec-camera ros-jazzy-orbbec-description
+sudo apt install -y ros-jazzy-openni2-camera
 ```
 
-## udev rules (required)
+### Configure OpenNI2 (Orbbec SDK)
 
-```bash
-sudo cp /opt/ros/$ROS_DISTRO/share/orbbec_camera/udev/99-obsensor-libusb.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
-# unplug + replug camera
-```
+`openni2_camera` links against `libOpenNI2.so.0`. The Orbbec OpenNI2 SDK ships `libOpenNI2.so` (no `.so.0`), so add a symlink and prefer this directory via `LD_LIBRARY_PATH`.
 
-## Smoke test (headless)
-
-Start the driver (list available launches if unsure):
-```bash
-ls -1 /opt/ros/$ROS_DISTRO/share/orbbec_camera/launch
-```
-
-Example (try one launch that matches your device family, e.g. `astra2.launch.py`):
 ```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
-ros2 launch orbbec_camera astra2.launch.py camera_name:=camera
 
-ros2 launch orbbec_camera astra.launch.py usb_port:=3-1.3.2-6.0 log_level:=debug
-
+export OPENNI2_REDIST=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer
+ln -sf "$OPENNI2_REDIST/libOpenNI2.so" "$OPENNI2_REDIST/libOpenNI2.so.0"
+export LD_LIBRARY_PATH=$OPENNI2_REDIST:$LD_LIBRARY_PATH
 ```
 
-Verify topics/services:
+Sanity-check device discovery:
 ```bash
-ros2 topic list | rg '^/camera/'
-ros2 service list | rg '^/camera/.*save_'
+ros2 run openni2_camera list_devices
 ```
 
-Capture a quick snapshot set (saved under the current working directory as `./image/*`):
+If it still shows `Found 0 devices`, confirm which OpenNI2 library is being used:
 ```bash
-mkdir -p output/orbbec && cd output/orbbec
-ros2 service call /camera/save_images std_srvs/srv/Empty "{}"
-ls -la image
+ldd /opt/ros/$ROS_DISTRO/lib/openni2_camera/list_devices | rg 'OpenNI2'
 ```
 
+### Run (headless)
 
+Use the packaged launch:
+```bash
+ros2 launch openni2_camera camera_only.launch.py namespace:=camera
+```
 
-Current usb device port list:
- - 2-1.3.1-9.0 | USB Camera
- - 3-1.3.2-6.0 | Orbbec(R) Astra(TM) 3D Camera(F) Depth
+Verify:
+```bash
+ros2 topic list | rg -i 'openni|depth|ir|camera_info'
+```
+
+Notes:
+- Depth + IR come from OpenNI2. RGB may not be provided via OpenNI2 on this device (it presents RGB as a separate UVC camera), so treat RGB as a separate V4L2 camera if needed.
+- If the driver prints “Unsupported * video mode …”, it’s usually non-fatal if topics are streaming. Confirm with:
+  - `ros2 topic hz /depth_raw/image`
+  - `ros2 topic echo /depth_raw/image --once` (check `encoding`, `width`, `height`)
 
 # Native
 ## Install
@@ -308,4 +309,10 @@ ioctl: VIDIOC_ENUM_FMT
                         Interval: Discrete 0.067s (15.000 fps)
                         Interval: Discrete 0.100s (10.000 fps)
                         Interval: Discrete 0.200s (5.000 fps)
+```
+
+```bash
+wass@rovi:~$ v4l2-ctl -d /dev/video1 --list-formats-ext
+
+
 ```
