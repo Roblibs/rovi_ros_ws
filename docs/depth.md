@@ -40,6 +40,14 @@ Use the packaged launch:
 ros2 launch openni2_camera camera_only.launch.py namespace:=camera
 ```
 
+For this specific camera (Astra Stereo S U3), the OpenNI2 sensor modes are `640x400` and `320x200` (not `640x480`/`320x240`). If you see “Unsupported * video mode … 640x480 …” and the images are black, run with the Orbbec-specific modes:
+
+```bash
+ros2 run openni2_camera openni2_camera_driver
+```
+
+Note: this repo carries a small `openni2_camera` overlay patch (in `src/openni2_camera`) to add the `ORBBEC_640x400_*` / `ORBBEC_320x200_*` mode names and default to them; run `build` after pulling changes.
+
 Verify:
 ```bash
 ros2 topic list | rg -i 'openni|depth|ir|camera_info'

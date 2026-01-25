@@ -38,6 +38,20 @@ Custom topics/output:
 
 `python3 tools/depth/ros_snapshot.py --topic /depth_raw/image --out-dir output/cam_snapshot_ros`
 
+Note: the saved depth image is 16-bit (`.pgm` with maxval 65535). Many image viewers display it as black; use the generated `*_viz.pgm` (8-bit scaled) for quick inspection.
+
+## openni2_list_modes
+
+List the OpenNI2 device’s supported video modes (resolution/fps/pixel format) for depth/IR/color.
+
+Build (uses the Orbbec OpenNI2 SDK headers/libs):
+
+`g++ -std=c++17 openni2_list_modes.cpp -I$HOME/OpenNI/OpenNI_2.3.0/sdk/Include -L$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer -lOpenNI2 -Wl,-rpath,$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer -o openni2_list_modes`
+
+Run:
+
+`OPENNI2_REDIST=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer LD_LIBRARY_PATH=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer:$LD_LIBRARY_PATH ./openni2_list_modes`
+
 runlog
 ```bash
 (rovi-ros-ws) wass@rovi:~/dev/rovi_ros_ws/tools/depth$ ./ob_list

@@ -57,6 +57,38 @@ def _write_pgm16_be(path: str, width: int, height: int, data: bytes) -> None:
         f.write(data)
 
 
+def _u16_stats_le(data: bytes) -> tuple[int, int, int, int]:
+    if len(data) % 2 != 0:
+        raise ValueError("u16 buffer has odd length")
+    total = len(data) // 2
+    zeros = 0
+    min_nonzero = None
+    max_val = 0
+    for i in range(0, len(data), 2):
+        v = data[i] | (data[i + 1] << 8)
+        if v == 0:
+            zeros += 1
+            continue
+        if min_nonzero is None or v < min_nonzero:
+            min_nonzero = v
+        if v > max_val:
+            max_val = v
+    return total, zeros, (min_nonzero or 0), max_val
+
+
+def _depth_u16_to_u8_viz_le(data: bytes, clip_max_mm: int = 5000) -> bytes:
+    out = bytearray(len(data) // 2)
+    for idx in range(0, len(data), 2):
+        v = data[idx] | (data[idx + 1] << 8)
+        if v <= 0:
+            out[idx // 2] = 0
+            continue
+        if v > clip_max_mm:
+            v = clip_max_mm
+        out[idx // 2] = int(v * 255 / clip_max_mm)
+    return bytes(out)
+
+
 def _write_ppm8_rgb(path: str, width: int, height: int, data: bytes) -> None:
     header = f"P6\n{width} {height}\n255\n".encode("ascii")
     with open(path, "wb") as f:
@@ -89,10 +121,25 @@ def _save_image_msg(out_dir: str, topic: str, msg: Image) -> str:
     if encoding in {"mono16", "16uc1"}:
         row_bytes = width * 2
         packed = _extract_packed_rows(bytes(msg.data), int(msg.step), row_bytes, height)
-        if int(msg.is_bigendian) == 0:
-            packed = _swap_u16_endianness(packed)
+        is_little_endian = int(msg.is_bigendian) == 0
+        packed_le = packed if is_little_endian else _swap_u16_endianness(packed)
+        total, zeros, min_nz, max_val = _u16_stats_le(packed_le)
+
+        if zeros == total:
+            print(f"{topic}: mono16 stats: ALL ZERO ({total} px)", file=sys.stderr)
+        else:
+            print(
+                f"{topic}: mono16 stats: total={total} zeros={zeros} min_nonzero={min_nz} max={max_val}",
+                file=sys.stderr,
+            )
+
+        packed_be = _swap_u16_endianness(packed_le)
         out_path = os.path.join(out_dir, f"{base}.pgm")
-        _write_pgm16_be(out_path, width, height, packed)
+        _write_pgm16_be(out_path, width, height, packed_be)
+
+        viz8 = _depth_u16_to_u8_viz_le(packed_le, clip_max_mm=5000)
+        viz_path = os.path.join(out_dir, f"{base}_viz.pgm")
+        _write_pgm8(viz_path, width, height, viz8)
         return out_path
 
     if encoding == "rgb8":
@@ -199,4 +246,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

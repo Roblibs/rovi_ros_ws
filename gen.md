@@ -1,3 +1,17 @@
+# 2026-01-25
+
+## Orbbec depth camera integration (Astra Stereo S U3 / Yahboom AI View Depth Camera)
+
+The camera works via OpenNI2, but OpenOrbbecSDK (used by `ros-jazzy-orbbec-camera`) does not accept the device on this robot: it enumerates USB but returns an empty device list (`deviceCount=0`), so the Orbbec ROS driver never publishes real image topics.
+
+**Decision:**
+- Prefer ROS `openni2_camera` for depth/IR on Jazzy; treat RGB as a separate UVC camera if needed.
+
+**Integration notes:**
+- Use the Orbbec OpenNI2 SDK (`libOpenNI2.so` + `OpenNI2/Drivers/liborbbec.so`). ROS `openni2_camera` links against `libOpenNI2.so.0`, so we provide a symlink and prefer the Orbbec directory via `LD_LIBRARY_PATH` (wired via `rovi_env.sh`).
+- The Astra Stereo S U3 exposes OpenNI2 video modes `640x400` / `320x200` (not `640x480` / `320x240`). This repo overlays `openni2_camera` at `src/openni2_camera` to add `ORBBEC_640x400_*` / `ORBBEC_320x200_*` mode names and default to `ORBBEC_640x400_30Hz`, so `ros2 run openni2_camera openni2_camera_driver` works without extra args after `build`.
+
+
 # 2026-01-18
 
 ## USB device identity + udev mapping
@@ -21,18 +35,6 @@ ROS 2 `launch` propagates SIGINT (Ctrl-C) to all node processes. For `rclpy` nod
 
 **Applied fix:**
 - `rosmaster_driver` now uses `rclpy.try_shutdown()` and handles external shutdown to avoid exit code 1 on Ctrl-C.
-
-# 2026-01-25
-
-## Orbbec depth camera integration (Astra Stereo S U3 / Yahboom AI View Depth Camera)
-
-The camera’s depth stream works via OpenNI2, but OpenOrbbecSDK (used by `ros-jazzy-orbbec-camera`) does not accept the device on this robot: it enumerates USB but returns an empty device list (`deviceCount=0`), so the ROS driver never publishes real image topics.
-
-**Decision:**
-- Prefer ROS `openni2_camera` for depth/IR on Jazzy; treat RGB as a separate UVC camera if needed.
-
-**Gotchas:**
-- `openni2_camera` links against `libOpenNI2.so.0`, but the Orbbec OpenNI2 SDK ships `libOpenNI2.so`; a symlink + `LD_LIBRARY_PATH` are needed so ROS uses the Orbbec OpenNI2 driver (`liborbbec.so`) instead of the system OpenNI2.
 
 # 2026-01-10
 
