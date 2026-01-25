@@ -1,5 +1,5 @@
 # rovi_ros_ws
-ROVI is the short name of "Room View Bot", a ROS robot platform for indoor virtual presence in homes and rooms, mostly flat ground. ROVI is based on the Yahboom X3+ chassis and control board equipped with mecanum wheels, a lidar depth camera, and a stereo camera. Videos, gallery, and more details about the robot hardware are available on this wiki page https://homesmartmesh.github.io/robotics/room-view-bot/
+ROVI is the short name of "Room View Bot", a ROS robot platform for indoor virtual presence in homes and rooms, mostly flat ground. ROVI is based on the Yahboom X3+ chassis and control board equipped with mecanum wheels, a lidar depth camera, and a stereo camera. Videos, gallery, and more details about the robot hardware are available on this wiki page https://homesmartmesh.github.io/robotics/rovi/
 
 This repo provides a ROS2 Jazzy software stack that covers multiple run modes including simulation.
 

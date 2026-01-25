@@ -140,13 +140,26 @@ ros2 topic echo /cmd_vel_joy
 - Override `joy_params_file` or `teleop_params_file` if you keep custom YAMLs elsewhere.
 
 
-# ELP stereo camera
 
+# Cameras
 ```bash
 v4l2-ctl --list-devices
 v4l2-ctl -d /dev/video0 --list-formats-ext
 ```
+## Stereo camera
+ELP stereo camera.
+
 See more details in [stereo camera](./stereo.md).
+
+# Depth camera
+Orbbec `Astra Stereo S U3`, aka Yahboom `AI View Depth Camera`
+
+* product https://store.orbbec.com/products/astra-stereo-s-u3
+* used library https://github.com/orbbec/OpenNI_SDK
+* API reference https://github.com/orbbec/OpenNI_SDK/blob/main/Doc/English/0400_API.md
+
+See more details in [stereo camera](./depth.md).
+
 
 # rplidar
 When testing the rplidar alone, it is necessary to add a transform for visualization.

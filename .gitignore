@@ -8,3 +8,4 @@ __pycache__/
 out/
 src/rovi_description/models/*.glb
 src/rovi_description/models/*.glb.meta.json
+output/
