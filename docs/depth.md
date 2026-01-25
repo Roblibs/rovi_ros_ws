@@ -15,7 +15,7 @@ ros2 run openni2_camera openni2_camera_driver
 
 For this specific camera (Astra Stereo S U3), the OpenNI2 sensor modes are `640x400` and `320x200` (not `640x480`/`320x240`). If you see “Unsupported * video mode … 640x480 …” and the images are black, run with the Orbbec-specific modes:
 
-Note: this repo carries a small `openni2_camera` overlay patch in `src/openni2_camera` (details in `src/openni2_camera/README.md`); run `build` after pulling changes.
+Note: this repo carries a small `openni2_camera` overlay patch in `src/openni2_camera` (details in [src/openni2_camera/README.md](../src/openni2_camera/README.md)); run `build` after pulling changes.
 
 Verify:
 ```bash
@@ -84,42 +84,24 @@ export LD_LIBRARY_PATH=$PWD:$LD_LIBRARY_PATH
 
 ## sanity checks
 
-* color
+* color (UVC)
 ```bash
 mkdir -p output/cam_snapshot
-ffmpeg -hide_banner -loglevel error -y -f v4l2 -i /dev/video0 -frames:v 1 output/cam_snapshot/video0.png
+
+ls -la /dev/v4l/by-id/
+
+ffmpeg -hide_banner -loglevel error -y -f v4l2 \
+  -i /dev/v4l/by-id/usb-Sonix_Technology_Co.__Ltd._USB_2.0_Camera_AY2W35300N8-video-index0 \
+  -frames:v 1 "output/cam_snapshot/rgb_$(date +%Y%m%d_%H%M%S).png"
+
 ```
 
-* depth
+* depth (OpenNI2)
 ```bash
 cd ~/OpenNI/OpenNI_2.3.0/tools/NiViewer
-(rovi-ros-ws) wass@rovi:~/OpenNI/OpenNI_2.3.0/tools/NiViewer$ ./SimpleRead
-Warning: USB events thread - failed to set priority. This might cause loss of data...
-ReadBinaryFile, 63
-[width height fx fy cx cy baseline]640 400 945.028 945.028 640 400 40
-[00000000]     1228
-[00030726]        0
-[00064006]        0
-[00097287]        0
-[00130567]        0
-[00163848]     1923
-[00197128]        0
-[00230408]        0
-[00263689]        0
-[00330250]     1218
-[00363530]        0
-[00396810]        0
-[00430091]        0
-[00463371]        0
-[00496652]     1948
-[00529932]        0
-[00563212]        0
-[00596493]        0
-[00629773]        0
-[00696334]     1258
-[00729614]     1258
-[00762895]     1248
-[00796175]     1258
+export OPENNI2_REDIST=$PWD
+export LD_LIBRARY_PATH=$PWD:$LD_LIBRARY_PATH
+./SimpleRead
 ```
 
 # Listing
