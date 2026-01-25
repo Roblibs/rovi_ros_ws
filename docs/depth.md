@@ -4,49 +4,18 @@
 
 This camera works reliably via OpenNI2 on this robot, so the preferred ROS path is `openni2_camera`.
 
-### Install
-
-```bash
-sudo apt update
-sudo apt install -y ros-jazzy-openni2-camera
-```
-
-### Configure OpenNI2 (Orbbec SDK)
-
-`openni2_camera` links against `libOpenNI2.so.0`. The Orbbec OpenNI2 SDK ships `libOpenNI2.so` (no `.so.0`), so add a symlink and prefer this directory via `LD_LIBRARY_PATH`.
-
-```bash
-source /opt/ros/$ROS_DISTRO/setup.bash
-
-export OPENNI2_REDIST=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer
-ln -sf "$OPENNI2_REDIST/libOpenNI2.so" "$OPENNI2_REDIST/libOpenNI2.so.0"
-export LD_LIBRARY_PATH=$OPENNI2_REDIST:$LD_LIBRARY_PATH
-```
-
-Sanity-check device discovery:
-```bash
-ros2 run openni2_camera list_devices
-```
-
-If it still shows `Found 0 devices`, confirm which OpenNI2 library is being used:
-```bash
-ldd /opt/ros/$ROS_DISTRO/lib/openni2_camera/list_devices | rg 'OpenNI2'
-```
-
 ### Run (headless)
 
-Use the packaged launch:
-```bash
-ros2 launch openni2_camera camera_only.launch.py namespace:=camera
-```
+The OpenNI2 environment is set up by `rovi_env.sh` (it exports `OPENNI2_REDIST` and adjusts `LD_LIBRARY_PATH` so ROS uses the Orbbec OpenNI2 driver).
 
-For this specific camera (Astra Stereo S U3), the OpenNI2 sensor modes are `640x400` and `320x200` (not `640x480`/`320x240`). If you see “Unsupported * video mode … 640x480 …” and the images are black, run with the Orbbec-specific modes:
-
+Run:
 ```bash
 ros2 run openni2_camera openni2_camera_driver
 ```
 
-Note: this repo carries a small `openni2_camera` overlay patch (in `src/openni2_camera`) to add the `ORBBEC_640x400_*` / `ORBBEC_320x200_*` mode names and default to them; run `build` after pulling changes.
+For this specific camera (Astra Stereo S U3), the OpenNI2 sensor modes are `640x400` and `320x200` (not `640x480`/`320x240`). If you see “Unsupported * video mode … 640x480 …” and the images are black, run with the Orbbec-specific modes:
+
+Note: this repo carries a small `openni2_camera` overlay patch in `src/openni2_camera` (details in `src/openni2_camera/README.md`); run `build` after pulling changes.
 
 Verify:
 ```bash
@@ -54,12 +23,19 @@ ros2 topic list | rg -i 'openni|depth|ir|camera_info'
 ```
 
 Notes:
-- Depth + IR come from OpenNI2. RGB may not be provided via OpenNI2 on this device (it presents RGB as a separate UVC camera), so treat RGB as a separate V4L2 camera if needed.
+- This workspace’s `openni2_camera` overlay defaults to depth-only publishing (`enable_depth:=true`, `enable_ir:=false`, `enable_color:=false`) to keep the topic list clean.
+- RGB is a separate UVC device (`/dev/video0`); it is not published by `openni2_camera` on this robot.
 - If the driver prints “Unsupported * video mode …”, it’s usually non-fatal if topics are streaming. Confirm with:
   - `ros2 topic hz /depth_raw/image`
   - `ros2 topic echo /depth_raw/image --once` (check `encoding`, `width`, `height`)
-- This workspace’s `openni2_camera` overlay defaults to depth-only publishing (`enable_ir:=false`, `enable_color:=false`) to keep the topic list clean.
 - `device_id:="#1"` means “first OpenNI2 enumerated device”. If you ever plug multiple OpenNI2 cameras, set `device_id` using the URI from `ros2 run openni2_camera list_devices`.
+
+### Topics (what they are)
+
+- `/depth_raw/image` (`sensor_msgs/Image`, `encoding: 16UC1`): raw depth in **millimeters**.
+- `/depth/image` (`sensor_msgs/Image`, `encoding: 32FC1`): converted depth in **meters**.
+- `/depth_raw/camera_info`, `/depth/camera_info`: intrinsics for the corresponding depth images.
+- `/projector/camera_info`: auxiliary info derived from depth intrinsics (used by some disparity pipelines).
 
 # Native
 ## Install
