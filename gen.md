@@ -1,3 +1,19 @@
+# 2026-01-31
+
+## Camera stack (teleop + depth + RGB) + viewer-friendly PC workflow
+
+**Decision:**
+- Add a `stack:=camera` in `rovi_bringup` to run teleop plus separate depth (OpenNI2) and RGB (UVC/V4L2) feeds, with a stable TF mount (`base_link -> camera_link -> camera_*_optical_frame`).
+- Keep depth and RGB **separate for now** (no registered RGB-D / pointcloud); RViz shows two image panels (`view camera`).
+
+**Implementation notes:**
+- Depth uses `openni2_camera` namespaced under `/camera/*`; `device_id` uses OpenNI2’s `#1` convention and is forced to string at launch evaluation to avoid YAML comment parsing.
+- RGB uses `v4l2_camera` under `/camera/rgb/*` and prefers a stable `/dev/v4l/by-id/...` path to avoid `/dev/videoX` renumbering when adding more cameras later.
+
+**PC viewer workflow:**
+- Add `ROVI_SKIP_OPENNI2=1` to skip building `openni2_camera` and to skip OpenNI2 env setup in `rovi_env.sh` for viewer-only machines.
+
+
 # 2026-01-25
 
 ## Orbbec depth camera integration (Astra Stereo S U3 / Yahboom AI View Depth Camera)
