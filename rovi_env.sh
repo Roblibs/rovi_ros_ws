@@ -13,9 +13,13 @@ if [ -f /opt/ros/jazzy/setup.bash ]; then
   source /opt/ros/jazzy/setup.bash
 fi
 
-export OPENNI2_REDIST=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer
-ln -sf "$OPENNI2_REDIST/libOpenNI2.so" "$OPENNI2_REDIST/libOpenNI2.so.0"
-export LD_LIBRARY_PATH=$OPENNI2_REDIST:$LD_LIBRARY_PATH
+if [ "${ROVI_SKIP_OPENNI2:-}" != "1" ]; then
+  export OPENNI2_REDIST=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer
+  if [ -d "$OPENNI2_REDIST" ]; then
+    ln -sf "$OPENNI2_REDIST/libOpenNI2.so" "$OPENNI2_REDIST/libOpenNI2.so.0" 2>/dev/null || true
+    export LD_LIBRARY_PATH=$OPENNI2_REDIST:$LD_LIBRARY_PATH
+  fi
+fi
 
 # Common ROS settings
 export ROS_DOMAIN_ID=0
