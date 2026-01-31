@@ -59,6 +59,7 @@ sudo apt install -y \
   ros-jazzy-joint-state-publisher-gui \
   ros-jazzy-rviz2 \
   ros-jazzy-foxglove-bridge \
+  ros-jazzy-camera-info-manager \
   ros-jazzy-v4l2-camera \
   ros-jazzy-camera-calibration \
   ros-jazzy-rplidar-ros \

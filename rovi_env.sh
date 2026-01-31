@@ -54,7 +54,11 @@ build() {
     echo "[rovi_env] Missing ${ROVI_ROS_WS_DIR}/.venv/bin/colcon (run: uv sync)" >&2
     return 1
   fi
-  "${ROVI_ROS_WS_DIR}/.venv/bin/colcon" build "$@"
+  local -a extra_args=()
+  if [ "${ROVI_SKIP_OPENNI2:-}" = "1" ]; then
+    extra_args+=(--packages-skip openni2_camera)
+  fi
+  "${ROVI_ROS_WS_DIR}/.venv/bin/colcon" build "${extra_args[@]}" "$@"
 }
 
 setup() {
@@ -215,6 +219,7 @@ install_ros_deps() {
     ros-jazzy-joint-state-publisher-gui
     ros-jazzy-rviz2
     ros-jazzy-foxglove-bridge
+    ros-jazzy-camera-info-manager
     ros-jazzy-v4l2-camera
     ros-jazzy-camera-calibration
     ros-jazzy-rplidar-ros

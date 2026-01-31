@@ -97,3 +97,10 @@ For now, ROVI uses **separate** depth + RGB feeds (no registered depth-to-color)
 
 For “two panels in RViz”, this is fine. If you later need true RGB-D alignment, plan on using approximate time sync and adding explicit RGB↔Depth extrinsics/registration.
 
+## Viewer-only build (PC)
+
+If your PC is only a viewer and you don’t want to build the vendored `openni2_camera` overlay, you can skip it:
+```bash
+export ROVI_SKIP_OPENNI2=1
+build
+```
