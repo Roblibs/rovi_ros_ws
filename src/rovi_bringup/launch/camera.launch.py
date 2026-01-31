@@ -170,7 +170,9 @@ def generate_launch_description() -> LaunchDescription:
             {"use_sim_time": use_sim_time_param},
             {"use_device_time": True},
             {"depth_registration": False},
-            {"device_id": LaunchConfiguration("device_id")},
+            # NOTE: the OpenNI2 convention '#1' would be parsed as a YAML comment
+            # unless we force it to a string at launch evaluation time.
+            {"device_id": ParameterValue(LaunchConfiguration("device_id"), value_type=str)},
             {"depth_mode": LaunchConfiguration("depth_mode")},
             {"ir_mode": LaunchConfiguration("depth_mode")},
             {"enable_depth": True},
@@ -194,25 +196,21 @@ def generate_launch_description() -> LaunchDescription:
             {"use_sim_time": use_sim_time_param},
             {"video_device": LaunchConfiguration("rgb_video_device_resolved")},
             {
-                "image_size": [
-                    ParameterValue(LaunchConfiguration("rgb_width"), value_type=int),
-                    ParameterValue(LaunchConfiguration("rgb_height"), value_type=int),
-                ]
+                "image_size": ParameterValue(
+                    PythonExpression([
+                        "'[' + '",
+                        LaunchConfiguration("rgb_width"),
+                        "' + ', ' + '",
+                        LaunchConfiguration("rgb_height"),
+                        "' + ']'",
+                    ]),
+                    value_type=List[int],
+                )
             },
             {"pixel_format": LaunchConfiguration("rgb_pixel_format")},
             {"output_encoding": LaunchConfiguration("rgb_output_encoding")},
             {"camera_frame_id": "camera_rgb_optical_frame"},
         ],
-    )
-
-    rgb_image_proc = Node(
-        condition=is_real,
-        package="image_proc",
-        executable="image_proc",
-        namespace="camera/rgb",
-        name="image_proc",
-        output="screen",
-        parameters=[{"use_sim_time": use_sim_time_param}],
     )
 
     return LaunchDescription([
@@ -239,5 +237,4 @@ def generate_launch_description() -> LaunchDescription:
         tf_rgb_optical,
         depth_node,
         rgb_node,
-        rgb_image_proc,
     ])
