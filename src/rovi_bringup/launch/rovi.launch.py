@@ -3,7 +3,7 @@
 
 This launch owns the high-level choices:
 - which robot backend to run (robot_mode: real|sim|offline)
-- which stack to run (stack: teleop|mapping|localization|nav|offline|bringup)
+- which stack to run (stack: teleop|camera|mapping|localization|nav|offline|bringup)
 - whether RViz should start (rviz), defaulting to true only for sim/offline
 
 Intended usage:
@@ -35,7 +35,7 @@ def _write_current_launch(context, *args, **kwargs):  # noqa: ANN001
 
     # Persist the *stack* launch ref (not rovi.launch.py) so tools can infer intent
     # (bagging, UI fixed frame policy, etc.). This is deterministic and not TF-dependent.
-    if stack in {'teleop', 'mapping', 'localization', 'nav'}:
+    if stack in {'teleop', 'camera', 'mapping', 'localization', 'nav'}:
         launch_ref = f"rovi_bringup/{stack}.launch.py"
     else:
         launch_ref = 'rovi_bringup/teleop.launch.py'
@@ -55,6 +55,7 @@ def generate_launch_description() -> LaunchDescription:
 
     robot_bringup_launch = os.path.join(bringup_share, 'launch', 'robot_bringup.launch.py')
     teleop_stack_launch = os.path.join(bringup_share, 'launch', 'teleop.launch.py')
+    camera_stack_launch = os.path.join(bringup_share, 'launch', 'camera.launch.py')
     mapping_stack_launch = os.path.join(bringup_share, 'launch', 'mapping.launch.py')
     localization_stack_launch = os.path.join(bringup_share, 'launch', 'localization.launch.py')
     nav_stack_launch = os.path.join(bringup_share, 'launch', 'nav.launch.py')
@@ -63,6 +64,7 @@ def generate_launch_description() -> LaunchDescription:
     default_rviz_map = os.path.join(desc_share, 'rviz', 'rovi_map.rviz')
     default_rviz_nav = os.path.join(desc_share, 'rviz', 'rovi_nav.rviz')
     default_rviz_odom = os.path.join(desc_share, 'rviz', 'rovi_odom.rviz')
+    default_rviz_camera = os.path.join(desc_share, 'rviz', 'rovi_camera.rviz')
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
     default_ui_bridge_config = os.path.join(ui_bridge_share, 'config', 'default.yaml')
     default_serial_display_config = os.path.join(serial_display_share, 'config', 'default.yaml')
@@ -75,7 +77,7 @@ def generate_launch_description() -> LaunchDescription:
     stack = DeclareLaunchArgument(
         'stack',
         default_value='teleop',
-        description="Stack to run: 'teleop', 'mapping', 'localization', 'nav', 'offline', or 'bringup'.",
+        description="Stack to run: 'teleop', 'camera', 'mapping', 'localization', 'nav', 'offline', or 'bringup'.",
     )
     use_sim_time = DeclareLaunchArgument(
         'use_sim_time',
@@ -197,9 +199,13 @@ def generate_launch_description() -> LaunchDescription:
         default_rviz_map,
         "' if '",
         LaunchConfiguration('stack'),
-        "' in ['mapping','localization'] else '",
+        "' in ['mapping','localization'] else ('",
+        default_rviz_camera,
+        "' if '",
+        LaunchConfiguration('stack'),
+        "' == 'camera' else '",
         default_rviz_odom,
-        "'))",
+        "')))",
     ])
 
     # Backend: always start, even for offline (robot_bringup handles robot_mode=offline).
@@ -227,12 +233,21 @@ def generate_launch_description() -> LaunchDescription:
         condition=IfCondition(PythonExpression([
             "'",
             LaunchConfiguration('stack'),
-            "' in ['teleop','mapping','localization','nav']",
+            "' in ['teleop','camera','mapping','localization','nav']",
         ])),
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'joy_enabled': LaunchConfiguration('joy_enabled'),
             'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
+        }.items(),
+    )
+
+    stack_camera = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(camera_stack_launch),
+        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stack'), "' == 'camera'"])),
+        launch_arguments={
+            'robot_mode': LaunchConfiguration('robot_mode'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
         }.items(),
     )
 
@@ -303,6 +318,7 @@ def generate_launch_description() -> LaunchDescription:
         odom_mode,
         backend,
         control_stack,
+        stack_camera,
         stack_mapping,
         stack_localization,
         stack_nav,

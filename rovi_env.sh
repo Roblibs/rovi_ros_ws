@@ -104,6 +104,10 @@ teleop() {
   ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=teleop rviz:=false "$@"
 }
 
+camera() {
+  ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=camera rviz:=false "$@"
+}
+
 keyboard() {
   python3 "${ROVI_ROS_WS_DIR}/tools/rovi_keyboard.py" "$@"
 }
@@ -163,6 +167,10 @@ view() {
       rviz_cfg="${ROVI_ROS_WS_DIR}/src/rovi_description/rviz/rovi_odom.rviz"
       rviz2 -d "${rviz_cfg}" "$@"
       ;;
+    camera)
+      rviz_cfg="${ROVI_ROS_WS_DIR}/src/rovi_description/rviz/rovi_camera.rviz"
+      rviz2 -d "${rviz_cfg}" "$@"
+      ;;
     offline)
       ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_bringup rovi.launch.py \
         robot_mode:=offline \
@@ -170,7 +178,7 @@ view() {
         "$@"
       ;;
     *)
-      echo "[rovi_env] Usage: view {nav|mapping|teleop|offline} [...args]" >&2
+      echo "[rovi_env] Usage: view {nav|mapping|teleop|camera|offline} [...args]" >&2
       return 2
       ;;
   esac
@@ -207,6 +215,8 @@ install_ros_deps() {
     ros-jazzy-joint-state-publisher-gui
     ros-jazzy-rviz2
     ros-jazzy-foxglove-bridge
+    ros-jazzy-v4l2-camera
+    ros-jazzy-camera-calibration
     ros-jazzy-rplidar-ros
     ros-jazzy-slam-toolbox
     ros-jazzy-robot-localization

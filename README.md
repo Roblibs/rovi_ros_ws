@@ -21,6 +21,7 @@ Tables with the full list of packages, launches, nodes and params are also avail
 | `sim` | PC Simulation: `sim` (default mapping) or `sim teleop|mapping|nav|localization` → runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz (use `rviz:=false` for headless). |
 | `view` | PC view: `view` (default `nav`) or `view teleop|mapping|nav`; `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
+| `camera` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=camera` (teleop + depth + RGB; headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
 
 # Install
@@ -58,6 +59,8 @@ sudo apt install -y \
   ros-jazzy-joint-state-publisher-gui \
   ros-jazzy-rviz2 \
   ros-jazzy-foxglove-bridge \
+  ros-jazzy-v4l2-camera \
+  ros-jazzy-camera-calibration \
   ros-jazzy-rplidar-ros \
   ros-jazzy-slam-toolbox \
   ros-jazzy-robot-localization \

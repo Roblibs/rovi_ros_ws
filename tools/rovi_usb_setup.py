@@ -9,7 +9,12 @@ Targets:
 
 This script requires all devices to be attached so it can positively identify
 the Rosmaster board via Rosmaster.get_version() and assign the other CH340 as
-the lidar. It does not install rules if devices are missing.
+the lidar.
+
+By default it expects the display to be connected (as an ESP32-S3 native USB CDC
+device: VID:PID 303a:1001 on /dev/ttyACM*). If the display is temporarily
+unavailable, you can still (re)install the udev rules for the other devices by
+passing --allow-missing-display.
 
 Run with sudo:
   sudo python3 tools/rovi_usb_setup.py
@@ -19,6 +24,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import subprocess
 import sys
 import time
@@ -46,6 +52,16 @@ LEGACY_RULES = {
         'MODE:="0666", SYMLINK+="my_ros_board"\n'
     ),
 }
+
+_HEX4_RE = re.compile(r"^[0-9a-fA-F]{4}$")
+
+
+def _fmt_vidpid(vendor: str, product: str) -> str:
+    return f"{vendor.lower()}:{product.lower()}"
+
+
+def _is_hex4(value: str) -> bool:
+    return bool(_HEX4_RE.match(value))
 
 
 def _ensure_venv_site() -> Optional[str]:
@@ -113,6 +129,46 @@ def _scan_devices(dev_glob: str, vendor: str, product: str) -> List[Dict[str, st
             }
         )
     return devices
+
+
+def _scan_all_ttys() -> List[Dict[str, str]]:
+    devices: List[Dict[str, str]] = []
+    for dev_glob in ("/dev/ttyACM*", "/dev/ttyUSB*"):
+        for devnode in sorted(glob.glob(dev_glob)):
+            props, err = _udev_props(devnode)
+            if err:
+                continue
+            devices.append(
+                {
+                    "devnode": devnode,
+                    "id_vendor": props.get("ID_VENDOR_ID", ""),
+                    "id_model": props.get("ID_MODEL_ID", ""),
+                    "id_serial": props.get("ID_SERIAL", ""),
+                    "id_path": props.get("ID_PATH", ""),
+                    "id_path_tag": props.get("ID_PATH_TAG", ""),
+                    "by_path": _by_path_link(devnode),
+                }
+            )
+    return devices
+
+
+def _print_tty_debug() -> None:
+    print("[debug] TTY devices visible right now (for udev rule matching):")
+    ttys = _scan_all_ttys()
+    if not ttys:
+        print("  (none)")
+        return
+    for dev in ttys:
+        vidpid = _fmt_vidpid(dev.get("id_vendor", ""), dev.get("id_model", ""))
+        extra = []
+        if dev.get("id_serial"):
+            extra.append(f"id_serial={dev['id_serial']}")
+        if dev.get("id_path"):
+            extra.append(f"id_path={dev['id_path']}")
+        if dev.get("by_path"):
+            extra.append(f"by_path={dev['by_path']}")
+        extra_s = (" " + " ".join(extra)) if extra else ""
+        print(f"  - {dev['devnode']} vidpid={vidpid}{extra_s}")
 
 
 def _sniff_device(devnode: str, *, baudrate: int = 115200, timeout_s: float = 0.2) -> str:
@@ -215,13 +271,47 @@ def _remove_legacy_rule(path: str, expected: str) -> None:
 
 
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Install udev rules for ROVI USB devices (/dev/robot_* symlinks)."
+    )
+    parser.add_argument(
+        "--allow-missing-display",
+        action="store_true",
+        help=(
+            "Write/update udev rules even if the display isn't currently detected. "
+            "Useful if you want to install rules first and plug the display later."
+        ),
+    )
+    parser.add_argument(
+        "--display-vid",
+        default=DISPLAY_VENDOR,
+        help=f"Display USB vendor id (default: {DISPLAY_VENDOR}).",
+    )
+    parser.add_argument(
+        "--display-pid",
+        default=DISPLAY_PRODUCT,
+        help=f"Display USB product id (default: {DISPLAY_PRODUCT}).",
+    )
+    args = parser.parse_args()
+
+    display_vendor = str(args.display_vid).lower()
+    display_product = str(args.display_pid).lower()
+    if not _is_hex4(display_vendor) or not _is_hex4(display_product):
+        print(
+            f"[error] Invalid --display-vid/--display-pid: {_fmt_vidpid(display_vendor, display_product)} "
+            "(expected 4 hex digits each, e.g. 303a 1001)."
+        )
+        return 1
+
     if os.geteuid() != 0:
         print("Please run as root: sudo python3 tools/rovi_usb_setup.py", file=sys.stderr)
         return 1
 
     print("[scan] Looking for attached devices...")
     ch340_devices = _scan_devices("/dev/ttyUSB*", CH340_VENDOR, CH340_PRODUCT)
-    display_devices = _scan_devices("/dev/ttyACM*", DISPLAY_VENDOR, DISPLAY_PRODUCT)
+    display_devices = _scan_devices("/dev/ttyACM*", display_vendor, display_product)
 
     print(f"[scan] CH340 devices ({len(ch340_devices)}):")
     for dev in ch340_devices:
@@ -244,8 +334,22 @@ def main() -> int:
         return 1
 
     if len(display_devices) != 1:
-        print("[error] Expected exactly 1 display device (ESP32-S3). Attach it and re-run.")
-        return 1
+        expected = _fmt_vidpid(display_vendor, display_product)
+        print(
+            f"[error] Expected exactly 1 display device (ESP32-S3) as ttyACM* with vidpid={expected}."
+        )
+        _print_tty_debug()
+        print(
+            "[debug] If you *just* plugged it in, watch kernel logs and udev events:\n"
+            "  - sudo dmesg -T | tail -n 80\n"
+            "  - sudo udevadm monitor --environment --udev --kernel\n"
+            "[debug] If the display shows up in lsusb with a different VID/PID, re-run with:\n"
+            "  - sudo python3 tools/rovi_usb_setup.py --display-vid XXXX --display-pid YYYY\n"
+            "[debug] If you only want to (re)install the rules now and plug the display later, use:\n"
+            "  - sudo python3 tools/rovi_usb_setup.py --allow-missing-display"
+        )
+        if not args.allow_missing_display:
+            return 1
 
     if not all(dev.get("id_path") for dev in ch340_devices):
         print("[error] Missing ID_PATH for CH340 devices; cannot create stable rules.")
@@ -274,7 +378,7 @@ def main() -> int:
             'SYMLINK+="robot_lidar"\n'
         ),
         (
-            'SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", '
+            f'SUBSYSTEM=="tty", ATTRS{{idVendor}}=="{display_vendor}", ATTRS{{idProduct}}=="{display_product}", '
             'MODE:="0666", SYMLINK+="robot_display"\n'
         ),
     ]
@@ -309,7 +413,14 @@ def main() -> int:
     cmds = [
         ["udevadm", "control", "--reload-rules"],
         ["udevadm", "trigger", "--attr-match", "idVendor=1a86", "--attr-match", "idProduct=7523"],
-        ["udevadm", "trigger", "--attr-match", "idVendor=303a", "--attr-match", "idProduct=1001"],
+        [
+            "udevadm",
+            "trigger",
+            "--attr-match",
+            f"idVendor={display_vendor}",
+            "--attr-match",
+            f"idProduct={display_product}",
+        ],
     ]
     for cmd in cmds:
         try:
