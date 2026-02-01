@@ -1,0 +1,38 @@
+# Color camera calibration (UVC / v4l2_camera)
+#
+# This file is intended to be replaced by real calibration output and committed,
+# so the robot can be restored after a reinstall.
+#
+# Typical workflow:
+# 1) Run `ros2 run camera_calibration cameracalibrator ...`
+# 2) Copy the generated YAML into this file
+# 3) Ensure the runtime uses the same calibration (commonly by copying/symlinking
+#    into `~/.ros/camera_info/` on the robot).
+#
+# Placeholder values below are NOT valid calibration.
+image_width: 640
+image_height: 480
+camera_name: rovi_color
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0,
+         0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.0, 0.0, 0.0, 0.0, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0,
+         0.0, 1.0, 0.0,
+         0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0]
