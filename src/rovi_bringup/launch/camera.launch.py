@@ -158,7 +158,7 @@ def generate_launch_description() -> LaunchDescription:
         yaw=-math.pi / 2.0,
     )
 
-    # Depth driver (publishes /camera/depth_raw/image, /camera/depth/image, etc.)
+    # Depth driver (publishes /camera/depth/image_raw, /camera/depth/image, etc.)
     depth_node = Node(
         condition=is_real,
         package="openni2_camera",
@@ -166,6 +166,10 @@ def generate_launch_description() -> LaunchDescription:
         namespace="camera",
         name="openni2_camera",
         output="screen",
+        remappings=[
+            ("depth_raw/image", "depth/image_raw"),
+            ("depth_raw/camera_info", "depth/camera_info"),
+        ],
         parameters=[
             {"use_sim_time": use_sim_time_param},
             {"use_device_time": True},
@@ -184,12 +188,12 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # RGB driver (publishes /camera/rgb/image_raw + /camera/rgb/camera_info)
+    # Color driver (publishes /camera/color/image_raw + /camera/color/camera_info)
     rgb_node = Node(
         condition=is_real,
         package="v4l2_camera",
         executable="v4l2_camera_node",
-        namespace="camera/rgb",
+        namespace="camera/color",
         name="v4l2_camera",
         output="screen",
         parameters=[

@@ -27,7 +27,7 @@ Optional: pass a different SDK config path as arg1:
 Save a single snapshot from ROS image topics (no OpenCV; writes `.pgm`/`.ppm`/`.pfm`).
 
 Default topics:
-- `/depth_raw/image`
+- `/camera/depth/image_raw`
 
 Run:
 
@@ -35,7 +35,7 @@ Run:
 
 Custom topics/output:
 
-`python3 tools/depth/ros_snapshot.py --topic /depth_raw/image --out-dir output/cam_snapshot_ros`
+`python3 tools/depth/ros_snapshot.py --topic /camera/depth/image_raw --out-dir output/cam_snapshot_ros`
 
 Note: the saved depth image is 16-bit (`.pgm` with maxval 65535). Many image viewers display it as black; use the generated `*_viz.pgm` (8-bit scaled) for quick inspection.
 

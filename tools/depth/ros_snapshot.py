@@ -204,13 +204,13 @@ def main() -> int:
         "--topic",
         action="append",
         default=None,
-        help="Image topic to capture (repeatable). Default: /depth_raw/image",
+        help="Image topic to capture (repeatable). Default: /camera/depth/image_raw",
     )
     parser.add_argument("--out-dir", default="output/cam_snapshot_ros", help="Output directory (gitignored).")
     parser.add_argument("--timeout-s", type=float, default=5.0, help="Timeout in seconds.")
     args = parser.parse_args()
 
-    topics = args.topic or ["/depth_raw/image"]
+    topics = args.topic or ["/camera/depth/image_raw"]
     out_dir = os.path.abspath(args.out_dir)
     os.makedirs(out_dir, exist_ok=True)
 

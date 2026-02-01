@@ -2,6 +2,9 @@
 
 ## Camera stack (RGB UVC + Depth OpenNI2)
 
+### Topic conventions (decision)
+- Use `/camera/color/*` for the Astra color stream, `/camera/depth/*` for the Astra depth stream, and reserve `/camera/stereo/*` for the ELP stereo camera.
+
 ### Calibration (required)
 - Generate and install RGB calibration YAML for the UVC camera (the current default path under `~/.ros/camera_info/` is missing, so `camera_info` is uncalibrated).
 - Decide how depth intrinsics should be sourced (factory/OpenNI2 vs calibrated YAML) and ensure `depth/*/camera_info` is correct and stable across boots.

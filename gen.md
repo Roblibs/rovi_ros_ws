@@ -8,7 +8,7 @@
 
 **Implementation notes:**
 - Depth uses `openni2_camera` namespaced under `/camera/*`; `device_id` uses OpenNI2’s `#1` convention and is forced to string at launch evaluation to avoid YAML comment parsing.
-- RGB uses `v4l2_camera` under `/camera/rgb/*` and prefers a stable `/dev/v4l/by-id/...` path to avoid `/dev/videoX` renumbering when adding more cameras later.
+- RGB uses `v4l2_camera` under `/camera/color/*` and prefers a stable `/dev/v4l/by-id/...` path to avoid `/dev/videoX` renumbering when adding more cameras later.
 
 **PC viewer workflow:**
 - Add `ROVI_SKIP_OPENNI2=1` to skip building `openni2_camera` and to skip OpenNI2 env setup in `rovi_env.sh` for viewer-only machines.
