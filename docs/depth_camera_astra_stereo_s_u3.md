@@ -41,17 +41,14 @@ Color (UVC) under `/camera/color`:
 - `/camera/color/image_raw`
 - `/camera/color/camera_info`
 
-TF published by `src/rovi_bringup/launch/camera.launch.py`:
+TF is published by `robot_state_publisher` from `src/rovi_description/urdf/rovi.urdf`:
 - `base_link -> camera_link` (mount)
 - `camera_link -> camera_depth_frame` (approx internal offset)
 - `camera_depth_frame -> camera_depth_optical_frame`
-- `camera_link -> camera_rgb_frame` (approx internal offset)
-- `camera_rgb_frame -> camera_rgb_optical_frame`
+- `camera_link -> camera_color_frame` (approx internal offset)
+- `camera_color_frame -> camera_color_optical_frame`
 
-Tune the mount if the camera is moved:
-```bash
-ros2 launch rovi_bringup rovi.launch.py stack:=camera camera_x:=... camera_y:=... camera_z:=... camera_yaw:=...
-```
+If you move the camera mount, update the fixed joint in `src/rovi_description/urdf/rovi.urdf` (`camera_joint` origin).
 
 ## Device selection
 
@@ -97,9 +94,9 @@ This section is intentionally pragmatic: today, depth and color are produced by 
 
 **B) Extrinsics between frames (TF)**
 
-- Store robot mount (`base_link -> camera_link`) as launch params (already supported: `camera_x/y/z/roll/pitch/yaw`).
-- Store the *internal* RGB↔depth offset as TF too (either measured and set in launch, or later computed and written into a small config file that launch loads).
-- Today’s `camera_link -> camera_depth_frame` / `camera_link -> camera_rgb_frame` offsets are placeholders; treat them as “good enough to visualize” until measured.
+- Store robot mount (`base_link -> camera_link`) as fixed URDF joints (`src/rovi_description/urdf/rovi.urdf`).
+- Store the *internal* RGB↔depth offset as TF too (either measured and set in the URDF, or later computed and then encoded back into the URDF).
+- Today’s `camera_link -> camera_depth_frame` / `camera_link -> camera_color_frame` offsets are placeholders; treat them as “good enough to visualize” until measured.
 
 ### Phase 2 — who generates it (how we get calibration files/TF)
 
@@ -132,7 +129,7 @@ We do **not** need RGB↔depth registration for the current stack, but if we lat
 1) **Reuse factory extrinsics via OpenNI2 (Yahboom-style)**  
    Yahboom’s `ros2_astra_camera` reads Orbbec/OpenNI2 “camera params” from the device and uses them to populate default intrinsics (and some stereo/extrinsic-related fields), while still allowing overrides via `color_info_url` / `ir_info_url`. This suggests a future “tiny helper” approach for ROVI:
    - query the device’s factory RGB/IR params via OpenNI2 extension APIs
-   - publish a measured/static TF between `camera_depth_frame` and `camera_rgb_frame`
+   - publish a measured/static TF between `camera_depth_frame` and `camera_color_frame`
    - keep driver binaries out of the repo (still rely on system-installed OpenNI2 runtime)
 
 2) **Do an explicit calibration run (offline/ROS tool) and write TF**  
@@ -144,6 +141,15 @@ In Yahboom’s integrated node (`ros2_astra_camera`):
 - It optionally loads calibration YAML via `camera_info_manager` using `color_info_url` and `ir_info_url`.
 - If YAML is not provided, it tries to read “factory” camera parameters from the device via OpenNI2/Orbbec extension properties and synthesizes reasonable `CameraInfo` defaults.
 - This is a useful reference model for us (separating “factory defaults” vs “explicit calibration overrides”) even if we keep the split-driver architecture.
+
+## Simulation (`sim camera`)
+
+Simulation publishes camera topics from Gazebo sensors defined in `src/rovi_description/urdf/rovi.urdf` and bridges them via `src/rovi_sim/config/bridge.yaml`:
+
+- Color: `/camera/color/image_raw`
+- Depth: `/camera/depth/image`
+
+To make simulated optics “feel closer” to the real device, tweak the Gazebo sensor settings in the URDF (`horizontal_fov`, `width/height`, `near/far`).
 
 ## Native tools (optional, for lower-level sanity checks)
 

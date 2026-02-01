@@ -139,7 +139,7 @@ sim() {
   fi
 
   case "${mode}" in
-    teleop|mapping|localization|nav)
+    teleop|camera|mapping|localization|nav)
       ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_bringup rovi.launch.py \
         robot_mode:=sim \
         stack:="${mode}" \
@@ -150,7 +150,7 @@ sim() {
       ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST ros2 launch rovi_sim gazebo_sim.launch.py "$@"
       ;;
     *)
-      echo "[rovi_env] Usage: sim {teleop|mapping|localization|nav|gazebo} [ros2 launch args...]" >&2
+      echo "[rovi_env] Usage: sim {teleop|camera|mapping|localization|nav|gazebo} [ros2 launch args...]" >&2
       return 2
       ;;
   esac

@@ -3,15 +3,14 @@
 
 This launch is intended to be composed "on top of teleop" via rovi.launch.py:
 - rovi.launch.py owns starting the control stack (twist_mux + optional joystick)
-- this file owns starting camera drivers + static TF for the camera mount
+- this file owns starting camera drivers
 
 Current policy:
 - Publish depth and RGB as separate feeds (no registered RGB-D pointcloud).
-- Publish a stable TF chain: base_link -> camera_link -> camera_*_optical_frame
+- Publish stable frame IDs; fixed camera TF comes from the robot URDF via robot_state_publisher.
 """
 
 import glob
-import math
 import os
 from typing import List
 
@@ -45,36 +44,6 @@ def _resolve_rgb_device(context, *args, **kwargs):  # noqa: ANN001
     resolved = requested or _pick_default_rgb_device()
     context.launch_configurations["rgb_video_device_resolved"] = resolved
     return [LogInfo(msg=f"[camera] rgb_video_device: {resolved}")]
-
-
-def _as_sub(value):
-    return value if hasattr(value, "perform") else str(value)
-
-
-def _static_tf(*, parent: str, child: str, x=0.0, y=0.0, z=0.0, roll=0.0, pitch=0.0, yaw=0.0) -> Node:
-    return Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        output="screen",
-        arguments=[
-            "--x",
-            _as_sub(x),
-            "--y",
-            _as_sub(y),
-            "--z",
-            _as_sub(z),
-            "--roll",
-            _as_sub(roll),
-            "--pitch",
-            _as_sub(pitch),
-            "--yaw",
-            _as_sub(yaw),
-            "--frame-id",
-            parent,
-            "--child-frame-id",
-            child,
-        ],
-    )
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -118,45 +87,10 @@ def generate_launch_description() -> LaunchDescription:
         description="Output encoding for v4l2_camera (e.g. rgb8, mono8).",
     )
 
-    # Mount TF: base_link -> camera_link
-    camera_x_arg = DeclareLaunchArgument("camera_x", default_value="0.129")
-    camera_y_arg = DeclareLaunchArgument("camera_y", default_value="0.0")
-    camera_z_arg = DeclareLaunchArgument("camera_z", default_value="0.10")
-    camera_roll_arg = DeclareLaunchArgument("camera_roll", default_value="0.0")
-    camera_pitch_arg = DeclareLaunchArgument("camera_pitch", default_value="0.0")
-    camera_yaw_arg = DeclareLaunchArgument("camera_yaw", default_value="0.0")
-
     is_real = IfCondition(PythonExpression(["'", LaunchConfiguration("robot_mode"), "' == 'real'"]))
     use_sim_time_param = ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)
 
     resolve_rgb = OpaqueFunction(function=_resolve_rgb_device)
-
-    tf_mount = _static_tf(
-        parent="base_link",
-        child="camera_link",
-        x=LaunchConfiguration("camera_x"),
-        y=LaunchConfiguration("camera_y"),
-        z=LaunchConfiguration("camera_z"),
-        roll=LaunchConfiguration("camera_roll"),
-        pitch=LaunchConfiguration("camera_pitch"),
-        yaw=LaunchConfiguration("camera_yaw"),
-    )
-
-    # Model the Astra-style internal offsets (approx; good enough until measured).
-    tf_link_to_depth_frame = _static_tf(parent="camera_link", child="camera_depth_frame", y=-0.02)
-    tf_link_to_rgb_frame = _static_tf(parent="camera_link", child="camera_rgb_frame", y=-0.045)
-    tf_depth_optical = _static_tf(
-        parent="camera_depth_frame",
-        child="camera_depth_optical_frame",
-        roll=-math.pi / 2.0,
-        yaw=-math.pi / 2.0,
-    )
-    tf_rgb_optical = _static_tf(
-        parent="camera_rgb_frame",
-        child="camera_rgb_optical_frame",
-        roll=-math.pi / 2.0,
-        yaw=-math.pi / 2.0,
-    )
 
     # Depth driver (publishes /camera/depth/image_raw, /camera/depth/image, etc.)
     depth_node = Node(
@@ -182,7 +116,7 @@ def generate_launch_description() -> LaunchDescription:
             {"enable_depth": True},
             {"enable_ir": False},
             {"enable_color": False},
-            {"rgb_frame_id": "camera_rgb_optical_frame"},
+            {"rgb_frame_id": "camera_color_optical_frame"},
             {"depth_frame_id": "camera_depth_optical_frame"},
             {"ir_frame_id": "camera_ir_optical_frame"},
         ],
@@ -213,7 +147,7 @@ def generate_launch_description() -> LaunchDescription:
             },
             {"pixel_format": LaunchConfiguration("rgb_pixel_format")},
             {"output_encoding": LaunchConfiguration("rgb_output_encoding")},
-            {"camera_frame_id": "camera_rgb_optical_frame"},
+            {"camera_frame_id": "camera_color_optical_frame"},
         ],
     )
 
@@ -227,18 +161,7 @@ def generate_launch_description() -> LaunchDescription:
         rgb_height_arg,
         rgb_pixel_format_arg,
         rgb_output_encoding_arg,
-        camera_x_arg,
-        camera_y_arg,
-        camera_z_arg,
-        camera_roll_arg,
-        camera_pitch_arg,
-        camera_yaw_arg,
         resolve_rgb,
-        tf_mount,
-        tf_link_to_depth_frame,
-        tf_link_to_rgb_frame,
-        tf_depth_optical,
-        tf_rgb_optical,
         depth_node,
         rgb_node,
     ])

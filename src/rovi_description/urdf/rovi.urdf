@@ -190,6 +190,46 @@
     <origin xyz="0.129 0 0.1645" rpy="0 0 3.14159"/>
   </joint>
 
+  <!-- Depth + color camera frames (fixed, documented here). -->
+  <link name="camera_link"/>
+  <link name="camera_depth_frame"/>
+  <link name="camera_depth_optical_frame"/>
+  <link name="camera_color_frame"/>
+  <link name="camera_color_optical_frame"/>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <!-- Match the previous bringup defaults (formerly in camera.launch.py). -->
+    <origin xyz="0.129 0 0.10" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Astra internal offsets (approx; good enough to visualize until measured). -->
+  <joint name="camera_link_to_depth_frame" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_depth_frame"/>
+    <origin xyz="0 -0.02 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="camera_link_to_rgb_frame" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_color_frame"/>
+    <origin xyz="0 -0.045 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ROS optical frame convention: x right, y down, z forward. -->
+  <joint name="camera_depth_optical_joint" type="fixed">
+    <parent link="camera_depth_frame"/>
+    <child link="camera_depth_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+  </joint>
+
+  <joint name="camera_color_optical_joint" type="fixed">
+    <parent link="camera_color_frame"/>
+    <child link="camera_color_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+  </joint>
+
   <!-- Gazebo Sim extensions (ignored by robot_state_publisher / RViz) -->
 
   <!-- Holonomic base motion (X/Y + yaw) driven by gz.msgs.Twist on /model/<name>/cmd_vel -->
@@ -240,6 +280,53 @@
       <update_rate>100</update_rate>
       <topic>/rovi/imu</topic>
       <gz_frame_id>imu_link</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+  <!-- Simulated RGB + depth cameras (Gazebo Transport topics bridged to /camera/*). -->
+  <gazebo reference="camera_color_optical_frame">
+    <sensor name="rovi_color_camera" type="camera">
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <update_rate>30</update_rate>
+      <topic>/rovi/camera/color/image</topic>
+      <gz_frame_id>camera_color_optical_frame</gz_frame_id>
+      <camera>
+        <!-- Rough FOV; tweak here if you want closer real-world behavior. -->
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>12.0</far>
+        </clip>
+      </camera>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="camera_depth_optical_frame">
+    <sensor name="rovi_depth_camera" type="depth_camera">
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <update_rate>30</update_rate>
+      <topic>/rovi/camera/depth/image</topic>
+      <gz_frame_id>camera_depth_optical_frame</gz_frame_id>
+      <camera>
+        <!-- Match Astra depth resolution shape (640x400). -->
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>400</height>
+          <format>R_FLOAT32</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>12.0</far>
+        </clip>
+      </camera>
     </sensor>
   </gazebo>
 </robot>
