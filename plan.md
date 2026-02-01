@@ -1,18 +1,17 @@
 # plan.md — future notes / next steps
 
-## Depth camera (Orbbec Astra Stereo S U3 / Yahboom AI View Depth Camera)
+## Camera stack (RGB UVC + Depth OpenNI2)
 
-### Current status (2026-01-25)
-- OpenNI2 path works (depth is readable with OpenNI tools), so the hardware is functional.
-- `ros-jazzy-orbbec-camera` (OrbbecSDK_ROS2 wrapper) is currently not usable with this camera on this robot: OpenOrbbecSDK `2.5.5` enumerates USB but returns `deviceCount=0`, so no ROS topics ever appear beyond `device_status`.
-  - Repro: `tools/depth/ob_list.cpp` prints SDK version and `deviceCount=0` and logs `Failed to query USB device serial number` (missing USB serial descriptor).
-  - Implication: any solution based on `ros-jazzy-orbbec-camera` will remain blocked until the underlying OpenOrbbecSDK accepts this device (or the device firmware exposes the expected descriptors).
+### Calibration (required)
+- Generate and install RGB calibration YAML for the UVC camera (the current default path under `~/.ros/camera_info/` is missing, so `camera_info` is uncalibrated).
+- Decide how depth intrinsics should be sourced (factory/OpenNI2 vs calibrated YAML) and ensure `depth/*/camera_info` is correct and stable across boots.
+- Verify RViz / downstream nodes are using the intended frames and `CameraInfo` (rectification / pointcloud projection sanity check).
 
-### Options (short)
-- **Preferred (pragmatic):** integrate via ROS2 `openni2_camera` (matches the proven-working OpenNI2 stack).
-- **Fallback 1:** write a small ROS2 node that uses OpenNI2 directly (publish `sensor_msgs/Image` + `CameraInfo`) for depth/IR, and treat RGB as a separate UVC camera if needed.
-- **Fallback 2 (investigation-heavy):** try a different OpenOrbbecSDK build/version or patch OpenOrbbecSDK device filtering so devices without a USB serial descriptor are still accepted; then re-test `ros-jazzy-orbbec-camera`.
+### Warnings/errors from `camera` launch (need decisions/actions)
+- `v4l2_camera` control read fails with `Permission denied (13)` for control id `10092545`: confirm whether this affects any required settings; if yes, fix via udev/device permissions or avoid querying that control.
+- `v4l2_camera` “Control type not currently supported: 6” (Camera Controls): confirm if it is safe to ignore; otherwise, either patch `v4l2_camera` to support it or remove it from the control list.
+- RGB format conversion warning (`yuv422_yuy2 => rgb8`): measure CPU impact; if needed, adjust requested pixel format / use MJPEG / reduce resolution or frame rate.
+- OpenNI2 “USB events thread - failed to set priority”: decide whether to tolerate (most cases) or configure realtime privileges to reduce risk of dropped frames under load.
 
-### Next steps
-- Try `openni2_camera` on Jazzy and confirm topics: depth image, IR image (if available), and camera info; document the working launch in `docs/depth.md`.
-- If OpenNI2 works, define the target ROS topic/TF contract for the rest of the stack (Nav/RViz) before wiring it into `rovi_bringup`.
+### Startup robustness (nice-to-have)
+- `robot_serial_display` initially fails to connect to gRPC (`Connection refused`) until `ros_ui_bridge` starts: decide if we want to enforce start order (or keep retry behavior and classify as acceptable).
