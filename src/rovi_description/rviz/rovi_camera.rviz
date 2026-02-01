@@ -43,7 +43,7 @@ Visualization Manager:
         Value: /camera/depth/image
       Value: true
   Global Options:
-    Fixed Frame: odom
+    Fixed Frame: base_footprint
     Frame Rate: 30
   Name: root
   Tools:

@@ -113,6 +113,23 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
+    # Bridge image topics via ros_gz_image (more reliable than parameter_bridge for images).
+    camera_image_bridge = Node(
+        package='ros_gz_image',
+        executable='image_bridge',
+        name='ros_gz_image_bridge',
+        output='screen',
+        arguments=[
+            '/rovi/camera/color/image',
+            '/rovi/camera/depth/image',
+        ],
+        remappings=[
+            ('/rovi/camera/color/image', '/camera/color/image_raw'),
+            ('/rovi/camera/depth/image', '/camera/depth/image'),
+        ],
+        parameters=[{'use_sim_time': use_sim_time_param}],
+    )
+
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
@@ -151,6 +168,7 @@ def generate_launch_description() -> LaunchDescription:
         gazebo_server,
         gazebo_client,
         bridge,
+        camera_image_bridge,
         delayed_spawn,
         graceful_shutdown,
     ])

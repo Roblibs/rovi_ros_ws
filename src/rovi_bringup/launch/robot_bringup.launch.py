@@ -164,7 +164,11 @@ def generate_launch_description() -> LaunchDescription:
     )
     serial_display_enabled_arg = DeclareLaunchArgument(
         'serial_display_enabled',
-        default_value='true',
+        default_value=PythonExpression([
+            "'true' if '",
+            LaunchConfiguration('robot_mode'),
+            "' == 'real' else 'false'",
+        ]),
         description='Start robot_serial_display (gRPC client -> USB serial display).',
     )
     serial_display_config_arg = DeclareLaunchArgument(
@@ -394,6 +398,8 @@ def generate_launch_description() -> LaunchDescription:
             "'",
             LaunchConfiguration('serial_display_enabled'),
             "' == 'true' and '",
+            LaunchConfiguration('robot_mode'),
+            "' == 'real' and '",
             LaunchConfiguration('serial_display_debug'),
             "' != 'true'",
         ])),
@@ -410,6 +416,8 @@ def generate_launch_description() -> LaunchDescription:
             "'",
             LaunchConfiguration('serial_display_enabled'),
             "' == 'true' and '",
+            LaunchConfiguration('robot_mode'),
+            "' == 'real' and '",
             LaunchConfiguration('serial_display_debug'),
             "' == 'true'",
         ])),

@@ -248,7 +248,6 @@
       <visualize>true</visualize>
       <update_rate>10</update_rate>
       <topic>/rovi/scan</topic>
-      <gz_frame_id>laser_link</gz_frame_id>
       <ray>
         <scan>
           <horizontal>
@@ -279,18 +278,16 @@
       <visualize>false</visualize>
       <update_rate>100</update_rate>
       <topic>/rovi/imu</topic>
-      <gz_frame_id>imu_link</gz_frame_id>
     </sensor>
   </gazebo>
 
   <!-- Simulated RGB + depth cameras (Gazebo Transport topics bridged to /camera/*). -->
-  <gazebo reference="camera_color_optical_frame">
+  <gazebo reference="camera_color_frame">
     <sensor name="rovi_color_camera" type="camera">
       <always_on>true</always_on>
       <visualize>false</visualize>
       <update_rate>30</update_rate>
       <topic>/rovi/camera/color/image</topic>
-      <gz_frame_id>camera_color_optical_frame</gz_frame_id>
       <camera>
         <!-- Rough FOV; tweak here if you want closer real-world behavior. -->
         <horizontal_fov>1.047</horizontal_fov>
@@ -307,25 +304,25 @@
     </sensor>
   </gazebo>
 
-  <gazebo reference="camera_depth_optical_frame">
-    <sensor name="rovi_depth_camera" type="depth_camera">
+  <gazebo reference="camera_depth_frame">
+    <sensor name="rovi_depth_camera" type="depth">
       <always_on>true</always_on>
       <visualize>false</visualize>
       <update_rate>30</update_rate>
       <topic>/rovi/camera/depth/image</topic>
-      <gz_frame_id>camera_depth_optical_frame</gz_frame_id>
       <camera>
         <!-- Match Astra depth resolution shape (640x400). -->
         <horizontal_fov>1.047</horizontal_fov>
         <image>
           <width>640</width>
           <height>400</height>
-          <format>R_FLOAT32</format>
         </image>
-        <clip>
-          <near>0.05</near>
-          <far>12.0</far>
-        </clip>
+        <depth_camera>
+          <clip>
+            <near>0.05</near>
+            <far>12.0</far>
+          </clip>
+        </depth_camera>
       </camera>
     </sensor>
   </gazebo>

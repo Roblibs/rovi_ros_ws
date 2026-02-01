@@ -40,6 +40,9 @@ def _pick_default_rgb_device() -> str:
 
 def _resolve_rgb_device(context, *args, **kwargs):  # noqa: ANN001
     del args, kwargs
+    robot_mode = LaunchConfiguration("robot_mode").perform(context).strip()
+    if robot_mode != "real":
+        return []
     requested = LaunchConfiguration("rgb_video_device").perform(context).strip()
     resolved = requested or _pick_default_rgb_device()
     context.launch_configurations["rgb_video_device_resolved"] = resolved

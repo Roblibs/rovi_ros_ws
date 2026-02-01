@@ -35,15 +35,4 @@
   gz_type_name: "gz.msgs.Twist"
   direction: ROS_TO_GZ
 
-# Simulated cameras (from rovi_description/urdf/rovi.urdf Gazebo sensors)
-- ros_topic_name: "camera/color/image_raw"
-  gz_topic_name: "/rovi/camera/color/image"
-  ros_type_name: "sensor_msgs/msg/Image"
-  gz_type_name: "gz.msgs.Image"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "camera/depth/image"
-  gz_topic_name: "/rovi/camera/depth/image"
-  ros_type_name: "sensor_msgs/msg/Image"
-  gz_type_name: "gz.msgs.Image"
-  direction: GZ_TO_ROS
+# Simulated cameras are bridged via ros_gz_image (see rovi_sim gazebo_sim.launch.py).
