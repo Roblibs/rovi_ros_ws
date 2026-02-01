@@ -64,14 +64,13 @@ Not acceptable if:
 
 ## Not acceptable (requires action)
 
-### Missing camera calibration files
+### Missing color camera calibration file
 Typical log:
 - `camera_calibration_parsers: Unable to open camera calibration file [...]`
 - `Camera calibration file ... not found`
 
 Why it matters:
-- Without calibration, `CameraInfo` is missing/incorrect and any rectification, projection, or depth-to-3D/pointcloud operations are unreliable.
+- Without RGB calibration, `/camera/color/camera_info` is missing/incorrect and any rectification or pixel-to-ray projection from the color camera is unreliable.
 
 Expected resolution:
-- Generate and provide calibration YAMLs (and/or explicitly set `camera_info_url`) so `CameraInfo` is deterministic and correct.
-
+- Generate and provide an RGB calibration YAML (and/or explicitly set `camera_info_url`) so `/camera/color/camera_info` is deterministic and correct.

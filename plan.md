@@ -6,9 +6,15 @@
 - Use `/camera/color/*` for the Astra color stream, `/camera/depth/*` for the Astra depth stream, and reserve `/camera/stereo/*` for the ELP stereo camera.
 
 ### Calibration (required)
-- Generate and install RGB calibration YAML for the UVC camera (the current default path under `~/.ros/camera_info/` is missing, so `camera_info` is uncalibrated).
-- Decide how depth intrinsics should be sourced (factory/OpenNI2 vs calibrated YAML) and ensure `depth/*/camera_info` is correct and stable across boots.
+- Decide calibration storage policy:
+  - Preferred for this robot: commit calibration YAML in-repo (restore-friendly) under `src/rovi_bringup/config/camera_info/` and load it from launch (avoid relying only on `~/.ros/camera_info/` on the Pi).
+- Generate RGB calibration YAML for the UVC camera and point the RGB driver to it (the current `/camera/color/camera_info` is uncalibrated).
 - Verify RViz / downstream nodes are using the intended frames and `CameraInfo` (rectification / pointcloud projection sanity check).
+ 
+### Frames / URDF vs launch TF (decision needed)
+- Decide the single source of truth for fixed camera frames (`camera_link`, `camera_*_frame`, `camera_*_optical_frame`):
+  - keep static TF in `rovi_bringup` launch (quick iteration), or
+  - move fixed joints into `src/rovi_description/urdf/rovi.urdf` and remove the duplicate static TF publishers (cleaner TF + consistent offline/sim), but do not publish both.
 
 ### Warnings/errors from `camera` launch (need decisions/actions)
 - `v4l2_camera` control read fails with `Permission denied (13)` for control id `10092545`: confirm whether this affects any required settings; if yes, fix via udev/device permissions or avoid querying that control.
