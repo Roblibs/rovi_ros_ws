@@ -9,12 +9,20 @@ Related projects:
 * webapp : https://github.com/MicroWebStacks/tanstack-robot-space
 * LCD monitor firmware : https://github.com/ESP32Home/robot_serial_display
 
+# Detailed docs
+
+| Doc | What it covers |
+|---|---|
+| [reference.md](./docs/reference.md) | Full command list and deeper reference tables. |
+| [nodes.md](./docs/nodes.md) | Quick index of packages/nodes plus useful debug commands. |
+| [depth_camera_astra_stereo_s_u3.md](./docs/depth_camera_astra_stereo_s_u3.md) | Astra Stereo S U3 depth camera (depth via OpenNI2 + RGB via UVC): run, topics/TF, install notes, calibration pointers. |
+| [stereo_elp.md](./docs/stereo_elp.md) | ELP stereo camera notes and V4L2 formats. |
+| [runtime.md](./docs/runtime.md) | Runtime warnings/errors description. |
+
 # Usage
 Before first time usage, start with the [install](#install) section
 
-Main Operation commands, for the full list of commands see the [commands](./docs/reference.md#commands) section
-
-Tables with the full list of packages, launches, nodes and params are also available in the [reference](./docs/reference.md) section.
+Main Operation commands are listed below; for the full list see [commands](./docs/reference.md#commands).
 
 | Command | Description |
 |---|---|

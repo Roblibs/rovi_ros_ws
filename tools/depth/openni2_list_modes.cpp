@@ -1,5 +1,5 @@
 // List OpenNI2 video modes for each sensor (depth/IR/color).
-// Uses the Orbbec OpenNI2 SDK (see docs/depth.md for install).
+// Uses the Orbbec OpenNI2 SDK (see docs/depth_camera_astra_stereo_s_u3.md for install).
 
 #include <OpenNI.h>
 

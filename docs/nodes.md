@@ -149,7 +149,7 @@ v4l2-ctl -d /dev/video0 --list-formats-ext
 ## Stereo camera
 ELP stereo camera.
 
-See more details in [stereo camera](./stereo.md).
+See more details in [stereo camera](./stereo_elp.md).
 
 # Depth camera
 Orbbec `Astra Stereo S U3`, aka Yahboom `AI View Depth Camera`
@@ -158,7 +158,7 @@ Orbbec `Astra Stereo S U3`, aka Yahboom `AI View Depth Camera`
 * used library https://github.com/orbbec/OpenNI_SDK
 * API reference https://github.com/orbbec/OpenNI_SDK/blob/main/Doc/English/0400_API.md
 
-See more details in [stereo camera](./depth.md).
+See more details in [depth camera](./depth_camera_astra_stereo_s_u3.md).
 
 
 # rplidar

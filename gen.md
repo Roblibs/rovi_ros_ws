@@ -18,7 +18,7 @@
 
 ## Orbbec depth camera integration (Astra Stereo S U3 / Yahboom AI View Depth Camera)
 
-The camera works via OpenNI2, but OpenOrbbecSDK (used by `ros-jazzy-orbbec-camera`) does not accept the device on this robot: it enumerates USB but returns an empty device list (`deviceCount=0`), so the Orbbec ROS driver never publishes real image topics.
+The camera works via OpenNI2, but the “modern” Orbbec ROS driver path we tried did not enumerate the device (USB is present but device list is empty), which is consistent with the camera behaving like a legacy/OpenNI-era Astra variant; we therefore stopped chasing OrbbecSDK/driver version pinning and standardized on OpenNI2. See [yahboom.md](docs/yahboom.md) for the reasoning and how Yahboom’s tutorial stack differs.
 
 **Decision:**
 - Prefer ROS `openni2_camera` for depth/IR on Jazzy; treat RGB as a separate UVC camera if needed.

@@ -1,6 +1,6 @@
+# ELP stereo camera
 
-
-# Devices
+## Devices
 
 ```bash
 wass@rovi:~$ v4l2-ctl --list-devices
@@ -36,7 +36,7 @@ rpivid (platform:rpivid):
         /dev/media3
 ```
 
-# Formats
+## Formats
 
 ```bash
 wass@rovi:~$ v4l2-ctl -d /dev/video0 --list-formats-ext
@@ -102,9 +102,8 @@ ioctl: VIDIOC_ENUM_FMT
 ```
 
 
-# quick test
+## Quick test
 ```bash
 sudo apt install ffmpeg
 ffplay /dev/video0
 ```
-

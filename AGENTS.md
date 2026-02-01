@@ -37,7 +37,7 @@ This file is intentionally short and focuses on the "golden path". For deeper re
 
 - `docs/nodes.md`: commands, packages, launches, nodes, and key params (good as a quick index / source of truth).
 - `docs/reference.md`: deeper reference notes (robot interface contract, joystick mapping, rosbags helpers, rosmaster driver details, sensor notes).
-- `docs/stereo.md`: stereo camera notes.
+- `docs/stereo_elp.md`: stereo camera notes.
 
 ## Repo map (where to look first)
 Core packages (owned here): :contentReference[oaicite:9]{index=9}
