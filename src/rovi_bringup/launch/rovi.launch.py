@@ -17,12 +17,22 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from rovi_bringup.launch_lib.args import (
+    BACKEND_ARG_NAMES,
+    CAMERA_STACK_ARG_NAMES,
+    CONTROL_STACK_ARG_NAMES,
+    LOCALIZATION_STACK_ARG_NAMES,
+    MAPPING_STACK_ARG_NAMES,
+    NAV_STACK_ARG_NAMES,
+    launch_config_map,
+)
+from rovi_bringup.launch_lib.includes import include_launch
+from rovi_bringup.launch_lib.modes import CONTROL_STACKS, SESSION_STACKS, stack_equals, stack_in
 
 
 def _ros_home() -> Path:
@@ -35,7 +45,7 @@ def _write_current_launch(context, *args, **kwargs):  # noqa: ANN001
 
     # Persist the *stack* launch ref (not rovi.launch.py) so tools can infer intent
     # (bagging, UI fixed frame policy, etc.). This is deterministic and not TF-dependent.
-    if stack in {'teleop', 'camera', 'mapping', 'localization', 'nav'}:
+    if stack in SESSION_STACKS:
         launch_ref = f"rovi_bringup/{stack}.launch.py"
     else:
         launch_ref = 'rovi_bringup/teleop.launch.py'
@@ -251,88 +261,38 @@ def generate_launch_description() -> LaunchDescription:
     ])
 
     # Backend: always start, even for offline (robot_bringup handles robot_mode=offline).
-    backend = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(robot_bringup_launch),
-        launch_arguments={
-            'robot_mode': LaunchConfiguration('robot_mode'),
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'model': LaunchConfiguration('model'),
-            'world': LaunchConfiguration('world'),
-            'gazebo_gui': LaunchConfiguration('gazebo_gui'),
-            'odom_integrator_publish_tf': odom_integrator_publish_tf,
-            'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
-            'ui_bridge_config': LaunchConfiguration('ui_bridge_config'),
-            'ui_bridge_log_level': LaunchConfiguration('ui_bridge_log_level'),
-            'serial_display_config': LaunchConfiguration('serial_display_config'),
-            'serial_display_log_level': LaunchConfiguration('serial_display_log_level'),
-            'serial_display_debug': LaunchConfiguration('serial_display_debug'),
-        }.items(),
-    )
+    backend_args = launch_config_map(BACKEND_ARG_NAMES)
+    backend_args['odom_integrator_publish_tf'] = odom_integrator_publish_tf
+    backend = include_launch(robot_bringup_launch, launch_arguments=backend_args)
 
     # Twist muxing (needed for teleop/mapping/nav; joy can be disabled).
-    control_stack = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(teleop_stack_launch),
-        condition=IfCondition(PythonExpression([
-            "'",
-            LaunchConfiguration('stack'),
-            "' in ['teleop','camera','mapping','localization','nav']",
-        ])),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'joy_enabled': LaunchConfiguration('joy_enabled'),
-            'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
-        }.items(),
+    control_stack = include_launch(
+        teleop_stack_launch,
+        condition=stack_in(CONTROL_STACKS),
+        launch_arguments=launch_config_map(CONTROL_STACK_ARG_NAMES),
     )
 
-    stack_camera = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(camera_stack_launch),
-        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stack'), "' == 'camera'"])),
-        launch_arguments={
-            'robot_mode': LaunchConfiguration('robot_mode'),
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'device_id': LaunchConfiguration('device_id'),
-            'depth_mode': LaunchConfiguration('depth_mode'),
-            'rgb_video_device': LaunchConfiguration('rgb_video_device'),
-            'rgb_width': LaunchConfiguration('rgb_width'),
-            'rgb_height': LaunchConfiguration('rgb_height'),
-            'color_mode': LaunchConfiguration('color_mode'),
-            'rgb_pixel_format': LaunchConfiguration('rgb_pixel_format'),
-            'rgb_output_encoding': LaunchConfiguration('rgb_output_encoding'),
-        }.items(),
+    stack_camera = include_launch(
+        camera_stack_launch,
+        condition=stack_equals('camera'),
+        launch_arguments=launch_config_map(CAMERA_STACK_ARG_NAMES),
     )
 
     # Stacks (headless; RViz is owned by this top-level file).
-    stack_mapping = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(mapping_stack_launch),
-        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stack'), "' == 'mapping'"])),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'odom_mode': LaunchConfiguration('odom_mode'),
-            'slam_enabled': LaunchConfiguration('slam_enabled'),
-            'mag_enabled': LaunchConfiguration('mag_enabled'),
-        }.items(),
+    stack_mapping = include_launch(
+        mapping_stack_launch,
+        condition=stack_equals('mapping'),
+        launch_arguments=launch_config_map(MAPPING_STACK_ARG_NAMES),
     )
-    stack_localization = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(localization_stack_launch),
-        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stack'), "' == 'localization'"])),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'odom_mode': LaunchConfiguration('odom_mode'),
-            'slam_enabled': LaunchConfiguration('slam_enabled'),
-            'mag_enabled': LaunchConfiguration('mag_enabled'),
-            'map_file_name': LaunchConfiguration('map_file_name'),
-        }.items(),
+    stack_localization = include_launch(
+        localization_stack_launch,
+        condition=stack_equals('localization'),
+        launch_arguments=launch_config_map(LOCALIZATION_STACK_ARG_NAMES),
     )
-    stack_nav = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(nav_stack_launch),
-        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('stack'), "' == 'nav'"])),
-        launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'odom_mode': LaunchConfiguration('odom_mode'),
-            'slam_mode': LaunchConfiguration('slam_mode'),
-            'map_file_name': LaunchConfiguration('map_file_name'),
-            'mag_enabled': LaunchConfiguration('mag_enabled'),
-        }.items(),
+    stack_nav = include_launch(
+        nav_stack_launch,
+        condition=stack_equals('nav'),
+        launch_arguments=launch_config_map(NAV_STACK_ARG_NAMES),
     )
 
     rviz_node = Node(
