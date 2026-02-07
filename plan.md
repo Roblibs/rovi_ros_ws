@@ -1,4 +1,4 @@
-# Camera stack (RGB UVC + Depth OpenNI2)
+# Camera stack (remaining focus)
 
 ## Calibration (required)
 - Decide calibration storage policy:
@@ -23,6 +23,18 @@
 - Add a `camera_profile` launch arg (`quality|balanced|performance`) to switch depth/RGB resolution/fps presets without editing params.
 - Add a `camera_health` status stream in `ros_ui_bridge` (RGB Hz, depth Hz, dropped frame counters) for runtime diagnostics.
 - Add a calibration sanity command (`camera verify`) that checks `CameraInfo` presence, frame IDs, and basic intrinsics consistency.
+## Camera identifiers
+- Keep RGB bound to stable `/dev/v4l/by-id/...` path (already in use) and document it as mandatory.
+- Verify depth camera binding is stable across replug/reboot (OpenNI2 currently reports `2bc5/0614@3/6`, which is bus-topology sensitive).
+- Make camera identity to calibration mapping deterministic:
+  - Current calibration is loaded from `~/.ros/camera_info/usb_2.0_camera:_usb_camera.yaml`.
+  - Confirm uniqueness if multiple similar UVC cameras are ever connected.
+
+## Warnings/errors from `camera` launch (remaining)
+- `v4l2_camera` control read fails with `Permission denied (13)` for control id `10092545`: decide if this is ignorable or fix via permissions/udev/patched control handling.
+- `v4l2_camera` warning: `Control type not currently supported: 6` (`Camera Controls`): decide if safe to ignore or patch/remove from queried controls.
+- RGB conversion warning: `yuv422_yuy2 => rgb8`: measure CPU impact and decide whether to switch format (e.g., MJPEG) or keep current config.
+- OpenNI2 warning: `USB events thread - failed to set priority`: decide whether to tolerate or configure realtime privileges to reduce drop risk under load.
 
 # Large refactors
 

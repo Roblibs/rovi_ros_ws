@@ -171,6 +171,48 @@ def generate_launch_description() -> LaunchDescription:
         description='Enable magnetometer usage in the IMU orientation filter (odom_mode=fusion_wheels_imu).',
     )
 
+    # Camera stack args (passed through when stack:=camera).
+    camera_device_id = DeclareLaunchArgument(
+        'device_id',
+        default_value='#1',
+        description='OpenNI2 device selector for depth camera (camera stack).',
+    )
+    camera_depth_mode = DeclareLaunchArgument(
+        'depth_mode',
+        default_value='ORBBEC_640x400_30Hz',
+        description='OpenNI2 depth/IR mode preset (camera stack).',
+    )
+    camera_rgb_video_device = DeclareLaunchArgument(
+        'rgb_video_device',
+        default_value='',
+        description='RGB V4L2 device path (camera stack).',
+    )
+    camera_rgb_width = DeclareLaunchArgument(
+        'rgb_width',
+        default_value='640',
+        description='RGB image width (camera stack).',
+    )
+    camera_rgb_height = DeclareLaunchArgument(
+        'rgb_height',
+        default_value='480',
+        description='RGB image height (camera stack).',
+    )
+    camera_color_mode = DeclareLaunchArgument(
+        'color_mode',
+        default_value='yuyv',
+        description="Color transport mode: 'yuyv' or 'mjpeg' (camera stack).",
+    )
+    camera_rgb_pixel_format = DeclareLaunchArgument(
+        'rgb_pixel_format',
+        default_value='',
+        description='Optional RGB pixel format override for v4l2_camera (camera stack).',
+    )
+    camera_rgb_output_encoding = DeclareLaunchArgument(
+        'rgb_output_encoding',
+        default_value='',
+        description='Optional RGB output encoding override for v4l2_camera (camera stack).',
+    )
+
     # Odometry coordination between backend and localization stack.
     odom_mode = DeclareLaunchArgument(
         'odom_mode',
@@ -248,6 +290,14 @@ def generate_launch_description() -> LaunchDescription:
         launch_arguments={
             'robot_mode': LaunchConfiguration('robot_mode'),
             'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'device_id': LaunchConfiguration('device_id'),
+            'depth_mode': LaunchConfiguration('depth_mode'),
+            'rgb_video_device': LaunchConfiguration('rgb_video_device'),
+            'rgb_width': LaunchConfiguration('rgb_width'),
+            'rgb_height': LaunchConfiguration('rgb_height'),
+            'color_mode': LaunchConfiguration('color_mode'),
+            'rgb_pixel_format': LaunchConfiguration('rgb_pixel_format'),
+            'rgb_output_encoding': LaunchConfiguration('rgb_output_encoding'),
         }.items(),
     )
 
@@ -315,6 +365,14 @@ def generate_launch_description() -> LaunchDescription:
         slam_mode,
         map_file_name,
         mag_enabled,
+        camera_device_id,
+        camera_depth_mode,
+        camera_rgb_video_device,
+        camera_rgb_width,
+        camera_rgb_height,
+        camera_color_mode,
+        camera_rgb_pixel_format,
+        camera_rgb_output_encoding,
         odom_mode,
         backend,
         control_stack,

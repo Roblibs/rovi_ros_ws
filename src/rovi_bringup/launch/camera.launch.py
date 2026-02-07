@@ -49,6 +49,31 @@ def _resolve_rgb_device(context, *args, **kwargs):  # noqa: ANN001
     return [LogInfo(msg=f"[camera] rgb_video_device: {resolved}")]
 
 
+def _resolve_color_format(context, *args, **kwargs):  # noqa: ANN001
+    del args, kwargs
+    mode = LaunchConfiguration("color_mode").perform(context).strip().lower()
+    pixel_override = LaunchConfiguration("rgb_pixel_format").perform(context).strip()
+    encoding_override = LaunchConfiguration("rgb_output_encoding").perform(context).strip()
+
+    if mode not in {"yuyv", "mjpeg"}:
+        mode = "yuyv"
+
+    default_pixel = "YUYV" if mode == "yuyv" else "MJPG"
+    default_encoding = "rgb8"
+
+    pixel = pixel_override or default_pixel
+    output_encoding = encoding_override or default_encoding
+
+    context.launch_configurations["rgb_pixel_format_resolved"] = pixel
+    context.launch_configurations["rgb_output_encoding_resolved"] = output_encoding
+
+    return [
+        LogInfo(msg=f"[camera] color_mode: {mode}"),
+        LogInfo(msg=f"[camera] rgb_pixel_format: {pixel}"),
+        LogInfo(msg=f"[camera] rgb_output_encoding: {output_encoding}"),
+    ]
+
+
 def generate_launch_description() -> LaunchDescription:
     robot_mode_arg = DeclareLaunchArgument(
         "robot_mode",
@@ -79,21 +104,36 @@ def generate_launch_description() -> LaunchDescription:
     )
     rgb_width_arg = DeclareLaunchArgument("rgb_width", default_value="640")
     rgb_height_arg = DeclareLaunchArgument("rgb_height", default_value="480")
+    color_mode_arg = DeclareLaunchArgument(
+        "color_mode",
+        default_value="yuyv",
+        description=(
+            "RGB transport mode preset for v4l2_camera: "
+            "'yuyv' (YUYV->rgb8 conversion) or 'mjpeg' (MJPG decode->rgb8)."
+        ),
+    )
     rgb_pixel_format_arg = DeclareLaunchArgument(
         "rgb_pixel_format",
-        default_value="YUYV",
-        description="Pixel format for v4l2_camera (e.g. YUYV, UYVY, GREY).",
+        default_value="",
+        description=(
+            "Optional override for v4l2 pixel format (e.g. YUYV, MJPG). "
+            "If empty, resolved from color_mode."
+        ),
     )
     rgb_output_encoding_arg = DeclareLaunchArgument(
         "rgb_output_encoding",
-        default_value="rgb8",
-        description="Output encoding for v4l2_camera (e.g. rgb8, mono8).",
+        default_value="",
+        description=(
+            "Optional override for v4l2 output encoding (e.g. rgb8, mono8). "
+            "If empty, resolved from color_mode."
+        ),
     )
 
     is_real = IfCondition(PythonExpression(["'", LaunchConfiguration("robot_mode"), "' == 'real'"]))
     use_sim_time_param = ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)
 
     resolve_rgb = OpaqueFunction(function=_resolve_rgb_device)
+    resolve_color_format = OpaqueFunction(function=_resolve_color_format)
 
     # Depth driver (publishes /camera/depth/image_raw, /camera/depth/image, etc.)
     depth_node = Node(
@@ -148,8 +188,8 @@ def generate_launch_description() -> LaunchDescription:
                     value_type=List[int],
                 )
             },
-            {"pixel_format": LaunchConfiguration("rgb_pixel_format")},
-            {"output_encoding": LaunchConfiguration("rgb_output_encoding")},
+            {"pixel_format": LaunchConfiguration("rgb_pixel_format_resolved")},
+            {"output_encoding": LaunchConfiguration("rgb_output_encoding_resolved")},
             {"camera_frame_id": "camera_color_optical_frame"},
         ],
     )
@@ -162,9 +202,11 @@ def generate_launch_description() -> LaunchDescription:
         rgb_video_device_arg,
         rgb_width_arg,
         rgb_height_arg,
+        color_mode_arg,
         rgb_pixel_format_arg,
         rgb_output_encoding_arg,
         resolve_rgb,
+        resolve_color_format,
         depth_node,
         rgb_node,
     ])
