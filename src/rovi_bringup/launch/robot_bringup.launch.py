@@ -221,6 +221,9 @@ def generate_launch_description() -> LaunchDescription:
     rosmaster_driver_exec = _resolve_python_node_executable('rosmaster_driver', 'rosmaster_driver_node')
     ui_bridge_exec = _resolve_python_node_executable('ros_ui_bridge', 'ui_bridge')
     serial_display_exec = _resolve_python_node_executable('robot_serial_display', 'serial_display')
+    rovi_local_joint_states_exec = _resolve_python_node_executable('rovi_sim', 'rovi_local_joint_states')
+    rovi_sim_base_exec = _resolve_python_node_executable('rovi_sim', 'rovi_sim_base')
+    rovi_gz_odom_exec = _resolve_python_node_executable('rovi_sim', 'rovi_gz_odom')
 
     # Prefer an active venv; otherwise try $ROVI_ROS_WS_DIR/.venv so launches work without `activate`.
     venv_root = os.environ.get('VIRTUAL_ENV')
@@ -270,8 +273,7 @@ def generate_launch_description() -> LaunchDescription:
     # Use a small local publisher to keep shutdown clean.
     joint_state_pub_sim = Node(
         condition=is_sim,
-        package='rovi_sim',
-        executable='rovi_local_joint_states',
+        executable=rovi_local_joint_states_exec,
         output='screen',
         arguments=[LaunchConfiguration('model')],
         parameters=[{'use_sim_time': use_sim_time_param}],
@@ -366,8 +368,7 @@ def generate_launch_description() -> LaunchDescription:
 
     sim_base = Node(
         condition=is_sim,
-        package='rovi_sim',
-        executable='rovi_sim_base',
+        executable=rovi_sim_base_exec,
         name='rovi_sim_base',
         output='screen',
         parameters=[
@@ -381,8 +382,7 @@ def generate_launch_description() -> LaunchDescription:
 
     sim_odom = Node(
         condition=is_sim,
-        package='rovi_sim',
-        executable='rovi_gz_odom',
+        executable=rovi_gz_odom_exec,
         name='rovi_gz_odom',
         output='screen',
         parameters=[

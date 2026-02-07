@@ -36,6 +36,13 @@
 - RGB conversion warning: `yuv422_yuy2 => rgb8`: measure CPU impact and decide whether to switch format (e.g., MJPEG) or keep current config.
 - OpenNI2 warning: `USB events thread - failed to set priority`: decide whether to tolerate or configure realtime privileges to reduce drop risk under load.
 
+## Temporary launch hacks to remove
+- `robot_bringup.launch.py` now uses temporary executable fallback (`<prefix>/bin/*` if `<prefix>/lib/<pkg>/*` is missing) for three `rovi_sim` nodes:
+  - `rovi_local_joint_states`
+  - `rovi_sim_base`
+  - `rovi_gz_odom`
+- Remove this once `rovi_sim` install layout is fixed to standard ROS 2 libexec (`install/rovi_sim/lib/rovi_sim/*`) and validated on clean build.
+
 # Large refactors
 
 ## 1) Decompose launch orchestration into reusable modules
