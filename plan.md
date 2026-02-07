@@ -13,7 +13,7 @@
 ## Warnings/errors from `camera` launch (need decisions/actions)
 - `v4l2_camera` control read fails with `Permission denied (13)` for control id `10092545`: confirm whether this affects any required settings; if yes, fix via udev/device permissions or avoid querying that control.
 - `v4l2_camera` “Control type not currently supported: 6” (Camera Controls): confirm if it is safe to ignore; otherwise, either patch `v4l2_camera` to support it or remove it from the control list.
-- RGB format conversion warning (`yuv422_yuy2 => rgb8`): measure CPU impact; if needed, adjust requested pixel format / use MJPEG / reduce resolution or frame rate.
+- RGB format conversion warning (`yuv422_yuy2 => rgb8`): measure CPU impact; if needed, reduce resolution/FPS or move to an explicit decode pipeline/driver.
 - OpenNI2 “USB events thread - failed to set priority”: decide whether to tolerate (most cases) or configure realtime privileges to reduce risk of dropped frames under load.
 
 ## Startup robustness (nice-to-have)
@@ -33,7 +33,7 @@
 ## Warnings/errors from `camera` launch (remaining)
 - `v4l2_camera` control read fails with `Permission denied (13)` for control id `10092545`: decide if this is ignorable or fix via permissions/udev/patched control handling.
 - `v4l2_camera` warning: `Control type not currently supported: 6` (`Camera Controls`): decide if safe to ignore or patch/remove from queried controls.
-- RGB conversion warning: `yuv422_yuy2 => rgb8`: measure CPU impact and decide whether to switch format (e.g., MJPEG) or keep current config.
+- RGB conversion warning: `yuv422_yuy2 => rgb8`: measure CPU impact and decide whether to keep current config or reduce resolution/FPS (avoid MJPG via `v4l2_camera`).
 - OpenNI2 warning: `USB events thread - failed to set priority`: decide whether to tolerate or configure realtime privileges to reduce drop risk under load.
 
 # Large refactors

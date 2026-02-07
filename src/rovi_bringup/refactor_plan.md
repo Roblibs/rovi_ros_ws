@@ -75,8 +75,7 @@
 ### Validation Strategy (manual, no added test code)
 - Use real runs + logs as requested.
 - Validation matrix:
-  - `camera color_mode:=yuyv`
-  - `camera color_mode:=mjpeg`
+  - `camera`
   - `teleop`
   - `mapping`
   - `localization`
@@ -154,7 +153,7 @@
 - Keep verification runbook-based:
   - fresh `uv sync`
   - `build`
-  - run `teleop`, `camera color_mode:=yuyv`, `camera color_mode:=mjpeg`
+  - run `teleop`, `camera`
   - confirm logs and process starts.
 - This gives deterministic validation without adding test code to the repo.
 

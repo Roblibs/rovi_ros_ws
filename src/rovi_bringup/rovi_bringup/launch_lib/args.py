@@ -37,9 +37,6 @@ CAMERA_STACK_ARG_NAMES: tuple[str, ...] = (
     "rgb_video_device",
     "rgb_width",
     "rgb_height",
-    "color_mode",
-    "rgb_pixel_format",
-    "rgb_output_encoding",
 )
 
 # Mapping stack args from rovi.launch.py -> mapping.launch.py
@@ -72,4 +69,3 @@ NAV_STACK_ARG_NAMES: tuple[str, ...] = (
 def launch_config_map(names: Iterable[str]) -> dict[str, LaunchConfiguration]:
     """Create `{arg_name: LaunchConfiguration(arg_name)}` for include launch arguments."""
     return {name: LaunchConfiguration(name) for name in names}
-

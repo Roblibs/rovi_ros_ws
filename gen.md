@@ -13,6 +13,17 @@
 **PC viewer workflow:**
 - Add `ROVI_SKIP_OPENNI2=1` to skip building `openni2_camera` and to skip OpenNI2 env setup in `rovi_env.sh` for viewer-only machines.
 
+# 2026-02-07
+
+## Lessons learned: don’t use MJPG (MJPEG) with `v4l2_camera` in this stack
+
+We tried switching the RGB UVC feed from `YUYV` to `MJPG` to reduce the CPU cost of `yuv422_yuy2 => rgb8` conversion. On this setup, `ros-jazzy-v4l2-camera` warns that `MJPG` is not supported and can crash with `cv_bridge::Exception` due to an empty/unknown input encoding, while also driving CPU high and producing no visible color image.
+
+**Decision / guidance:**
+- Keep the RGB path forced to `YUYV` + `rgb8` conversion for the `camera` stack.
+- If CPU becomes an issue, prefer lowering RGB resolution/FPS first.
+- If we truly need MJPEG, use a pipeline/driver that explicitly decodes MJPEG (e.g., gstreamer/ffmpeg-based bridge) rather than toggling `pixel_format=MJPG` in `v4l2_camera`.
+
 
 # 2026-01-25
 

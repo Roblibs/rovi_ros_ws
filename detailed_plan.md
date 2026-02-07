@@ -55,7 +55,7 @@
 3. Pixel format conversion warning:
    - `yuv422_yuy2 => rgb8` conversion may be slow.
    - Measure CPU and frame stability under expected camera load.
-   - Decide whether to keep YUYV conversion or switch RGB path (e.g., MJPEG or lower resolution/fps).
+   - Keep the current YUYV path; if CPU is too high, reduce resolution/FPS or switch to a driver/pipeline that explicitly decodes MJPEG (avoid MJPG via `v4l2_camera`).
 4. OpenNI2 scheduling warning:
    - `USB events thread - failed to set priority`.
    - Measure dropped frames under stress.

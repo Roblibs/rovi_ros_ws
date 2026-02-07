@@ -18,17 +18,6 @@ CAMERA_ARG_SPECS: tuple[tuple[str, str, str], ...] = (
     ),
     ("rgb_width", "640", "RGB image width."),
     ("rgb_height", "480", "RGB image height."),
-    ("color_mode", "yuyv", "Color transport mode: 'yuyv' or 'mjpeg'."),
-    (
-        "rgb_pixel_format",
-        "",
-        "Optional RGB pixel format override (e.g. YUYV, MJPG). Empty => resolved from color_mode.",
-    ),
-    (
-        "rgb_output_encoding",
-        "",
-        "Optional RGB output encoding override (e.g. rgb8, mono8). Empty => resolved from color_mode.",
-    ),
 )
 
 
@@ -38,4 +27,3 @@ def declare_camera_args() -> list[DeclareLaunchArgument]:
         DeclareLaunchArgument(name, default_value=default, description=description)
         for name, default, description in CAMERA_ARG_SPECS
     ]
-

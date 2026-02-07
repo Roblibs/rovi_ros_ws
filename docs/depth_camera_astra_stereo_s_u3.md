@@ -30,24 +30,11 @@ On a PC to visualize:
 view camera
 ```
 
-### RGB mode switch (`YUYV` vs `MJPG`)
+### RGB format policy
 
-Default is `YUYV` transport with `rgb8` output conversion.
+ROVI forces `YUYV` with `rgb8` output conversion.
 
-Switch for one run:
-```bash
-camera color_mode:=mjpeg
-```
-
-Switch back:
-```bash
-camera color_mode:=yuyv
-```
-
-Notes:
-- `color_mode:=yuyv` -> `pixel_format=YUYV`, `output_encoding=rgb8`
-- `color_mode:=mjpeg` -> `pixel_format=MJPG`, `output_encoding=rgb8`
-- Advanced overrides still work via `rgb_pixel_format:=...` and `rgb_output_encoding:=...`
+Note: we intentionally do **not** offer an `MJPG`/MJPEG toggle in launch args because `v4l2_camera` is not reliable with `pixel_format=MJPG` on this setup.
 
 ## ROS contract (topics + TF)
 
