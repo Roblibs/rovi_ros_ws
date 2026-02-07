@@ -1,3 +1,30 @@
+# 2026-02-07
+
+## Lessons learned: don’t use MJPG (MJPEG) with `v4l2_camera` in this stack
+
+We tried switching the RGB UVC feed from `YUYV` to `MJPG` to reduce the CPU cost of `yuv422_yuy2 => rgb8` conversion. On this setup, `ros-jazzy-v4l2-camera` warns that `MJPG` is not supported and can crash with `cv_bridge::Exception` due to an empty/unknown input encoding, while also driving CPU high and producing no visible color image.
+
+**Decision / guidance:**
+- Keep the RGB path forced to `YUYV` + `rgb8` conversion for the `camera` stack.
+- If CPU becomes an issue, prefer lowering RGB resolution/FPS first.
+- If we truly need MJPEG, use a pipeline/driver that explicitly decodes MJPEG (e.g., gstreamer/ffmpeg-based bridge) rather than toggling `pixel_format=MJPG` in `v4l2_camera`.
+
+## Launch orchestration + build toolchain boundary
+
+Launch orchestration has been modularized into reusable helpers under `src/rovi_bringup/rovi_bringup/launch_lib` and consumed by top-level launch files, so argument/condition wiring is no longer duplicated in each stack entrypoint.
+
+We also hit a build break caused by mixed ownership of the Python build toolchain (`setuptools`/`colcon`) between `.venv` and system ROS packages. The workspace `.venv` had `setuptools` at a version that conflicted with `colcon` editable-install behavior.
+
+**Decision / guidance:**
+- Keep `.venv` for workspace Python runtime deps (`grpcio`, `catkin_pkg`, project libs), but not for `colcon` toolchain ownership.
+- Remove `colcon-common-extensions` from `pyproject.toml` so `uv sync` does not install `colcon` into `.venv`.
+- Enforce build execution through system `colcon` in `rovi_env.sh` (prefer `/usr/bin/colcon` when available).
+
+**Lessons learned:**
+- Avoid dual ownership of core build tooling across apt + venv; one authority avoids version skew.
+- Treat launch refactors and environment policy changes as contract-sensitive changes and validate with the same smoke path (`ws` -> `build` -> stack launch).
+- Record policy pivots in `gen.md` when they supersede earlier assumptions (for example, replacing the earlier venv-first `colcon` approach).
+
 # 2026-01-31
 
 ## Camera stack (teleop + depth + RGB) + viewer-friendly PC workflow
@@ -12,17 +39,6 @@
 
 **PC viewer workflow:**
 - Add `ROVI_SKIP_OPENNI2=1` to skip building `openni2_camera` and to skip OpenNI2 env setup in `rovi_env.sh` for viewer-only machines.
-
-# 2026-02-07
-
-## Lessons learned: don’t use MJPG (MJPEG) with `v4l2_camera` in this stack
-
-We tried switching the RGB UVC feed from `YUYV` to `MJPG` to reduce the CPU cost of `yuv422_yuy2 => rgb8` conversion. On this setup, `ros-jazzy-v4l2-camera` warns that `MJPG` is not supported and can crash with `cv_bridge::Exception` due to an empty/unknown input encoding, while also driving CPU high and producing no visible color image.
-
-**Decision / guidance:**
-- Keep the RGB path forced to `YUYV` + `rgb8` conversion for the `camera` stack.
-- If CPU becomes an issue, prefer lowering RGB resolution/FPS first.
-- If we truly need MJPEG, use a pipeline/driver that explicitly decodes MJPEG (e.g., gstreamer/ffmpeg-based bridge) rather than toggling `pixel_format=MJPG` in `v4l2_camera`.
 
 
 # 2026-01-25
