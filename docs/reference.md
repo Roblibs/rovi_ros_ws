@@ -3,9 +3,10 @@ All commands in this section are provided by `rovi_env.sh`
 
 | Command | Description |
 |---|---|
-| `sim` | PC simulation: `sim` (default `mapping`) or `sim teleop|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
-| `view` | PC visualization: `view` (default `nav`) or `view teleop|mapping|nav`. Use `view offline` for local URDF inspection (no hardware). |
+| `sim` | PC simulation: `sim` (default `mapping`) or `sim teleop|camera|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
+| `view` | PC visualization: `view` (default `nav`) or `view teleop|camera|mapping|nav`. Use `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
+| `camera` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=camera` (teleop + depth + RGB; headless; no RViz). |
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
@@ -22,7 +23,7 @@ Packages of this repo are listed in this table
 
 | Package | Role |
 |---|---|
-| `rovi_bringup` | Top-level launch entry points (teleop, visualization, mapping/localization stacks) |
+| `rovi_bringup` | Top-level launch entry points (teleop, camera, visualization, mapping/localization stacks) |
 | `rovi_sim` | Gazebo Sim backend: worlds + bridges + `rovi_sim_base` + `rovi_gz_odom`; spawns the shared robot model from `rovi_description` into Gazebo Sim |
 | `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
 | `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
@@ -112,7 +113,7 @@ Only the parameters toggling node activation are listed here.
 | Param | Package | Launch | Default | Explanation |
 |---|---|---|---|---|
 | `robot_mode` | `rovi_bringup` | `rovi.launch.py`, `robot_bringup.launch.py` | `real` | Selects the robot backend: `real`, `sim`, or `offline`. |
-| `stack` | `rovi_bringup` | `rovi.launch.py` | `teleop` | Selects the stack to run: `teleop`, `mapping`, `localization`, `nav`, `offline`, `bringup`. |
+| `stack` | `rovi_bringup` | `rovi.launch.py` | `teleop` | Selects the stack to run: `teleop`, `camera`, `mapping`, `localization`, `nav`, `offline`, `bringup`. |
 | `rviz` | `rovi_bringup` | `rovi.launch.py` | auto | Starts RViz automatically (default **off** for `real`, **on** for `sim`/`offline`). |
 | `joy_enabled` | `rovi_bringup` | `rovi.launch.py`, `teleop.launch.py` | auto | Starts joystick nodes (default **on** for `real`, **off** for `sim`). |
 | `lidar_enabled` | `rovi_bringup` | `robot_bringup.launch.py` | `true` | Starts LiDAR driver (`rplidar_ros`) in `robot_mode=real`; without it there is no `/scan`. |
@@ -120,8 +121,8 @@ Only the parameters toggling node activation are listed here.
 | `slam_enabled` | `rovi_slam` | `slam_toolbox.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
 | `slam_mode` | `rovi_slam` | `slam_toolbox.launch.py` | `mapping` | Selects SLAM mode: `mapping` or `localization`. |
 | `slam_mode` | `rovi_bringup` | `nav.launch.py`, `rovi.launch.py` | `mapping` | Selects SLAM mode when running Nav2. |
-| `odom_mode` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `fusion_wheels_imu` | Selects who publishes TF `odom -> base_footprint` (and whether IMU is used in that odom estimate) |
-| `odom_mode` | `rovi_localization` | `ekf.launch.py` | `fusion_wheels_imu` | Same as above, but for running the odometry pipeline without SLAM |
+| `odom_mode` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `filtered` | Selects who publishes TF `odom -> base_footprint` (and whether IMU is used in that odom estimate) |
+| `odom_mode` | `rovi_localization` | `ekf.launch.py` | `filtered` | Same as above, but for running the odometry pipeline without SLAM |
 | `mag_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
 | `mag_enabled` | `rovi_localization` | `ekf.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |
 | `map_file_name` | `rovi_bringup` | `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `~/.ros/rovi/maps/latest.posegraph` | Pose-graph file to load when `slam_mode=localization`. |

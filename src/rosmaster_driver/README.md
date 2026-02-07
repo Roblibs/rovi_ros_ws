@@ -18,26 +18,26 @@ Raspberry Pi 5 running Ubuntu 24.04 (ROS 2 Jazzy). These steps assume you are on
 ## Prerequisites
 
 ```bash
-cd ~/dev/rovi_ros_ws
+cd ~/dev/Roblibs/rovi_ros_ws
 uv sync
 ```
 
 ## Virtual environment (VIRTUAL_ENV)
 
-This package expects a Python virtual environment at `~/dev/rovi_ros_ws/.venv` and the launcher uses `$VIRTUAL_ENV` to add the venv's site-packages to `PYTHONPATH` automatically.
+This package expects a Python virtual environment at `~/dev/Roblibs/rovi_ros_ws/.venv` and the launcher uses `$VIRTUAL_ENV` to add the venv's site-packages to `PYTHONPATH` automatically.
 
 Activate the venv (recommended):
 
 ```bash
-cd ~/dev/rovi_ros_ws
+cd ~/dev/Roblibs/rovi_ros_ws
 source .venv/bin/activate   # sets $VIRTUAL_ENV for you
-echo "$VIRTUAL_ENV"        # should print /home/<you>/dev/rovi_ros_ws/.venv
+echo "$VIRTUAL_ENV"        # should print /home/<you>/dev/Roblibs/rovi_ros_ws/.venv
 ```
 
 If you cannot activate the venv (e.g., systemd service), set `VIRTUAL_ENV` explicitly:
 
 ```bash
-export VIRTUAL_ENV="$HOME/dev/rovi_ros_ws/.venv"
+export VIRTUAL_ENV="$HOME/dev/Roblibs/rovi_ros_ws/.venv"
 ```
 
 Notes:
@@ -47,7 +47,7 @@ Notes:
 ## Build (on the Pi)
 
 ```bash
-cd ~/dev/rovi_ros_ws
+cd ~/dev/Roblibs/rovi_ros_ws
 source .venv/bin/activate
 source /opt/ros/jazzy/setup.bash
 colcon build --merge-install
@@ -57,7 +57,7 @@ source install/setup.bash
 ## Run
 
 ```bash
-cd ~/dev/rovi_ros_ws
+cd ~/dev/Roblibs/rovi_ros_ws
 source /opt/ros/jazzy/setup.bash
 source .venv/bin/activate
 source install/setup.bash

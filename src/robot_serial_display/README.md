@@ -41,5 +41,5 @@ PY
 ```
 
 ```bash
-teleop ui_bridge_config:=/home/wass/dev/rovi_ros_ws/src/ros_ui_bridge/config/default.yaml serial_display_debug:=true
+teleop ui_bridge_config:=${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/config/default.yaml serial_display_debug:=true
 ```
