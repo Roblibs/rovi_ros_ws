@@ -11,9 +11,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, TextSubstitution
+from rovi_bringup.launch_lib.includes import include_launch
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -49,23 +49,23 @@ def generate_launch_description() -> LaunchDescription:
         description='Pose-graph file to load (slam_toolbox param map_file_name, typically .posegraph).',
     )
 
-    localization = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(ekf_launch),
+    localization = include_launch(
+        ekf_launch,
         launch_arguments={
             'odom_mode': LaunchConfiguration('odom_mode'),
             'mag_enabled': LaunchConfiguration('mag_enabled'),
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-        }.items(),
+        },
     )
 
-    slam = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(slam_launch),
+    slam = include_launch(
+        slam_launch,
         launch_arguments={
             'slam_enabled': LaunchConfiguration('slam_enabled'),
             'slam_mode': TextSubstitution(text='localization'),
             'map_file_name': LaunchConfiguration('map_file_name'),
             'use_sim_time': LaunchConfiguration('use_sim_time'),
-        }.items(),
+        },
     )
 
     return LaunchDescription([

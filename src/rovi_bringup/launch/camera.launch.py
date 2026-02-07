@@ -20,6 +20,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from rovi_bringup.launch_lib.camera_args import declare_camera_args
 
 
 def _pick_default_rgb_device() -> str:
@@ -82,52 +83,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     use_sim_time_arg = DeclareLaunchArgument("use_sim_time", default_value="false", description="Use /clock time.")
 
-    # Depth (OpenNI2)
-    device_id_arg = DeclareLaunchArgument(
-        "device_id",
-        default_value="#1",
-        description=(
-            'OpenNI2 device selector (e.g. "#1" for first device, or a URI from '
-            "`ros2 run openni2_camera list_devices`)."
-        ),
-    )
-    depth_mode_arg = DeclareLaunchArgument("depth_mode", default_value="ORBBEC_640x400_30Hz")
-
-    # RGB (UVC / V4L2)
-    rgb_video_device_arg = DeclareLaunchArgument(
-        "rgb_video_device",
-        default_value="",
-        description=(
-            "RGB V4L2 device. Prefer a stable /dev/v4l/by-id/... path; if empty, "
-            "a best-effort default is selected."
-        ),
-    )
-    rgb_width_arg = DeclareLaunchArgument("rgb_width", default_value="640")
-    rgb_height_arg = DeclareLaunchArgument("rgb_height", default_value="480")
-    color_mode_arg = DeclareLaunchArgument(
-        "color_mode",
-        default_value="yuyv",
-        description=(
-            "RGB transport mode preset for v4l2_camera: "
-            "'yuyv' (YUYV->rgb8 conversion) or 'mjpeg' (MJPG decode->rgb8)."
-        ),
-    )
-    rgb_pixel_format_arg = DeclareLaunchArgument(
-        "rgb_pixel_format",
-        default_value="",
-        description=(
-            "Optional override for v4l2 pixel format (e.g. YUYV, MJPG). "
-            "If empty, resolved from color_mode."
-        ),
-    )
-    rgb_output_encoding_arg = DeclareLaunchArgument(
-        "rgb_output_encoding",
-        default_value="",
-        description=(
-            "Optional override for v4l2 output encoding (e.g. rgb8, mono8). "
-            "If empty, resolved from color_mode."
-        ),
-    )
+    camera_args = declare_camera_args()
 
     is_real = IfCondition(PythonExpression(["'", LaunchConfiguration("robot_mode"), "' == 'real'"]))
     use_sim_time_param = ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)
@@ -197,14 +153,7 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         robot_mode_arg,
         use_sim_time_arg,
-        device_id_arg,
-        depth_mode_arg,
-        rgb_video_device_arg,
-        rgb_width_arg,
-        rgb_height_arg,
-        color_mode_arg,
-        rgb_pixel_format_arg,
-        rgb_output_encoding_arg,
+        *camera_args,
         resolve_rgb,
         resolve_color_format,
         depth_node,

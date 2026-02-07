@@ -31,6 +31,7 @@ from rovi_bringup.launch_lib.args import (
     NAV_STACK_ARG_NAMES,
     launch_config_map,
 )
+from rovi_bringup.launch_lib.camera_args import declare_camera_args
 from rovi_bringup.launch_lib.includes import include_launch
 from rovi_bringup.launch_lib.modes import CONTROL_STACKS, SESSION_STACKS, stack_equals, stack_in
 
@@ -182,46 +183,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # Camera stack args (passed through when stack:=camera).
-    camera_device_id = DeclareLaunchArgument(
-        'device_id',
-        default_value='#1',
-        description='OpenNI2 device selector for depth camera (camera stack).',
-    )
-    camera_depth_mode = DeclareLaunchArgument(
-        'depth_mode',
-        default_value='ORBBEC_640x400_30Hz',
-        description='OpenNI2 depth/IR mode preset (camera stack).',
-    )
-    camera_rgb_video_device = DeclareLaunchArgument(
-        'rgb_video_device',
-        default_value='',
-        description='RGB V4L2 device path (camera stack).',
-    )
-    camera_rgb_width = DeclareLaunchArgument(
-        'rgb_width',
-        default_value='640',
-        description='RGB image width (camera stack).',
-    )
-    camera_rgb_height = DeclareLaunchArgument(
-        'rgb_height',
-        default_value='480',
-        description='RGB image height (camera stack).',
-    )
-    camera_color_mode = DeclareLaunchArgument(
-        'color_mode',
-        default_value='yuyv',
-        description="Color transport mode: 'yuyv' or 'mjpeg' (camera stack).",
-    )
-    camera_rgb_pixel_format = DeclareLaunchArgument(
-        'rgb_pixel_format',
-        default_value='',
-        description='Optional RGB pixel format override for v4l2_camera (camera stack).',
-    )
-    camera_rgb_output_encoding = DeclareLaunchArgument(
-        'rgb_output_encoding',
-        default_value='',
-        description='Optional RGB output encoding override for v4l2_camera (camera stack).',
-    )
+    camera_args = declare_camera_args()
 
     # Odometry coordination between backend and localization stack.
     odom_mode = DeclareLaunchArgument(
@@ -325,14 +287,7 @@ def generate_launch_description() -> LaunchDescription:
         slam_mode,
         map_file_name,
         mag_enabled,
-        camera_device_id,
-        camera_depth_mode,
-        camera_rgb_video_device,
-        camera_rgb_width,
-        camera_rgb_height,
-        camera_color_mode,
-        camera_rgb_pixel_format,
-        camera_rgb_output_encoding,
+        *camera_args,
         odom_mode,
         backend,
         control_stack,
