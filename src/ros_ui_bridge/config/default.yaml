@@ -59,6 +59,22 @@ streams:
           topic: "/scan"
           msg_type: "sensor_msgs/msg/LaserScan"
 
+      - id: "hz_color"
+        unit: "Hz"
+        source:
+          provider: "ros"
+          type: "topic_rate"
+          topic: "/camera/color/image_raw"
+          msg_type: "sensor_msgs/msg/Image"
+
+      - id: "hz_depth"
+        unit: "Hz"
+        source:
+          provider: "ros"
+          type: "topic_rate"
+          topic: "/camera/depth/image_raw"
+          msg_type: "sensor_msgs/msg/Image"
+
       - id: "hz_slam"
         unit: "Hz"
         target: 50
