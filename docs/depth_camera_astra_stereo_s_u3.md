@@ -97,23 +97,25 @@ Depth and color are produced by two different drivers. The goal is a predictable
 
 UVC cameras typically do not provide usable intrinsics automatically. Calibrate the color stream and save the resulting YAML.
 
-Recommended tool:
+Recommended tool (provided by `rovi_env.sh`):
 ```bash
-ros2 run camera_calibration cameracalibrator \
-  --size 8x6 --square 0.025 \
-  image:=/camera/color/image_raw camera:=/camera/color
+camera
+calib
 ```
 
-Notes:
-- `--size` is inner corners; `--square` is meters.
-- The tool typically writes via `/camera/color/set_camera_info` and stores under `~/.ros/camera_info/`.
-- After generating calibration:
-  1) Identify the generated YAML under `~/.ros/camera_info/` (filename depends on the camera node’s naming).
-  2) Copy its content into `src/rovi_bringup/config/camera_info/color.yaml` and commit it.
-  3) Replace the generated file with a symlink to the committed one (same filename):
-     ```bash
-     ln -sf "$(pwd)/src/rovi_bringup/config/camera_info/color.yaml" "$HOME/.ros/camera_info/<the-generated-filename>.yaml"
-     ```
+In the calibrator UI:
+1) Move the chessboard until the progress indicators for **X**, **Y**, **size**, and **skew** are all green.
+2) Click **CALIBRATE**.
+3) Click **SAVE**.
+
+The calibration file should appear on the robot as:
+- `~/.ros/camera_info/usb_2.0_camera:_usb_camera.yaml`
+
+Copy it into the repo (canonical location):
+```bash
+cp -f ~/.ros/camera_info/usb_2.0_camera:_usb_camera.yaml \
+  ~/dev/rovi_ros_ws/src/rovi_bringup/config/camera_info/color.yaml
+```
 
 ## Simulation (`sim camera`)
 

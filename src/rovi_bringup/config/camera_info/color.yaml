@@ -1,38 +1,28 @@
-# Color camera calibration (UVC / v4l2_camera)
-#
-# This file is intended to be replaced by real calibration output and committed,
-# so the robot can be restored after a reinstall.
-#
-# Typical workflow:
-# 1) Run `ros2 run camera_calibration cameracalibrator ...`
-# 2) Copy the generated YAML into this file
-# 3) Ensure the runtime uses the same calibration (commonly by copying/symlinking
-#    into `~/.ros/camera_info/` on the robot).
-#
-# Placeholder values below are NOT valid calibration.
 image_width: 640
 image_height: 480
-camera_name: rovi_color
+camera_name: usb_2.0_camera:_usb_camera
 camera_matrix:
   rows: 3
   cols: 3
-  data: [0.0, 0.0, 0.0,
-         0.0, 0.0, 0.0,
-         0.0, 0.0, 1.0]
+  data: [433.78157831943764, 0, 329.04843430285456, 0, 435.48239682946746, 243.66647783878557, 0, 0, 1]
 distortion_model: plumb_bob
 distortion_coefficients:
   rows: 1
   cols: 5
-  data: [0.0, 0.0, 0.0, 0.0, 0.0]
+  data: [0.062813116964716545, -0.10411864329093655, 0.00011129840530272125, -0.0014696858555310734, 0]
 rectification_matrix:
   rows: 3
   cols: 3
-  data: [1.0, 0.0, 0.0,
-         0.0, 1.0, 0.0,
-         0.0, 0.0, 1.0]
+  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 projection_matrix:
   rows: 3
   cols: 4
-  data: [0.0, 0.0, 0.0, 0.0,
-         0.0, 0.0, 0.0, 0.0,
-         0.0, 0.0, 1.0, 0.0]
+  data: [434.64813232421875, 0, 327.95633020778041, 0, 0, 438.8812255859375, 243.22109250388166, 0, 0, 0, 1, 0]
+binning_x: 0
+binning_y: 0
+roi:
+  x_offset: 0
+  y_offset: 0
+  height: 0
+  width: 0
+  do_rectify: false

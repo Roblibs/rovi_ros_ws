@@ -116,6 +116,15 @@ camera() {
   ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=camera rviz:=false "$@"
 }
 
+calib() {
+  ros2 run camera_calibration cameracalibrator \
+    --size 8x5 --square 0.028 \
+    --ros-args \
+    --remap image:=/camera/color/image_raw \
+    --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info \
+    "$@"
+}
+
 keyboard() {
   python3 "${ROVI_ROS_WS_DIR}/tools/rovi_keyboard.py" "$@"
 }

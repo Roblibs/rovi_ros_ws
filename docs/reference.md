@@ -7,6 +7,7 @@ All commands in this section are provided by `rovi_env.sh`
 | `view` | PC visualization: `view` (default `nav`) or `view teleop|camera|mapping|nav`. Use `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `camera` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=camera` (teleop + depth + RGB; headless; no RViz). |
+| `calib` | Runs camera intrinsics calibration (GUI): `ros2 run camera_calibration cameracalibrator --size 8x5 --square 0.028 --ros-args --remap image:=/camera/color/image_raw --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info`. |
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
