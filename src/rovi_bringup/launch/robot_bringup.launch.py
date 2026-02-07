@@ -18,7 +18,7 @@ robot_mode:
 import os
 import sys
 
-from ament_index_python.packages import get_package_prefix, get_package_share_directory
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -34,19 +34,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, EnvironmentVariable, LaunchConfiguration, PythonExpression, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
-
-
-def _resolve_python_node_executable(package_name: str, executable_name: str) -> str:
-    """Return executable path with fallback for python package install layouts.
-
-    launch_ros.Node with `package=...` only searches `<prefix>/lib/<package>`.
-    Some builds install console scripts into `<prefix>/bin` instead.
-    """
-    prefix = get_package_prefix(package_name)
-    libexec_path = os.path.join(prefix, 'lib', package_name, executable_name)
-    if os.path.exists(libexec_path):
-        return libexec_path
-    return os.path.join(prefix, 'bin', executable_name)
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -218,10 +205,6 @@ def generate_launch_description() -> LaunchDescription:
     is_not_offline = IfCondition(PythonExpression(["'", LaunchConfiguration('robot_mode'), "' != 'offline'"]))
 
     use_sim_time_param = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
-    rosmaster_driver_exec = _resolve_python_node_executable('rosmaster_driver', 'rosmaster_driver_node')
-    ui_bridge_exec = _resolve_python_node_executable('ros_ui_bridge', 'ui_bridge')
-    serial_display_exec = _resolve_python_node_executable('robot_serial_display', 'serial_display')
-
     # Prefer an active venv; otherwise try $ROVI_ROS_WS_DIR/.venv so launches work without `activate`.
     venv_root = os.environ.get('VIRTUAL_ENV')
     if not venv_root:
@@ -319,7 +302,8 @@ def generate_launch_description() -> LaunchDescription:
 
     rosmaster_driver_node = Node(
         condition=is_real,
-        executable=rosmaster_driver_exec,
+        package='rosmaster_driver',
+        executable='rosmaster_driver_node',
         name='rosmaster_driver',
         output='screen',
         parameters=[
@@ -400,7 +384,8 @@ def generate_launch_description() -> LaunchDescription:
 
     ui_bridge_node = Node(
         condition=IfCondition(LaunchConfiguration('ui_bridge_enabled')),
-        executable=ui_bridge_exec,
+        package='ros_ui_bridge',
+        executable='ui_bridge',
         output='screen',
         arguments=['--config', LaunchConfiguration('ui_bridge_config')],
         parameters=[{'use_sim_time': use_sim_time_param}],
@@ -417,7 +402,8 @@ def generate_launch_description() -> LaunchDescription:
             LaunchConfiguration('serial_display_debug'),
             "' != 'true'",
         ])),
-        executable=serial_display_exec,
+        package='robot_serial_display',
+        executable='serial_display',
         name='robot_serial_display',
         output='screen',
         arguments=['--config', LaunchConfiguration('serial_display_config')],
@@ -434,7 +420,8 @@ def generate_launch_description() -> LaunchDescription:
             LaunchConfiguration('serial_display_debug'),
             "' == 'true'",
         ])),
-        executable=serial_display_exec,
+        package='robot_serial_display',
+        executable='serial_display',
         name='robot_serial_display',
         output='screen',
         arguments=['--config', LaunchConfiguration('serial_display_config'), '--debug'],
