@@ -74,10 +74,6 @@ ros2 run openni2_camera list_devices
 The upstream `openni2_camera` selects modes by named presets (e.g. VGA → `640x480`).
 This workspace carries a small `openni2_camera` overlay patch in `src/openni2_camera` so this camera’s `640x400` / `320x200` modes are selectable by name, defaulting to `ORBBEC_640x400_30Hz`.
 
-If you see errors about unsupported `640x480` modes and the images are black, re-check that:
-
-- you rebuilt the workspace after pulling changes (`build`)
-- you’re running with the Orbbec-friendly mode names (directly or via `stack:=camera`)
 
 ## Calibration
 

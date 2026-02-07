@@ -20,6 +20,7 @@ Related projects:
 | [depth_camera_astra_stereo_s_u3.md](./docs/depth_camera_astra_stereo_s_u3.md) | Astra Stereo S U3 depth camera (depth via OpenNI2 + RGB via UVC): run, topics/TF, install notes, calibration pointers. |
 | [stereo_elp.md](./docs/stereo_elp.md) | ELP stereo camera notes and V4L2 formats. |
 | [runtime.md](./docs/runtime.md) | Runtime warnings/errors description. |
+| [troubleshooting.md](./docs/troubleshooting.md) | Common “if you see X, do Y” fixes (build + runtime). |
 
 # Usage
 Before first time usage, start with the [install guide](./docs/install.md).

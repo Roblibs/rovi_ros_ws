@@ -34,12 +34,6 @@ source .venv/bin/activate   # sets $VIRTUAL_ENV for you
 echo "$VIRTUAL_ENV"        # should print /home/<you>/dev/Roblibs/rovi_ros_ws/.venv
 ```
 
-If you cannot activate the venv (e.g., systemd service), set `VIRTUAL_ENV` explicitly:
-
-```bash
-export VIRTUAL_ENV="$HOME/dev/Roblibs/rovi_ros_ws/.venv"
-```
-
 Notes:
 - The launch file reads `$VIRTUAL_ENV/lib/pythonX.Y/site-packages` and prepends it to `PYTHONPATH` so packages installed into the venv (e.g., `rosmaster-lib`) are importable at runtime.
 - Activating the venv also makes `python` and `pip` point to the venv, which is preferred during build.
@@ -78,5 +72,4 @@ Parameters:
   such as `rclpy` come from the system (apt) and are not installed via pip/uv.
 - The package also declares the direct Git URL in `setup.py`. Using the venv with uv ensures the dependency is
   present even if your build environment doesn’t auto-install Python deps during `colcon build`.
-- If you open a new terminal, remember to re-activate the venv (or export `VIRTUAL_ENV`) before launching.
-  The launcher depends on `VIRTUAL_ENV` to locate the venv's site-packages at runtime.
+- If you open a new terminal, remember to re-activate the venv before launching (the launcher depends on `VIRTUAL_ENV`).

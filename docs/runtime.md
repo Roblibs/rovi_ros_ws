@@ -71,6 +71,3 @@ Typical log:
 
 Why it matters:
 - Without RGB calibration, `/camera/color/camera_info` is missing/incorrect and any rectification or pixel-to-ray projection from the color camera is unreliable.
-
-Expected resolution:
-- Generate and provide an RGB calibration YAML (and/or explicitly set `camera_info_url`) so `/camera/color/camera_info` is deterministic and correct.
