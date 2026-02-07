@@ -9,7 +9,7 @@ uv needed by the robot for control board python dependencies
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 * clone this repo under `~/dev/Roblibs/rovi_ros_ws` change it then run `uv sync`
-* set `ROVI_ROS_WS_DIR` + source `rovi_env.sh` (see [Config in ~/.bashrc](#config-in-bashrc)), then build with the venv:
+* set `ROVI_ROS_WS_DIR` + source `rovi_env.sh` (see [Config in ~/.bashrc](#config-in-bashrc)), then build (uses system ROS colcon; `.venv` remains active for Python deps):
 ```bash
 uv sync
 ws
@@ -119,4 +119,3 @@ In WSL or Linux:
 ```bash
 sudo usermod -a -G dialout "$USER"
 ```
-

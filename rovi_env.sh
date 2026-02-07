@@ -54,15 +54,21 @@ stop() {
 
 build() {
   ensure_venv || return 1
-  if [ ! -x "${ROVI_ROS_WS_DIR}/.venv/bin/colcon" ]; then
-    echo "[rovi_env] Missing ${ROVI_ROS_WS_DIR}/.venv/bin/colcon (run: uv sync)" >&2
+  local colcon_cmd=""
+  if [ -x "/usr/bin/colcon" ]; then
+    colcon_cmd="/usr/bin/colcon"
+  elif command -v colcon >/dev/null 2>&1; then
+    colcon_cmd="$(command -v colcon)"
+  fi
+  if [ -z "${colcon_cmd}" ]; then
+    echo "[rovi_env] Missing colcon command (install ROS Jazzy colcon packages)." >&2
     return 1
   fi
   local -a extra_args=()
   if [ "${ROVI_SKIP_OPENNI2:-}" = "1" ]; then
     extra_args+=(--packages-skip openni2_camera)
   fi
-  "${ROVI_ROS_WS_DIR}/.venv/bin/colcon" build "${extra_args[@]}" "$@"
+  "${colcon_cmd}" build "${extra_args[@]}" "$@"
 }
 
 setup() {
