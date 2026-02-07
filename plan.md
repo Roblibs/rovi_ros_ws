@@ -1,8 +1,5 @@
 # Camera stack (RGB UVC + Depth OpenNI2)
 
-## Topic conventions (decision)
-- Use `/camera/color/*` for the Astra color stream, `/camera/depth/*` for the Astra depth stream, and reserve `/camera/stereo/*` for the ELP stereo camera.
-
 ## Calibration (required)
 - Decide calibration storage policy:
   - Preferred for this robot: commit calibration YAML in-repo (restore-friendly) under `src/rovi_bringup/config/camera_info/` and load it from launch (avoid relying only on `~/.ros/camera_info/` on the Pi).

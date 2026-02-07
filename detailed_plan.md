@@ -3,10 +3,6 @@
 ## 1) Evaluation of current camera-stack items
 
 ### What is already well-scoped
-- Topic namespace decision is clear and consistent:
-  - `/camera/color/*` (Astra color)
-  - `/camera/depth/*` (Astra depth)
-  - `/camera/stereo/*` (ELP stereo)
 - TF ownership decision is clear:
   - Camera frames come from `src/rovi_description/urdf/rovi.urdf`
   - No launch-time static TF duplication
