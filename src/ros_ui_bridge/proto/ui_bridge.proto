@@ -33,11 +33,19 @@ message Time {
 }
 
 message StatusFieldMeta {
+  enum StatusFieldType {
+    STATUS_FIELD_TYPE_FLOAT = 0;
+    STATUS_FIELD_TYPE_TEXT = 1;
+  }
+
   // Stable identifier for this field.
   string id = 1;
 
   // Unit string for display (e.g., "V", "%", "Hz").
   string unit = 2;
+
+  // Optional value type. When omitted, clients should assume FLOAT.
+  optional StatusFieldType type = 6;
 
   // Optional ranges (display / validation only).
   optional float min = 3;
@@ -50,6 +58,9 @@ message StatusFieldMeta {
 message StatusFieldValue {
   string id = 1;
   float value = 2;
+
+  // Optional textual value for TEXT-typed fields.
+  optional string text = 4;
 
   // Timestamp of the sample in ROS time (prefers message header stamp; falls back to node clock).
   Time stamp = 3;

@@ -63,12 +63,14 @@ def _parse_rate_or_period(section: dict[str, Any], default_rate_hz: float) -> fl
 @dataclass(frozen=True)
 class StatusFieldSource:
     provider: str  # system | ros
-    type: str  # cpu_percent | topic_value | topic_rate | tf_rate
+    type: str  # cpu_percent | service | process | topic_value | topic_rate | tf_rate
     topic: str | None
     msg_type: str | None
     value_key: str | None
     parent: str | None
     child: str | None
+    service: str | None
+    process: str | None
     downsample_period_s: float | None
     stale_after_s: float | None
 
@@ -77,6 +79,7 @@ class StatusFieldSource:
 class StatusFieldConfig:
     id: str
     unit: str
+    value_type: str  # float | text (default float)
     min: float | None
     max: float | None
     target: float | None
@@ -222,18 +225,29 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
             raise RuntimeError("Invalid entry in 'status.fields' (expected mapping)")
 
         field_id = str(entry.get('id', '')).strip()
+        value_type = str(entry.get('type', '')).strip().lower() or 'float'
         unit = str(entry.get('unit', '')).strip()
         if not field_id:
             raise RuntimeError("status.fields entry is missing non-empty 'id'")
-        if not unit:
+        if value_type not in ('float', 'text'):
+            raise RuntimeError(f"status.fields[{field_id}] unsupported type '{value_type}' (expected float|text)")
+        if value_type == 'float' and not unit:
             raise RuntimeError(f"status.fields[{field_id}] is missing non-empty 'unit'")
 
         min_val = entry.get('min')
         max_val = entry.get('max')
         target_val = entry.get('target')
-        min_f = float(min_val) if min_val is not None else None
-        max_f = float(max_val) if max_val is not None else None
-        target_f = float(target_val) if target_val is not None else None
+        if value_type == 'text':
+            if min_val is not None or max_val is not None or target_val is not None:
+                raise RuntimeError(f"status.fields[{field_id}] text fields do not support min/max/target")
+            min_f = None
+            max_f = None
+            target_f = None
+            unit = ''  # Keep meta.unit stable but empty for text fields.
+        else:
+            min_f = float(min_val) if min_val is not None else None
+            max_f = float(max_val) if max_val is not None else None
+            target_f = float(target_val) if target_val is not None else None
 
         source_section = _read_map(entry, 'source')
         provider = str(source_section.get('provider', '')).strip().lower()
@@ -258,10 +272,24 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
         child = source_section.get('child')
         parent_str = str(parent).strip() if parent is not None else None
         child_str = str(child).strip() if child is not None else None
+        service = source_section.get('service')
+        service_str = str(service).strip() if service is not None else None
+        process = source_section.get('process')
+        process_str = str(process).strip() if process is not None else None
 
         if provider == 'system':
-            if type_ != 'cpu_percent':
-                raise RuntimeError(f"status.fields[{field_id}] unsupported system source type '{type_}' (expected cpu_percent)")
+            if type_ == 'cpu_percent':
+                pass
+            elif type_ == 'service':
+                if not service_str:
+                    raise RuntimeError(f"status.fields[{field_id}] is missing 'source.service' for system/service")
+            elif type_ == 'process':
+                if not process_str:
+                    raise RuntimeError(f"status.fields[{field_id}] is missing 'source.process' for system/process")
+            else:
+                raise RuntimeError(
+                    f"status.fields[{field_id}] unsupported system source type '{type_}' (expected cpu_percent|service|process)"
+                )
         elif provider == 'ros':
             if type_ == 'topic_value':
                 if not topic_str:
@@ -289,6 +317,8 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
             value_key=value_key_str,
             parent=parent_str,
             child=child_str,
+            service=service_str,
+            process=process_str,
             downsample_period_s=downsample_f if downsample_f and downsample_f > 0 else None,
             stale_after_s=stale_after_f if stale_after_f and stale_after_f > 0 else default_stale_after_s,
         )
@@ -297,6 +327,7 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
             StatusFieldConfig(
                 id=field_id,
                 unit=unit,
+                value_type=value_type,
                 min=min_f,
                 max=max_f,
                 target=target_f,

@@ -213,6 +213,8 @@ def _time_to_proto(stamp) -> ui_bridge_pb2.Time:
 
 def _field_meta_to_proto(meta) -> ui_bridge_pb2.StatusFieldMeta:
     msg = ui_bridge_pb2.StatusFieldMeta(id=meta.id, unit=meta.unit)
+    if getattr(meta, 'value_type', None) == 'text':
+        msg.type = ui_bridge_pb2.StatusFieldMeta.StatusFieldType.STATUS_FIELD_TYPE_TEXT
     if meta.min is not None:
         msg.min = meta.min
     if meta.max is not None:
@@ -223,11 +225,11 @@ def _field_meta_to_proto(meta) -> ui_bridge_pb2.StatusFieldMeta:
 
 
 def _field_value_to_proto(value) -> ui_bridge_pb2.StatusFieldValue:
-    return ui_bridge_pb2.StatusFieldValue(
-        id=value.id,
-        value=value.value,
-        stamp=_time_to_proto(value.stamp),
-    )
+    msg = ui_bridge_pb2.StatusFieldValue(id=value.id, value=float(value.value), stamp=_time_to_proto(value.stamp))
+    text = getattr(value, 'text', None)
+    if text is not None:
+        msg.text = str(text)
+    return msg
 
 
 def _snapshot_to_proto(snapshot: StatusSnapshot) -> ui_bridge_pb2.StatusSnapshot:

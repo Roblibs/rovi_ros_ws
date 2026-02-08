@@ -20,6 +20,7 @@ Proto: `proto/ui_bridge.proto` (`package roblibs.ui_bridge.v1`)
 ## ROS inputs (high level)
 
 - Status fields are configurable: CPU (`system` provider), ROS topic values (`topic_value`), topic Hz (`topic_rate`), and TF Hz (`tf_rate`). Staleness is enforced in the bridge using ROS time; stale fields simply disappear from the stream.
+- Status fields support float values (default) and optional text values: text fields set `StatusFieldMeta.type=TEXT` and populate `StatusFieldValue.text`.
 - Robot pose is derived from `/odom_raw` (`nav_msgs/Odometry`) and optionally projected into `map` using the `map->odom` TF transform.
 - Wheel angles are read from `/joint_states` (`sensor_msgs/JointState`) using the configured wheel joint names.
 - Lidar scans are read from `/scan` (`sensor_msgs/LaserScan`) and downsampled to the configured rate.
@@ -65,6 +66,7 @@ Configuration is organized under `streams:`:
   - `ros` / `topic_rate` (topic, optional msg_type)
   - `ros` / `tf_rate` (parent, child)
   - Optional per-field staleness override via `source.stale_after_s`.
+  - Field value type: float by default; set field `type: text` to publish `StatusFieldValue.text` instead of a float.
 - `streams.robot_state` — pose/wheel stream downsampling (optional), topics, frames, wheel joints
 - `streams.lidar` — lidar stream downsampling (optional), input/output topics, frame_id (optional; omit to disable)
 - `robot_model` — GLB path and chunk size

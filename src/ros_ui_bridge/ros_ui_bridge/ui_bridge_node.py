@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import signal
+import subprocess
 import threading
 from typing import Optional
 
@@ -55,13 +56,26 @@ async def _publish_status_loop(
         for field in system_fields:
             if field.source.type == 'cpu_percent':
                 cpu_percent = float(psutil.cpu_percent(interval=None))
-                values.append(StatusFieldValue(id=field.id, value=cpu_percent, stamp=now_ros.to_msg()))
+                values.append(StatusFieldValue(id=field.id, value=cpu_percent, text=None, stamp=now_ros.to_msg()))
+            elif field.source.type == 'service':
+                service_name = (field.source.service or '').strip()
+                text = _systemd_is_active(service_name) if service_name else 'unknown'
+                values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
+            elif field.source.type == 'process':
+                process_name = (field.source.process or '').strip()
+                service_name = (field.source.service or '').strip() if field.source.service else None
+                if process_name:
+                    running = _process_is_running(process_name, service=service_name)
+                    text = 'running' if running else 'missing'
+                else:
+                    text = 'unknown'
+                values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
 
         # ROS-derived fields (topic values + rates).
         for field_id, value, stamp in ros_node.collect_ros_values(now_ros=now_ros):
-            values.append(StatusFieldValue(id=field_id, value=value, stamp=stamp))
+            values.append(StatusFieldValue(id=field_id, value=value, text=None, stamp=stamp))
 
-        signature = tuple(sorted((v.id, v.value, v.stamp.sec, v.stamp.nanosec) for v in values))
+        signature = tuple(sorted((v.id, v.value, v.text or '', v.stamp.sec, v.stamp.nanosec) for v in values))
 
         # If we've never sent anything and have no values yet, stay quiet to avoid empty spam.
         if last_signature is None and not signature and not always_publish:
@@ -128,7 +142,7 @@ async def _run_async(
 
     session = resolve_session()
     fields_meta = [
-        StatusFieldMeta(id=f.id, unit=f.unit, min=f.min, max=f.max, target=f.target)
+        StatusFieldMeta(id=f.id, unit=f.unit, value_type=f.value_type, min=f.min, max=f.max, target=f.target)
         for f in cfg.status_stream.fields
     ]
     system_fields = [f for f in cfg.status_stream.fields if f.source.provider == 'system']
@@ -291,6 +305,90 @@ def main(argv: Optional[list[str]] = None) -> None:
             spin_thread.join(timeout=2.0)
         except Exception:
             pass
+
+
+def _systemd_is_active(service_name: str) -> str:
+    unit = str(service_name).strip()
+    if not unit:
+        return 'unknown'
+    if not unit.endswith('.service'):
+        unit = unit + '.service'
+
+    try:
+        cp = subprocess.run(
+            ['systemctl', 'is-active', unit],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1.5,
+        )
+    except Exception:  # noqa: BLE001
+        return 'unknown'
+
+    out = (cp.stdout or '').strip()
+    if out:
+        return out
+    err = (cp.stderr or '').strip()
+    return err or 'unknown'
+
+
+def _process_is_running(process_name: str, *, service: str | None) -> bool:
+    needle = str(process_name).strip()
+    if not needle:
+        return False
+
+    if service:
+        unit = str(service).strip()
+        if not unit.endswith('.service'):
+            unit = unit + '.service'
+        try:
+            cp = subprocess.run(
+                ['systemctl', 'show', unit, '-p', 'ControlGroup', '--value'],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=1.5,
+            )
+        except Exception:  # noqa: BLE001
+            return False
+
+        cgroup = (cp.stdout or '').strip()
+        if not cgroup:
+            return False
+
+        procs_path = f"/sys/fs/cgroup{cgroup}/cgroup.procs"
+        try:
+            with open(procs_path, 'r', encoding='utf-8') as f:
+                pids_text = f.read()
+        except OSError:
+            return False
+
+        for line in pids_text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                pid = int(line)
+            except ValueError:
+                continue
+            try:
+                proc = psutil.Process(pid)
+                cmdline = ' '.join(proc.cmdline())
+            except Exception:  # noqa: BLE001
+                continue
+            if needle in cmdline:
+                return True
+        return False
+
+    for proc in psutil.process_iter(['cmdline']):
+        try:
+            cmdline_list = proc.info.get('cmdline') or []
+            cmdline = ' '.join(cmdline_list)
+        except Exception:  # noqa: BLE001
+            continue
+        if needle in cmdline:
+            return True
+    return False
 
 
 if __name__ == '__main__':

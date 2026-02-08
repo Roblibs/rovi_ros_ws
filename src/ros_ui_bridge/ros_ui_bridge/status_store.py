@@ -12,6 +12,7 @@ from builtin_interfaces.msg import Time as RosTime
 class StatusFieldMeta:
     id: str
     unit: str
+    value_type: str  # float | text (default float)
     min: Optional[float]
     max: Optional[float]
     target: Optional[float]
@@ -21,6 +22,7 @@ class StatusFieldMeta:
 class StatusFieldValue:
     id: str
     value: float
+    text: Optional[str]
     stamp: RosTime
 
 
