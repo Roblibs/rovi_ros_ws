@@ -43,11 +43,15 @@ def _default_odom_integrator_publish_tf() -> str:
 
 def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory("rovi_bringup")
+    desc_share = get_package_share_directory("rovi_description")
+    sim_share = get_package_share_directory("rovi_sim")
     ui_bridge_share = get_package_share_directory("ros_ui_bridge")
     serial_display_share = get_package_share_directory("robot_serial_display")
 
     robot_bringup_launch = str(Path(bringup_share) / "launch" / "robot_bringup.launch.py")
 
+    default_model = str(Path(desc_share) / "urdf" / "rovi.urdf")
+    default_world = str(Path(sim_share) / "worlds" / "rovi_room.sdf")
     default_ui_bridge_config = str(Path(ui_bridge_share) / "config" / "default.yaml")
     default_serial_display_config = str(Path(serial_display_share) / "config" / "default.yaml")
 
@@ -55,6 +59,21 @@ def generate_launch_description() -> LaunchDescription:
         "robot_mode",
         default_value="real",
         description="Robot backend: 'real' (hardware), 'sim' (Gazebo), or 'offline' (model only).",
+    )
+    model = DeclareLaunchArgument(
+        "model",
+        default_value=default_model,
+        description="Absolute path to the robot URDF.",
+    )
+    world = DeclareLaunchArgument(
+        "world",
+        default_value=default_world,
+        description="Full path to the Gazebo world SDF file (robot_mode=sim).",
+    )
+    gazebo_gui = DeclareLaunchArgument(
+        "gazebo_gui",
+        default_value="true",
+        description="Start Gazebo GUI client (server always starts) (robot_mode=sim).",
     )
     use_sim_time = DeclareLaunchArgument(
         "use_sim_time",
@@ -121,6 +140,7 @@ def generate_launch_description() -> LaunchDescription:
 
     # Backend contract (drivers, base, TF, /odom_raw, /scan, etc.).
     backend_args = launch_config_map(BACKEND_ARG_NAMES)
+    backend_args["model"] = LaunchConfiguration("model")
     backend_args["cmd_vel_topic"] = LaunchConfiguration("cmd_vel_topic")
     backend_args["odom_integrator_publish_tf"] = LaunchConfiguration("odom_integrator_publish_tf")
     backend = include_launch(robot_bringup_launch, launch_arguments=backend_args)
@@ -169,6 +189,9 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         robot_mode,
+        model,
+        world,
+        gazebo_gui,
         use_sim_time,
         cmd_vel_topic,
         odom_integrator_publish_tf,
