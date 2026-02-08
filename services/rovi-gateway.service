@@ -5,12 +5,12 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=rovi
+User=wass
 SupplementaryGroups=rovi-ops
-WorkingDirectory=%h/dev/Roblibs/rovi_ros_ws
-EnvironmentFile=%h/dev/Roblibs/rovi_ros_ws/.env.robot
+WorkingDirectory=/home/wass/dev/rovi_ros_ws
+EnvironmentFile=/home/wass/dev/rovi_ros_ws/.env.robot
 RuntimeDirectory=rovi
-ExecStart=%h/dev/Roblibs/rovi_ros_ws/services/run_gateway.sh
+ExecStart=/home/wass/dev/rovi_ros_ws/services/run_gateway.sh
 KillSignal=SIGINT
 TimeoutStopSec=20
 Restart=no

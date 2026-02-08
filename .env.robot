@@ -1,6 +1,6 @@
 ROVI_ENV=robot
 # NOTE: systemd EnvironmentFile does not expand $HOME; keep this absolute.
-ROVI_ROS_WS_DIR=/home/rovi/dev/Roblibs/rovi_ros_ws
+ROVI_ROS_WS_DIR=/home/wass/dev/rovi_ros_ws
 
 # DDS / discovery
 ROS_DOMAIN_ID=0

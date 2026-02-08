@@ -91,5 +91,5 @@ What to do:
 - Ensure the workspace venv is present and synced: `uv sync`
 - Ensure the node is launched with the venv active (so `$VIRTUAL_ENV` is set), or export it explicitly for non-interactive contexts (e.g. systemd):
   ```bash
-  export VIRTUAL_ENV="$HOME/dev/Roblibs/rovi_ros_ws/.venv"
+  export VIRTUAL_ENV="$HOME/dev/rovi_ros_ws/.venv"
   ```

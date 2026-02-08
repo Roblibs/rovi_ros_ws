@@ -11,7 +11,7 @@ die() {
 }
 
 ws_dir_default() {
-  echo "${HOME}/dev/Roblibs/rovi_ros_ws"
+  echo "${HOME}/dev/rovi_ros_ws"
 }
 
 resolve_ws_dir() {

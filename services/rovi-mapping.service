@@ -6,15 +6,14 @@ PartOf=rovi-gateway.service
 
 [Service]
 Type=simple
-User=rovi
-WorkingDirectory=%h/dev/Roblibs/rovi_ros_ws
-EnvironmentFile=%h/dev/Roblibs/rovi_ros_ws/.env.robot
+User=wass
+WorkingDirectory=/home/wass/dev/rovi_ros_ws
+EnvironmentFile=/home/wass/dev/rovi_ros_ws/.env.robot
 RuntimeDirectory=rovi
-ExecStart=%h/dev/Roblibs/rovi_ros_ws/services/run_stack.sh mapping
+ExecStart=/home/wass/dev/rovi_ros_ws/services/run_stack.sh mapping
 KillSignal=SIGINT
 TimeoutStopSec=20
 Restart=no
 
 [Install]
 WantedBy=multi-user.target
-

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-WS_DIR="${ROVI_ROS_WS_DIR:-$(cd -- "${SCRIPT_DIR}/.." && pwd)}"
+WS_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 log() { echo "[install] $*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
@@ -32,6 +32,7 @@ if ! getent group rovi-ops >/dev/null 2>&1; then
 fi
 
 systemctl daemon-reload
-systemctl enable --now rovi-gateway.service
+systemctl enable rovi-gateway.service
+systemctl restart rovi-gateway.service
 
 log "Installed. Add operator users to group rovi-ops to allow stack start/stop without sudo."

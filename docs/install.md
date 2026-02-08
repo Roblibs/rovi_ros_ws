@@ -8,12 +8,26 @@ uv needed by the robot for control board python dependencies
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-* clone this repo under `~/dev/Roblibs/rovi_ros_ws` change it then run `uv sync`
+* Recommended: clone this repo under `~/dev/rovi_ros_ws` (robot: `wass` user). The robot systemd units currently hardcode `/home/wass/dev/rovi_ros_ws`; if you move the workspace, update the unit files under `services/` before installing.
 * set `ROVI_ROS_WS_DIR` + source `rovi_env.sh` (see [Config in ~/.bashrc](#config-in-bashrc)), then build (uses system ROS colcon; `.venv` remains active for Python deps):
 ```bash
 uv sync
 ws
 build
+```
+
+## Robot services (systemd)
+
+Install the robot systemd units + polkit rules:
+
+```bash
+sudo ./services/install.sh
+```
+
+Allow operator users to start/stop stack services without sudo (log out/in after):
+
+```bash
+sudo usermod -aG rovi-ops "$USER"
 ```
 
 * Install the required ROS packages
@@ -86,10 +100,17 @@ If you still see `/dev/ttyUSB0` or `/dev/ttyACM0` in logs, an override is active
 Add these lines to your real `~/.bashrc`:
 
 ```bash
-export ROVI_ROS_WS_DIR="$HOME/dev/Roblibs/rovi_ros_ws"
-# Example: pin Gazebo Transport to a stable local IPv4
-export GZ_IP="<your-ipv4>"
+export ROVI_ROS_WS_DIR="$HOME/dev/rovi_ros_ws"
 source "$ROVI_ROS_WS_DIR/rovi_env.sh"
+
+# Optional (PC sim): pin Gazebo Transport to a stable local IPv4
+# export GZ_IP="<your-ipv4>"
+
+# Optional: skip OpenNI2 camera build/runtime helpers if not needed
+# export ROVI_SKIP_OPENNI2=1
+
+# Optional (PC sim): keep this terminal off the robot DDS network
+# export ROS_LOCALHOST_ONLY=1
 ```
 
 ## wsl
