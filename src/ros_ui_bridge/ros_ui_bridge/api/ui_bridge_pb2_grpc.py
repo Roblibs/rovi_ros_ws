@@ -3,10 +3,7 @@
 import grpc
 import warnings
 
-try:
-    from . import ui_bridge_pb2 as ui__bridge__pb2
-except ImportError:  # pragma: no cover - fallback for editable installs
-    import ui_bridge_pb2 as ui__bridge__pb2
+import ui_bridge_pb2 as ui__bridge__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
@@ -46,6 +43,31 @@ class UiBridgeStub(object):
                 '/roblibs.ui_bridge.v1.UiBridge/StreamStatus',
                 request_serializer=ui__bridge__pb2.StatusRequest.SerializeToString,
                 response_deserializer=ui__bridge__pb2.StatusUpdate.FromString,
+                _registered_method=True)
+        self.StartStack = channel.unary_unary(
+                '/roblibs.ui_bridge.v1.UiBridge/StartStack',
+                request_serializer=ui__bridge__pb2.StackControlRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.StackControlResponse.FromString,
+                _registered_method=True)
+        self.StopStack = channel.unary_unary(
+                '/roblibs.ui_bridge.v1.UiBridge/StopStack',
+                request_serializer=ui__bridge__pb2.StackControlRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.StackControlResponse.FromString,
+                _registered_method=True)
+        self.RestartStack = channel.unary_unary(
+                '/roblibs.ui_bridge.v1.UiBridge/RestartStack',
+                request_serializer=ui__bridge__pb2.StackControlRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.StackControlResponse.FromString,
+                _registered_method=True)
+        self.GetStackStatus = channel.unary_unary(
+                '/roblibs.ui_bridge.v1.UiBridge/GetStackStatus',
+                request_serializer=ui__bridge__pb2.StackStatusRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.StackStatus.FromString,
+                _registered_method=True)
+        self.ListStacks = channel.unary_unary(
+                '/roblibs.ui_bridge.v1.UiBridge/ListStacks',
+                request_serializer=ui__bridge__pb2.ListStacksRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.ListStacksResponse.FromString,
                 _registered_method=True)
         self.StreamRobotState = channel.unary_stream(
                 '/roblibs.ui_bridge.v1.UiBridge/StreamRobotState',
@@ -87,6 +109,37 @@ class UiBridgeServicer(object):
     def StreamStatus(self, request, context):
         """Streams status updates (values only; no metadata).
         """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StartStack(self, request, context):
+        """--- Stack control (Phase 5; optional / may be disabled by config) ---
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StopStack(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RestartStack(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetStackStatus(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListStacks(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -138,6 +191,31 @@ def add_UiBridgeServicer_to_server(servicer, server):
                     servicer.StreamStatus,
                     request_deserializer=ui__bridge__pb2.StatusRequest.FromString,
                     response_serializer=ui__bridge__pb2.StatusUpdate.SerializeToString,
+            ),
+            'StartStack': grpc.unary_unary_rpc_method_handler(
+                    servicer.StartStack,
+                    request_deserializer=ui__bridge__pb2.StackControlRequest.FromString,
+                    response_serializer=ui__bridge__pb2.StackControlResponse.SerializeToString,
+            ),
+            'StopStack': grpc.unary_unary_rpc_method_handler(
+                    servicer.StopStack,
+                    request_deserializer=ui__bridge__pb2.StackControlRequest.FromString,
+                    response_serializer=ui__bridge__pb2.StackControlResponse.SerializeToString,
+            ),
+            'RestartStack': grpc.unary_unary_rpc_method_handler(
+                    servicer.RestartStack,
+                    request_deserializer=ui__bridge__pb2.StackControlRequest.FromString,
+                    response_serializer=ui__bridge__pb2.StackControlResponse.SerializeToString,
+            ),
+            'GetStackStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetStackStatus,
+                    request_deserializer=ui__bridge__pb2.StackStatusRequest.FromString,
+                    response_serializer=ui__bridge__pb2.StackStatus.SerializeToString,
+            ),
+            'ListStacks': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListStacks,
+                    request_deserializer=ui__bridge__pb2.ListStacksRequest.FromString,
+                    response_serializer=ui__bridge__pb2.ListStacksResponse.SerializeToString,
             ),
             'StreamRobotState': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamRobotState,
@@ -219,6 +297,141 @@ class UiBridge(object):
             '/roblibs.ui_bridge.v1.UiBridge/StreamStatus',
             ui__bridge__pb2.StatusRequest.SerializeToString,
             ui__bridge__pb2.StatusUpdate.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StartStack(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/StartStack',
+            ui__bridge__pb2.StackControlRequest.SerializeToString,
+            ui__bridge__pb2.StackControlResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StopStack(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/StopStack',
+            ui__bridge__pb2.StackControlRequest.SerializeToString,
+            ui__bridge__pb2.StackControlResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RestartStack(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/RestartStack',
+            ui__bridge__pb2.StackControlRequest.SerializeToString,
+            ui__bridge__pb2.StackControlResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetStackStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/GetStackStatus',
+            ui__bridge__pb2.StackStatusRequest.SerializeToString,
+            ui__bridge__pb2.StackStatus.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListStacks(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/ListStacks',
+            ui__bridge__pb2.ListStacksRequest.SerializeToString,
+            ui__bridge__pb2.ListStacksResponse.FromString,
             options,
             channel_credentials,
             insecure,

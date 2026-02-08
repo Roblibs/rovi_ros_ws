@@ -6,12 +6,15 @@ Status stream uses StatusBroadcaster (timer-based collection with staleness filt
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Sequence
 from typing import Optional
 
 import grpc
 
 from .api import ui_bridge_pb2, ui_bridge_pb2_grpc
+from .config import ControlConfig
+from .conductor.systemd import UnitStatus, control_unit, get_unit_status, stack_to_unit
 from .lidar_node import LidarScanData
 from .map_node import MapData
 from .robot_model_provider import RobotModelProvider
@@ -36,6 +39,7 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         base_frame: str,
         map_frame: str,
         wheel_joint_names: list[str],
+        control: ControlConfig,
     ) -> None:
         self._status_broadcaster = status_broadcaster
         self._robot_state_broadcaster = robot_state_broadcaster
@@ -47,6 +51,116 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         self._base_frame = str(base_frame)
         self._map_frame = str(map_frame)
         self._wheel_joint_names = list(wheel_joint_names)
+        self._control = control
+
+    def _ensure_allowed_stack(self, stack: str) -> str:
+        key = str(stack).strip().lower()
+        if not key:
+            raise ValueError("Missing stack name")
+        if self._control.allowed_stacks and key not in set(self._control.allowed_stacks):
+            raise ValueError(f"Stack not allowed: {key}")
+        return key
+
+    def _stack_unit(self, stack: str) -> str:
+        key = self._ensure_allowed_stack(stack)
+        return stack_to_unit(key, unit_prefix=self._control.unit_prefix)
+
+    @staticmethod
+    def _unit_status_to_proto(stack: str, status: UnitStatus) -> ui_bridge_pb2.StackStatus:
+        return ui_bridge_pb2.StackStatus(
+            stack=str(stack),
+            unit=str(status.unit),
+            load_state=str(status.load_state),
+            active_state=str(status.active_state),
+            sub_state=str(status.sub_state),
+            unit_file_state=str(status.unit_file_state),
+            result=str(status.result),
+            exec_main_code=int(status.exec_main_code),
+            exec_main_status=int(status.exec_main_status),
+        )
+
+    async def GetStackStatus(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.StackStatusRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> ui_bridge_pb2.StackStatus:
+        try:
+            unit = self._stack_unit(request.stack)
+        except ValueError as exc:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+            raise AssertionError("unreachable") from exc
+
+        try:
+            status = await asyncio.to_thread(get_unit_status, unit)
+        except Exception as exc:  # noqa: BLE001
+            await context.abort(grpc.StatusCode.INTERNAL, str(exc))
+            raise AssertionError("unreachable") from exc
+
+        return self._unit_status_to_proto(request.stack, status)
+
+    async def ListStacks(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.ListStacksRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> ui_bridge_pb2.ListStacksResponse:
+        del request
+
+        stacks = list(self._control.allowed_stacks or [])
+        resp = ui_bridge_pb2.ListStacksResponse()
+        for stack in stacks:
+            try:
+                unit = self._stack_unit(stack)
+                status = await asyncio.to_thread(get_unit_status, unit)
+                resp.stacks.append(self._unit_status_to_proto(stack, status))
+            except Exception:
+                # Best-effort: omit stacks that can't be queried (unit missing, etc.).
+                continue
+        return resp
+
+    async def StartStack(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.StackControlRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> ui_bridge_pb2.StackControlResponse:
+        return await self._control_stack(request, context, verb="start")
+
+    async def StopStack(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.StackControlRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> ui_bridge_pb2.StackControlResponse:
+        return await self._control_stack(request, context, verb="stop")
+
+    async def RestartStack(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.StackControlRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> ui_bridge_pb2.StackControlResponse:
+        return await self._control_stack(request, context, verb="restart")
+
+    async def _control_stack(
+        self,
+        request: ui_bridge_pb2.StackControlRequest,
+        context: grpc.aio.ServicerContext,
+        *,
+        verb: str,
+    ) -> ui_bridge_pb2.StackControlResponse:
+        if not self._control.enabled:
+            await context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Stack control is disabled by config")
+            raise AssertionError("unreachable")
+
+        try:
+            unit = self._stack_unit(request.stack)
+        except ValueError as exc:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+            raise AssertionError("unreachable") from exc
+
+        ok, message, status = await asyncio.to_thread(control_unit, unit, verb)
+        return ui_bridge_pb2.StackControlResponse(
+            ok=bool(ok),
+            message=str(message),
+            status=self._unit_status_to_proto(request.stack, status),
+        )
 
     async def GetStatus(  # noqa: N802 - gRPC interface name
         self,

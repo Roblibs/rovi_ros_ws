@@ -1,3 +1,17 @@
+# 2026-02-08
+
+## Services + gateway split (systemd as source of truth)
+
+We introduced a hard separation between the always-on **gateway** plane and on-demand **stacks**, with systemd owning supervision and exclusivity.
+
+**Decisions / guidance:**
+- Treat `rovi-gateway.service` as the only always-on baseline; stacks (`rovi-*.service`) hard-require it (`Requires/After/PartOf`).
+- Keep the dev entrypoint (`rovi.launch.py`) usable by adding a `gateway_enabled:=true|false` switch, so systemd stacks can run stack-only without reworking stack params.
+- Enforce “one stack at a time” with a single `flock` lock (`/run/rovi/stack.lock`) instead of maintaining a `Conflicts=` matrix.
+- Use a polkit allowlist (group `rovi-ops`) for non-sudo `start|stop|restart` of stack units only; explicitly deny control of the gateway unit.
+- Accept that systemd `EnvironmentFile=` does not expand `$HOME`; use `%h/...` paths in unit files and keep an absolute `ROVI_ROS_WS_DIR` in `.env.robot`.
+- Keep raw-odom TF publishing a restart-time choice in gateway (`ROVI_ODOM_INTEGRATOR_PUBLISH_TF`) to avoid TF conflicts with EKF stacks.
+
 # 2026-02-07
 
 ## Lessons learned: don’t use MJPG (MJPEG) with `v4l2_camera` in this stack

@@ -6,6 +6,7 @@ Wants=network.target
 [Service]
 Type=simple
 User=rovi
+SupplementaryGroups=rovi-ops
 WorkingDirectory=%h/dev/Roblibs/rovi_ros_ws
 EnvironmentFile=%h/dev/Roblibs/rovi_ros_ws/.env.robot
 RuntimeDirectory=rovi
@@ -16,4 +17,3 @@ Restart=no
 
 [Install]
 WantedBy=multi-user.target
-

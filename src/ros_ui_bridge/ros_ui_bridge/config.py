@@ -63,7 +63,7 @@ def _parse_rate_or_period(section: dict[str, Any], default_rate_hz: float) -> fl
 @dataclass(frozen=True)
 class StatusFieldSource:
     provider: str  # system | ros
-    type: str  # cpu_percent | service | process | topic_value | topic_rate | tf_rate
+    type: str  # cpu_percent | service | process | net_iface | topic_value | topic_rate | tf_rate
     topic: str | None
     msg_type: str | None
     value_key: str | None
@@ -71,6 +71,7 @@ class StatusFieldSource:
     child: str | None
     service: str | None
     process: str | None
+    iface: str | None
     downsample_period_s: float | None
     stale_after_s: float | None
 
@@ -96,6 +97,13 @@ class TfDemuxConfig:
 class RobotModelConfig:
     glb_path: str | None
     chunk_size_bytes: int
+
+
+@dataclass(frozen=True)
+class ControlConfig:
+    enabled: bool
+    allowed_stacks: list[str]
+    unit_prefix: str
 
 
 @dataclass(frozen=True)
@@ -136,6 +144,7 @@ class MapStreamConfig:
 @dataclass(frozen=True)
 class UiBridgeConfig:
     grpc_bind: str
+    control: ControlConfig
     tf_demux: TfDemuxConfig
     status_stream: StatusStreamConfig
     robot_state_stream: RobotStateStreamConfig
@@ -173,11 +182,13 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
         raise RuntimeError(f"Invalid config root (expected mapping) in: {config_path}")
 
     grpc = _read_map(data, 'grpc')
+    control = _read_map(data, 'control')
     ros = _read_map(data, 'ros')
     streams = _read_map(data, 'streams')
     robot_model = _read_map(data, 'robot_model')
 
     grpc_bind = str(grpc.get('bind', '0.0.0.0:50051'))
+    control_cfg = _parse_control(control)
     tf_demux_cfg = _parse_tf_demux(ros)
 
     status_stream_cfg = _parse_status_stream(streams.get('status'))
@@ -188,6 +199,7 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
 
     return UiBridgeConfig(
         grpc_bind=grpc_bind,
+        control=control_cfg,
         tf_demux=tf_demux_cfg,
         status_stream=status_stream_cfg,
         robot_state_stream=robot_state_cfg,
@@ -211,6 +223,23 @@ def _parse_tf_demux(ros: dict[str, Any]) -> TfDemuxConfig:
     enabled = bool(section.get('enabled', True))
     prefix = str(section.get('prefix', '/viz/tf')).strip() or '/viz/tf'
     return TfDemuxConfig(enabled=enabled, prefix=prefix)
+
+
+def _parse_control(control: dict[str, Any]) -> ControlConfig:
+    enabled = bool(control.get('enabled', False))
+    unit_prefix = str(control.get('unit_prefix', 'rovi-')).strip() or 'rovi-'
+
+    allowed = control.get('allowed_stacks', ['teleop', 'mapping', 'localization', 'nav', 'camera'])
+    if allowed is None:
+        allowed = []
+    if not isinstance(allowed, list):
+        raise RuntimeError("Invalid 'control.allowed_stacks' (expected list)")
+
+    allowed_stacks = [str(s).strip().lower() for s in allowed if str(s).strip()]
+    # Never allow controlling the gateway via this path.
+    allowed_stacks = [s for s in allowed_stacks if s not in {'gateway', 'core'}]
+
+    return ControlConfig(enabled=enabled, allowed_stacks=allowed_stacks, unit_prefix=unit_prefix)
 
 
 def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[StatusFieldConfig]:
@@ -276,6 +305,8 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
         service_str = str(service).strip() if service is not None else None
         process = source_section.get('process')
         process_str = str(process).strip() if process is not None else None
+        iface = source_section.get('iface')
+        iface_str = str(iface).strip() if iface is not None else None
 
         if provider == 'system':
             if type_ == 'cpu_percent':
@@ -286,9 +317,12 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
             elif type_ == 'process':
                 if not process_str:
                     raise RuntimeError(f"status.fields[{field_id}] is missing 'source.process' for system/process")
+            elif type_ == 'net_iface':
+                if not iface_str:
+                    raise RuntimeError(f"status.fields[{field_id}] is missing 'source.iface' for system/net_iface")
             else:
                 raise RuntimeError(
-                    f"status.fields[{field_id}] unsupported system source type '{type_}' (expected cpu_percent|service|process)"
+                    f"status.fields[{field_id}] unsupported system source type '{type_}' (expected cpu_percent|service|process|net_iface)"
                 )
         elif provider == 'ros':
             if type_ == 'topic_value':
@@ -319,6 +353,7 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
             child=child_str,
             service=service_str,
             process=process_str,
+            iface=iface_str,
             downsample_period_s=downsample_f if downsample_f and downsample_f > 0 else None,
             stale_after_s=stale_after_f if stale_after_f and stale_after_f > 0 else default_stale_after_s,
         )

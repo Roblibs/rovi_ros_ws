@@ -9,6 +9,13 @@ service UiBridge {
   // Streams status updates (values only; no metadata).
   rpc StreamStatus(StatusRequest) returns (stream StatusUpdate);
 
+  // --- Stack control (Phase 5; optional / may be disabled by config) ---
+  rpc StartStack(StackControlRequest) returns (StackControlResponse);
+  rpc StopStack(StackControlRequest) returns (StackControlResponse);
+  rpc RestartStack(StackControlRequest) returns (StackControlResponse);
+  rpc GetStackStatus(StackStatusRequest) returns (StackStatus);
+  rpc ListStacks(ListStacksRequest) returns (ListStacksResponse);
+
   // Streams robot pose + wheel joint angles for 3D rendering.
   rpc StreamRobotState(RobotStateRequest) returns (stream RobotStateUpdate);
 
@@ -26,6 +33,44 @@ service UiBridge {
 }
 
 message StatusRequest {}
+
+message StackControlRequest {
+  // Stack identifier (e.g. "teleop", "mapping", "localization", "nav", "camera").
+  // Mapped to a systemd unit on the robot: rovi-<stack>.service
+  string stack = 1;
+}
+
+message StackControlResponse {
+  bool ok = 1;
+  string message = 2;
+  StackStatus status = 3;
+}
+
+message StackStatusRequest {
+  string stack = 1;
+}
+
+message StackStatus {
+  string stack = 1;
+  string unit = 2;
+
+  // systemd unit fields (best-effort).
+  string load_state = 3;
+  string active_state = 4;
+  string sub_state = 5;
+  string unit_file_state = 6;
+  string result = 7;
+
+  // ExecMainCode / ExecMainStatus from systemd (0 when unknown).
+  int32 exec_main_code = 8;
+  int32 exec_main_status = 9;
+}
+
+message ListStacksRequest {}
+
+message ListStacksResponse {
+  repeated StackStatus stacks = 1;
+}
 
 message Time {
   int32 sec = 1;

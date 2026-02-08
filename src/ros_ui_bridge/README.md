@@ -20,6 +20,7 @@ Proto: `proto/ui_bridge.proto` (`package roblibs.ui_bridge.v1`)
 ## ROS inputs (high level)
 
 - Status fields are configurable: CPU (`system` provider), ROS topic values (`topic_value`), topic Hz (`topic_rate`), and TF Hz (`tf_rate`). Staleness is enforced in the bridge using ROS time; stale fields simply disappear from the stream.
+- System status fields also support basic network readiness checks via `system/net_iface` (interface link + IP presence).
 - Status fields support float values (default) and optional text values: text fields set `StatusFieldMeta.type=TEXT` and populate `StatusFieldValue.text`.
 - Robot pose is derived from `/odom_raw` (`nav_msgs/Odometry`) and optionally projected into `map` using the `map->odom` TF transform.
 - Wheel angles are read from `/joint_states` (`sensor_msgs/JointState`) using the configured wheel joint names.
@@ -52,6 +53,9 @@ grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -prot
 
 # Lidar stream
 grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamLidar
+
+# Stack control (requires `control.enabled: true` in the UI bridge config and a polkit allowlist on the robot)
+grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto -d '{"stack":"nav"}' localhost:50051 roblibs.ui_bridge.v1.UiBridge/StartStack
 ```
 
 ## Configuration
@@ -62,6 +66,9 @@ Configuration is organized under `streams:`:
 
 - `streams.status` — cadence, default staleness window (`stale_after_s`), optional `debug_log`/`always_publish`, and `fields` (unit/min/max/target + source). Supported sources:
   - `system` / `cpu_percent`
+  - `system` / `service` (requires `service`, returns text from `systemctl is-active`)
+  - `system` / `process` (requires `process`, optional `service` to scope to a unit cgroup; returns text `running|missing`)
+  - `system` / `net_iface` (requires `iface`, returns text: `missing`, `down`, `up:no_ip`, `ip:<addr>`, `ip6:<addr>`)
   - `ros` / `topic_value` (topic + msg_type + value_key, optional downsample_period_s)
   - `ros` / `topic_rate` (topic, optional msg_type)
   - `ros` / `tf_rate` (parent, child)
@@ -70,6 +77,10 @@ Configuration is organized under `streams:`:
 - `streams.robot_state` — pose/wheel stream downsampling (optional), topics, frames, wheel joints
 - `streams.lidar` — lidar stream downsampling (optional), input/output topics, frame_id (optional; omit to disable)
 - `robot_model` — GLB path and chunk size
+- `control` — optional stack control RPCs (disabled by default):
+  - `enabled` (bool): enables `StartStack` / `StopStack` / `RestartStack`
+  - `allowed_stacks` (list): allowed stack names (mapped to `rovi-<stack>.service`)
+  - `unit_prefix` (string, default `rovi-`)
 
 Robot state / lidar / map support optional downsampling via either:
 - `downsampling_rate_hz` (preferred)

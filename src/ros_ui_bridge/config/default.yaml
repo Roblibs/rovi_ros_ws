@@ -1,6 +1,11 @@
 grpc:
   bind: "0.0.0.0:50051"
 
+control:
+  enabled: false
+  unit_prefix: "rovi-"
+  allowed_stacks: ["teleop", "mapping", "localization", "nav", "camera"]
+
 ros:
   tf_demux:
     enabled: true
@@ -20,6 +25,37 @@ streams:
         source:
           provider: "system"
           type: "cpu_percent"
+
+      # Systemd service status (text fields). Service names are configured without the `.service` suffix.
+      - id: "svc_gateway"
+        type: "text"
+        source: { provider: "system", type: "service", service: "rovi-gateway" }
+
+      # Wi-Fi / network interface readiness (text field).
+      # Values: missing|down|up:no_ip|ip:<addr>|ip6:<addr>
+      - id: "net_wlan0"
+        type: "text"
+        source: { provider: "system", type: "net_iface", iface: "wlan0" }
+
+      - id: "svc_teleop"
+        type: "text"
+        source: { provider: "system", type: "service", service: "rovi-teleop" }
+
+      - id: "svc_mapping"
+        type: "text"
+        source: { provider: "system", type: "service", service: "rovi-mapping" }
+
+      - id: "svc_localization"
+        type: "text"
+        source: { provider: "system", type: "service", service: "rovi-localization" }
+
+      - id: "svc_nav"
+        type: "text"
+        source: { provider: "system", type: "service", service: "rovi-nav" }
+
+      - id: "svc_camera"
+        type: "text"
+        source: { provider: "system", type: "service", service: "rovi-camera" }
 
       - id: "voltage"
         unit: "V"

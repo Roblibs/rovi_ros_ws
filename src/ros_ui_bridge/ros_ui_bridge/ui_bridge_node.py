@@ -26,6 +26,7 @@ from .status_store import StatusBroadcaster, StatusFieldMeta, StatusFieldValue
 from .throttled_forwarder import AsyncStreamBroadcaster
 from .session_info import resolve_session
 from .conductor.systemd import process_is_running, systemd_is_active
+from .conductor.net import iface_status_text
 
 
 async def _publish_status_loop(
@@ -69,6 +70,10 @@ async def _publish_status_loop(
                     text = 'running' if running else 'missing'
                 else:
                     text = 'unknown'
+                values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
+            elif field.source.type == 'net_iface':
+                iface = (field.source.iface or '').strip()
+                text = iface_status_text(iface) if iface else 'unknown'
                 values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
 
         # ROS-derived fields (topic values + rates).
@@ -166,6 +171,7 @@ async def _run_async(
         base_frame=cfg.robot_state_stream.base_frame,
         map_frame=cfg.robot_state_stream.map_frame,
         wheel_joint_names=cfg.robot_state_stream.wheel_joint_names,
+        control=cfg.control,
     )
 
     tasks: list[asyncio.Task[None]] = []
