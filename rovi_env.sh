@@ -48,9 +48,13 @@ clean() {
   rm -rf "${ROVI_ROS_WS_DIR}/build" "${ROVI_ROS_WS_DIR}/install" "${ROVI_ROS_WS_DIR}/log"
 }
 
-stop() {
+rovi_stop() {
   python3 "${ROVI_ROS_WS_DIR}/tools/rovi_stop.py" "$@"
 }
+
+if ! alias stop >/dev/null 2>&1 && ! declare -F stop >/dev/null 2>&1; then
+  function stop { rovi_stop "$@"; }
+fi
 
 build() {
   local colcon_cmd=""
@@ -73,10 +77,20 @@ build() {
   # Runtime can still use the venv (e.g. for Python deps), but build must be
   # stable against venv package drift.
   (
+    _remove_path_entry() {
+      local entry="$1"
+      local wrapped=":${PATH}:"
+      wrapped="${wrapped//:${entry}:/:}"
+      wrapped="${wrapped#:}"
+      wrapped="${wrapped%:}"
+      PATH="${wrapped}"
+    }
+
+    # Strip venv from PATH for this build invocation only (even if a venv was
+    # activated earlier, or its bin path was manually added).
+    _remove_path_entry "${ROVI_ROS_WS_DIR}/.venv/bin"
     if [ -n "${VIRTUAL_ENV:-}" ]; then
-      # Strip venv from PATH for this build invocation only.
-      PATH="${PATH//${VIRTUAL_ENV}\/bin:/}"
-      PATH="${PATH//:${VIRTUAL_ENV}\/bin/}"
+      _remove_path_entry "${VIRTUAL_ENV}/bin"
       unset VIRTUAL_ENV
     fi
     unset PYTHONHOME
