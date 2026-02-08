@@ -53,7 +53,6 @@ stop() {
 }
 
 build() {
-  ensure_venv || return 1
   local colcon_cmd=""
   if [ -x "/usr/bin/colcon" ]; then
     colcon_cmd="/usr/bin/colcon"
@@ -68,7 +67,26 @@ build() {
   if [ "${ROVI_SKIP_OPENNI2:-}" = "1" ]; then
     extra_args+=(--packages-skip openni2_camera)
   fi
-  "${colcon_cmd}" build "${extra_args[@]}" "$@"
+  # Build policy: keep system Python as the authority for CMake-based builds
+  # (rosidl, etc), and never depend on the workspace venv for builds.
+  #
+  # Runtime can still use the venv (e.g. for Python deps), but build must be
+  # stable against venv package drift.
+  (
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+      # Strip venv from PATH for this build invocation only.
+      PATH="${PATH//${VIRTUAL_ENV}\/bin:/}"
+      PATH="${PATH//:${VIRTUAL_ENV}\/bin/}"
+      unset VIRTUAL_ENV
+    fi
+    unset PYTHONHOME
+
+    local -a cmake_args=(
+      --cmake-args
+      -DPython3_EXECUTABLE=/usr/bin/python3
+    )
+    "${colcon_cmd}" build "${extra_args[@]}" "${cmake_args[@]}" "$@"
+  )
 }
 
 setup() {
