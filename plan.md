@@ -8,6 +8,9 @@ This file is an index of planning topics. Details live under `docs/plan/`.
 ## Display
 - Resolve startup robustness for UI/display path: `robot_serial_display` initial gRPC connection failure before `ros_ui_bridge` is ready.
 
+## Services
+- [Systemd + stack manager](docs/plan/services.md): two-level service/stack control, exclusivity, and safe UI start/stop without full sudo.
+
 ## Improvements
 - [Consistent UI stream timestamps](docs/plan/improvements/ui_timestamps.md): standardize on ROS/header time.
 - [No launch-time PYTHONPATH mutation](docs/plan/improvements/no_pythonpath_mutation.md): remove environment surgery where possible.
