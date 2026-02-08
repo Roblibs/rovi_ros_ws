@@ -6,7 +6,7 @@ from typing import Iterable
 
 from launch.substitutions import LaunchConfiguration
 
-# Backend argument pass-through from rovi.launch.py -> robot_bringup.launch.py
+# Backend argument pass-through from higher-level launches -> robot_bringup.launch.py
 BACKEND_ARG_NAMES: tuple[str, ...] = (
     "robot_mode",
     "use_sim_time",
@@ -14,8 +14,21 @@ BACKEND_ARG_NAMES: tuple[str, ...] = (
     "world",
     "gazebo_gui",
     "cmd_vel_topic",
+)
+
+# Gateway argument pass-through from rovi.launch.py -> gateway.launch.py
+GATEWAY_ARG_NAMES: tuple[str, ...] = (
+    "robot_mode",
+    "use_sim_time",
+    "model",
+    "world",
+    "gazebo_gui",
+    "cmd_vel_topic",
+    "odom_integrator_publish_tf",
+    "ui_bridge_enabled",
     "ui_bridge_config",
     "ui_bridge_log_level",
+    "serial_display_enabled",
     "serial_display_config",
     "serial_display_log_level",
     "serial_display_debug",

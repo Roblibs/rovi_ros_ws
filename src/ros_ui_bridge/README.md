@@ -34,7 +34,7 @@ UI clients should not invent staleness: the bridge drops stale fields before sen
 
 ## Run
 
-This node is started by `rovi_bringup/robot_bringup.launch.py` by default.
+This node is started by `rovi_bringup/gateway.launch.py` (and by `rovi_bringup/rovi.launch.py` when `gateway_enabled:=true`).
 
 To run manually:
 

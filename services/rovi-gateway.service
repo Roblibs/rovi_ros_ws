@@ -1,0 +1,19 @@
+[Unit]
+Description=ROVI gateway (backend + UI bridge + display)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=rovi
+WorkingDirectory=%h/dev/Roblibs/rovi_ros_ws
+EnvironmentFile=%h/dev/Roblibs/rovi_ros_ws/.env.robot
+RuntimeDirectory=rovi
+ExecStart=%h/dev/Roblibs/rovi_ros_ws/services/run_gateway.sh
+KillSignal=SIGINT
+TimeoutStopSec=20
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
+

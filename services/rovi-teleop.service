@@ -1,0 +1,20 @@
+[Unit]
+Description=ROVI stack: teleop
+Requires=rovi-gateway.service
+After=rovi-gateway.service
+PartOf=rovi-gateway.service
+
+[Service]
+Type=simple
+User=rovi
+WorkingDirectory=%h/dev/Roblibs/rovi_ros_ws
+EnvironmentFile=%h/dev/Roblibs/rovi_ros_ws/.env.robot
+RuntimeDirectory=rovi
+ExecStart=%h/dev/Roblibs/rovi_ros_ws/services/run_stack.sh teleop
+KillSignal=SIGINT
+TimeoutStopSec=20
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
+

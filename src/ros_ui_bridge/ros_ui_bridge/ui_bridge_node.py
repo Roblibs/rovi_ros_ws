@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import signal
-import subprocess
 import threading
 from typing import Optional
 
@@ -26,6 +25,7 @@ from .ros_metrics_node import UiBridgeRosNode
 from .status_store import StatusBroadcaster, StatusFieldMeta, StatusFieldValue
 from .throttled_forwarder import AsyncStreamBroadcaster
 from .session_info import resolve_session
+from .conductor.systemd import process_is_running, systemd_is_active
 
 
 async def _publish_status_loop(
@@ -59,13 +59,13 @@ async def _publish_status_loop(
                 values.append(StatusFieldValue(id=field.id, value=cpu_percent, text=None, stamp=now_ros.to_msg()))
             elif field.source.type == 'service':
                 service_name = (field.source.service or '').strip()
-                text = _systemd_is_active(service_name) if service_name else 'unknown'
+                text = systemd_is_active(service_name) if service_name else 'unknown'
                 values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
             elif field.source.type == 'process':
                 process_name = (field.source.process or '').strip()
                 service_name = (field.source.service or '').strip() if field.source.service else None
                 if process_name:
-                    running = _process_is_running(process_name, service=service_name)
+                    running = process_is_running(process_name, service=service_name)
                     text = 'running' if running else 'missing'
                 else:
                     text = 'unknown'
@@ -305,90 +305,6 @@ def main(argv: Optional[list[str]] = None) -> None:
             spin_thread.join(timeout=2.0)
         except Exception:
             pass
-
-
-def _systemd_is_active(service_name: str) -> str:
-    unit = str(service_name).strip()
-    if not unit:
-        return 'unknown'
-    if not unit.endswith('.service'):
-        unit = unit + '.service'
-
-    try:
-        cp = subprocess.run(
-            ['systemctl', 'is-active', unit],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=1.5,
-        )
-    except Exception:  # noqa: BLE001
-        return 'unknown'
-
-    out = (cp.stdout or '').strip()
-    if out:
-        return out
-    err = (cp.stderr or '').strip()
-    return err or 'unknown'
-
-
-def _process_is_running(process_name: str, *, service: str | None) -> bool:
-    needle = str(process_name).strip()
-    if not needle:
-        return False
-
-    if service:
-        unit = str(service).strip()
-        if not unit.endswith('.service'):
-            unit = unit + '.service'
-        try:
-            cp = subprocess.run(
-                ['systemctl', 'show', unit, '-p', 'ControlGroup', '--value'],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=1.5,
-            )
-        except Exception:  # noqa: BLE001
-            return False
-
-        cgroup = (cp.stdout or '').strip()
-        if not cgroup:
-            return False
-
-        procs_path = f"/sys/fs/cgroup{cgroup}/cgroup.procs"
-        try:
-            with open(procs_path, 'r', encoding='utf-8') as f:
-                pids_text = f.read()
-        except OSError:
-            return False
-
-        for line in pids_text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                pid = int(line)
-            except ValueError:
-                continue
-            try:
-                proc = psutil.Process(pid)
-                cmdline = ' '.join(proc.cmdline())
-            except Exception:  # noqa: BLE001
-                continue
-            if needle in cmdline:
-                return True
-        return False
-
-    for proc in psutil.process_iter(['cmdline']):
-        try:
-            cmdline_list = proc.info.get('cmdline') or []
-            cmdline = ' '.join(cmdline_list)
-        except Exception:  # noqa: BLE001
-            continue
-        if needle in cmdline:
-            return True
-    return False
 
 
 if __name__ == '__main__':

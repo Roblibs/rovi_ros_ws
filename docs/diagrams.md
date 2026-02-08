@@ -410,22 +410,42 @@ flowchart TD
 ```
 
 ## Launch wiring
-`rovi_bringup/robot_bringup.launch.py` selects the backend (`robot_mode:=real|sim|offline`), and `rovi_bringup/rovi.launch.py` is the single high-level entrypoint that chooses the stack and owns RViz startup policy.
+Target wiring after the **gateway split**:
+- `rovi_bringup/gateway.launch.py` is the systemd-owned always-on entrypoint (backend + UI bridge + manager).
+- `rovi_bringup/rovi.launch.py` becomes **stack-only** when launched with `gateway_enabled:=false` (teleop/mapping/localization/nav/camera) and assumes gateway is already running.
+- `ros_ui_bridge.conductor` is an **in-process** module used by `ros_ui_bridge` (no ROS topics/services by default).
+- `rovi-gateway.service` is robot-only (`robot_mode:=real`). Simulation on a PC remains a separate workflow and should not use robot systemd units.
 
 ```mermaid
 flowchart LR
-  Rovi["rovi_bringup/rovi.launch.py"]
-  RobotBringup["rovi_bringup/robot_bringup.launch.py"]
+  UnitCore("systemd: rovi-gateway.service")
+  UnitStack("systemd: rovi-<stack>.service")
 
-  Rovi --> RobotBringup
-  Rovi --> Teleop["rovi_bringup/teleop.launch.py"]
-  Rovi --> Mapping["rovi_bringup/mapping.launch.py"]
-  Rovi --> Localization["rovi_bringup/localization.launch.py"]
-  Rovi --> NavLaunch["rovi_bringup/nav.launch.py"]
+  CoreLaunch("rovi_bringup/gateway.launch.py")
+  StackLaunch("rovi_bringup/rovi.launch.py<br/>(gateway_enabled:=false)")
+  RobotBringup("rovi_bringup/robot_bringup.launch.py")
 
-  EkfLaunch["rovi_localization/launch/ekf.launch.py"]
-  SlamLaunch["rovi_slam/launch/slam_toolbox.launch.py"]
-  NavStackLaunch["rovi_nav/launch/nav.launch.py"]
+  NodeUiBridge("ros_ui_bridge")
+  NodeDisplay("robot_serial_display")
+  LibConductor["ros_ui_bridge.conductor (module)"]
+
+  UnitCore --> CoreLaunch
+  UnitStack --> StackLaunch
+
+  CoreLaunch -->|IncludeLaunchDescription| RobotBringup
+  CoreLaunch -->|Node| NodeUiBridge
+  CoreLaunch -->|Node| NodeDisplay
+  NodeUiBridge -->|import| LibConductor
+
+  StackLaunch --> Teleop("rovi_bringup/teleop.launch.py")
+  StackLaunch --> Mapping("rovi_bringup/mapping.launch.py")
+  StackLaunch --> Localization("rovi_bringup/localization.launch.py")
+  StackLaunch --> NavLaunch("rovi_bringup/nav.launch.py")
+  StackLaunch --> Camera("rovi_bringup/camera.launch.py")
+
+  EkfLaunch("rovi_localization/launch/ekf.launch.py")
+  SlamLaunch("rovi_slam/launch/slam_toolbox.launch.py")
+  NavStackLaunch("rovi_nav/launch/nav.launch.py")
 
   Mapping -->|IncludeLaunchDescription| EkfLaunch
   Mapping -->|IncludeLaunchDescription| SlamLaunch
@@ -437,7 +457,7 @@ flowchart LR
   NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=mapping)"| Mapping
   NavLaunch -->|"IncludeLaunchDescription<br/>(slam_mode=localization)"| Localization
 
-  RobotBringup -->|"IncludeLaunchDescription<br/>(robot_mode=sim)"| GazeboSim["rovi_sim/launch/gazebo_sim.launch.py"]
+  RobotBringup -->|"IncludeLaunchDescription<br/>(robot_mode=sim)"| GazeboSim("rovi_sim/launch/gazebo_sim.launch.py")
 ```
 
 ## Package dependencies

@@ -1,0 +1,33 @@
+// Allow members of group 'rovi-ops' to start/stop only 'rovi-*.service' stack units (not the gateway).
+polkit.addRule(function(action, subject) {
+  if (action.id != "org.freedesktop.systemd1.manage-units") {
+    return polkit.Result.NOT_HANDLED;
+  }
+
+  if (!subject.isInGroup("rovi-ops")) {
+    return polkit.Result.NOT_HANDLED;
+  }
+
+  // action.lookup("verb") is typically one of: start, stop, restart, reload, ...
+  var verb = action.lookup("verb");
+  if (verb != "start" && verb != "stop" && verb != "restart") {
+    return polkit.Result.NOT_HANDLED;
+  }
+
+  // action.lookup("unit") contains the unit name.
+  var unit = action.lookup("unit");
+  if (!unit) {
+    return polkit.Result.NOT_HANDLED;
+  }
+
+  // Allow only stack units: rovi-<stack>.service, explicitly deny rovi-gateway.service
+  if (unit == "rovi-gateway.service") {
+    return polkit.Result.NOT_HANDLED;
+  }
+  if (unit.indexOf("rovi-") === 0 && unit.indexOf(".service") === unit.length - 8) {
+    return polkit.Result.YES;
+  }
+
+  return polkit.Result.NOT_HANDLED;
+});
+

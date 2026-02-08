@@ -40,14 +40,10 @@ def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
     desc_share = get_package_share_directory('rovi_description')
     sim_share = get_package_share_directory('rovi_sim')
-    ui_bridge_share = get_package_share_directory('ros_ui_bridge')
-    serial_display_share = get_package_share_directory('robot_serial_display')
 
     default_model = os.path.join(desc_share, 'urdf', 'rovi.urdf')
     default_odom_integrator_params = os.path.join(bringup_share, 'config', 'rovi_odom_integrator.yaml')
     default_rosmaster_params = os.path.join(bringup_share, 'config', 'rosmaster_driver.yaml')
-    default_ui_bridge_config = os.path.join(ui_bridge_share, 'config', 'default.yaml')
-    default_serial_display_config = os.path.join(serial_display_share, 'config', 'default.yaml')
 
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
     sim_backend_launch = os.path.join(sim_share, 'launch', 'gazebo_sim.launch.py')
@@ -144,47 +140,6 @@ def generate_launch_description() -> LaunchDescription:
         'lidar_angle_compensate',
         default_value='true',
         description='Enable angle compensation in rplidar_ros',
-    )
-
-    # UI bridge + serial display client (all modes, can be disabled).
-    ui_bridge_enabled_arg = DeclareLaunchArgument(
-        'ui_bridge_enabled',
-        default_value='true',
-        description='Start ros_ui_bridge gRPC server.',
-    )
-    ui_bridge_config_arg = DeclareLaunchArgument(
-        'ui_bridge_config',
-        default_value=default_ui_bridge_config,
-        description='Path to ros_ui_bridge YAML config.',
-    )
-    ui_bridge_log_level_arg = DeclareLaunchArgument(
-        'ui_bridge_log_level',
-        default_value='info',
-        description='ROS log level for ros_ui_bridge (e.g., debug, info, warn, error).',
-    )
-    serial_display_enabled_arg = DeclareLaunchArgument(
-        'serial_display_enabled',
-        default_value=PythonExpression([
-            "'true' if '",
-            LaunchConfiguration('robot_mode'),
-            "' == 'real' else 'false'",
-        ]),
-        description='Start robot_serial_display (gRPC client -> USB serial display).',
-    )
-    serial_display_config_arg = DeclareLaunchArgument(
-        'serial_display_config',
-        default_value=default_serial_display_config,
-        description='Path to robot_serial_display YAML config.',
-    )
-    serial_display_log_level_arg = DeclareLaunchArgument(
-        'serial_display_log_level',
-        default_value='info',
-        description='ROS log level for robot_serial_display (e.g., debug, info, warn, error).',
-    )
-    serial_display_debug_arg = DeclareLaunchArgument(
-        'serial_display_debug',
-        default_value='false',
-        description='Enable verbose robot_serial_display payload logging.',
     )
 
     # Simulation backend (sim)
@@ -382,52 +337,6 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    ui_bridge_node = Node(
-        condition=IfCondition(LaunchConfiguration('ui_bridge_enabled')),
-        package='ros_ui_bridge',
-        executable='ui_bridge',
-        output='screen',
-        arguments=['--config', LaunchConfiguration('ui_bridge_config')],
-        parameters=[{'use_sim_time': use_sim_time_param}],
-        ros_arguments=['--ros-args', '--log-level', LaunchConfiguration('ui_bridge_log_level')],
-    )
-
-    serial_display_node = Node(
-        condition=IfCondition(PythonExpression([
-            "'",
-            LaunchConfiguration('serial_display_enabled'),
-            "' == 'true' and '",
-            LaunchConfiguration('robot_mode'),
-            "' == 'real' and '",
-            LaunchConfiguration('serial_display_debug'),
-            "' != 'true'",
-        ])),
-        package='robot_serial_display',
-        executable='serial_display',
-        name='robot_serial_display',
-        output='screen',
-        arguments=['--config', LaunchConfiguration('serial_display_config')],
-        ros_arguments=['--ros-args', '--log-level', LaunchConfiguration('serial_display_log_level')],
-    )
-
-    serial_display_debug_node = Node(
-        condition=IfCondition(PythonExpression([
-            "'",
-            LaunchConfiguration('serial_display_enabled'),
-            "' == 'true' and '",
-            LaunchConfiguration('robot_mode'),
-            "' == 'real' and '",
-            LaunchConfiguration('serial_display_debug'),
-            "' == 'true'",
-        ])),
-        package='robot_serial_display',
-        executable='serial_display',
-        name='robot_serial_display',
-        output='screen',
-        arguments=['--config', LaunchConfiguration('serial_display_config'), '--debug'],
-        ros_arguments=['--ros-args', '--log-level', LaunchConfiguration('serial_display_log_level')],
-    )
-
     return LaunchDescription([
         robot_mode_arg,
         model_arg,
@@ -445,13 +354,6 @@ def generate_launch_description() -> LaunchDescription:
         lidar_frame_arg,
         lidar_baud_arg,
         lidar_angle_comp_arg,
-        ui_bridge_enabled_arg,
-        ui_bridge_config_arg,
-        ui_bridge_log_level_arg,
-        serial_display_enabled_arg,
-        serial_display_config_arg,
-        serial_display_log_level_arg,
-        serial_display_debug_arg,
         world_arg,
         gazebo_gui_arg,
         *venv_env_actions,
@@ -462,9 +364,6 @@ def generate_launch_description() -> LaunchDescription:
         odom_integrator_node,
         rosmaster_driver_node,
         lidar_node,
-        ui_bridge_node,
-        serial_display_node,
-        serial_display_debug_node,
         sim_backend,
         sim_base,
         sim_odom,

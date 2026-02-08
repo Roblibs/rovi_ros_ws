@@ -1,16 +1,24 @@
 # services (systemd + stack manager)
 
+## update (2026-02-08)
+- Add a dedicated always-on **gateway** launch (backend + UI bridge + manager).
+- Split UI plane to **gateway only**; stacks assume gateway is already running and systemd enforces that.
+
 ## implementation status
-- Current phase: **Phase 2** (UI bridge schema + config support for text fields; system/service and system/process sources implemented).
-- Not started yet: repo `services/` artifacts (unit files, `run_stack.sh`, polkit install tooling) and the executor start/stop API.
+- Current phase: **Phase 3** (`services/` artifacts + systemd wiring).
+- Implemented:
+  - UI bridge proto + config support for **text** status fields; `system/service` + `system/process` status sources.
+  - Gateway split: `rovi_bringup/gateway.launch.py` and UI plane extracted from `robot_bringup.launch.py`.
+  - In-process conductor module scaffold (`ros_ui_bridge.conductor`) for systemd probes.
+- Not started yet: `services/` artifacts (unit files, `run_stack.sh`, install tooling, polkit) and the executor start/stop API.
 
 ## bring up phases
 0) Decisions + plan (this document)
-1) UI bridge proto: add optional text support for status fields
-2) UI bridge implementation: parse `fields[].type: text` and collect `system/service` + `system/process` into flat fields
+1) Gateway launch: add `rovi_bringup/gateway.launch.py` (backend + UI bridge + manager; robot-only `robot_mode:=real`)
+2) Extract UI plane: remove UI bridge + display + manager from backend/stack launches; gateway is the only owner
 3) Robot `services/`: add `rovi-*.service`, `run_stack.sh`, `install.sh`, `.env.robot`, `.env.pc`
 4) Polkit allowlist + group: enable non-sudo stack start/stop
-5) Executor API: UI bridge exposes start/stop stack units via systemd (polkit-backed)
+5) Executor API: UI bridge exposes start/stop stack units via systemd (polkit-backed; implemented via manager package)
 6) Expand stacks + process list: teleop/mapping/localization/nav/camera + expected process names
 
 ## goal
@@ -19,10 +27,10 @@ Provide a two-level runtime management system for ROVI:
 - Level 2 (**stack manager node/service**) exposes a safe control API (**start/stop stacks + status**) for the UI bridge/display without “full sudo”.
 
 Constraint refinements:
-- Exactly **one** permanently running service: `rovi-core.service` (enabled at boot).
+- Exactly **one** permanently running service: `rovi-gateway.service` (enabled at boot).
 - Managing **core** (enable/disable/start/stop) is admin-only; sudo is acceptable here.
 - Non-sudo control is only required for **on-demand stacks** (start/stop).
-- The manager is expected to run as part of **core**.
+- The manager is expected to run as part of **gateway**.
 - Safe dev mode: on failure, **stop and surface logs** (no auto-restart loops).
 - Observability is owned by `ros_ui_bridge`; execution is decoupled (the stack executor only starts/stops stacks and reports systemd state).
 - Robot services are **robot-only** and assume `robot_mode:=real` (no backend switching via services).
@@ -38,11 +46,26 @@ Non-goals:
 - **executor**: the minimal “execution” part of the manager (start/stop stacks; read systemd state).
 - **observer**: the observability part (ROS graph + UI topics + health probes), implemented in `ros_ui_bridge`.
 
+## gateway launch split (required)
+We need an explicit always-on launch that is *not* a stack, and stacks must not start the UI plane.
+
+Requirements:
+- `ros_ui_bridge` and the manager/executor are assumed to be **always running**.
+- Stack services must **hard fail** when gateway is not running (enforce via systemd `Requires=` / `After=`).
+- UI/manager logic must be extracted from backend/stack launches; gateway becomes the only owner.
+
+Proposed new launch entrypoint:
+- `rovi_bringup/gateway.launch.py`:
+  - starts the robot backend contract (`robot_bringup.launch.py`) **backend only**
+  - starts `ros_ui_bridge` **always on**
+  - starts the manager/executor (in-process module `ros_ui_bridge.conductor`) **always on**
+  - optionally starts `robot_serial_display` **always on (robot-only)**
+
 ## proposed architecture
 
 ### level 1: systemd services (source of truth)
 Recommended service split:
-- `rovi-core.service` (enabled at boot)
+- `rovi-gateway.service` (enabled at boot)
   - Starts the minimal robot backend + UI bridge path.
   - Owns hardware connections / sim bridge / shared infra.
   - Runs/includes the stack executor endpoint (start/stop stacks) and `ros_ui_bridge` (observability + UI stream).
@@ -58,9 +81,9 @@ Not on the robot:
 
 Dependencies:
 - Each on-demand stack unit declares:
-  - `Requires=rovi-core.service`
-  - `After=rovi-core.service`
-  - `PartOf=rovi-core.service` (stacks stop when core stops)
+  - `Requires=rovi-gateway.service`
+  - `After=rovi-gateway.service`
+  - `PartOf=rovi-gateway.service` (stacks stop when gateway stops)
 
 Restart policy (safe dev mode):
 - Core: no auto-restart (fail fast; inspect logs; avoid hardware restart loops)
@@ -77,17 +100,17 @@ This is a sketch to standardize conventions (final values TBD):
 ```ini
 [Unit]
 Description=ROVI stack: nav
-Requires=rovi-core.service
-After=rovi-core.service
-PartOf=rovi-core.service
+Requires=rovi-gateway.service
+After=rovi-gateway.service
+PartOf=rovi-gateway.service
 
 [Service]
 Type=simple
 User=rovi
-WorkingDirectory=/dev/rovi_ros_ws
-EnvironmentFile=/dev/rovi_ros_ws/.env.robot
+WorkingDirectory=%h/dev/Roblibs/rovi_ros_ws
+EnvironmentFile=%h/dev/Roblibs/rovi_ros_ws/.env.robot
 RuntimeDirectory=rovi
-ExecStart=/dev/rovi_ros_ws/services/run_stack.sh nav
+ExecStart=%h/dev/Roblibs/rovi_ros_ws/services/run_stack.sh nav
 KillSignal=SIGINT
 TimeoutStopSec=20
 Restart=no
@@ -109,15 +132,15 @@ Notes:
 - Hardcode the workspace path for systemd units (keep it predictable for boot).
 
 ### level 2: stack manager (UI control + policy)
-Run a single always-on execution endpoint (“executor”) as part of core. Keep observability in `ros_ui_bridge`.
+Run a single always-on execution endpoint (“executor”) as part of gateway. Keep observability in `ros_ui_bridge`.
 
 Responsibilities:
 - Executor: accept commands (operator/UI scope): `start(stack)`, `stop(stack)`, `get_systemd_status()`.
 - UI bridge: collect and publish observability (systemd + ROS) for the UI stream.
-- Keep admin actions out of the non-sudo path (core enable/disable/start/stop; optional stack enable/disable at boot).
+- Keep admin actions out of the non-sudo path (gateway enable/disable/start/stop; optional stack enable/disable at boot).
 - Enforce intent-level policy (beyond systemd):
   - “one active stack at a time” UX (even if ROS could technically run in parallel)
-  - “core must be up before any stack”
+  - “gateway must be up before any stack”
   - optional: “don’t allow stack switch while robot moving”
 - Map systemd + process presence into UI status fields; topic freshness remains a separate UI concept.
 
@@ -149,16 +172,16 @@ Design detail:
 - All stacks are exclusive by design; use a single lock for all stack units.
 
 ## privilege model (no full sudo)
-We need a safe way for the manager (running as an unprivileged user, inside core) to start/stop only the **stack** units.
+We need a safe way for the manager (running as an unprivileged user, inside gateway) to start/stop only the **stack** units.
 
 Explicitly not required:
-- Non-sudo control of `rovi-core.service` (admin manages core with sudo).
+- Non-sudo control of `rovi-gateway.service` (admin manages gateway with sudo).
 - Non-sudo enable/disable of units (keep this as admin/install tooling).
 
 ### polkit allowlist for stack start/stop
 Use systemd’s D-Bus API and a polkit rule that allows:
 - a dedicated group (e.g. `rovi-ops`)
-- to `StartUnit/StopUnit` **only** for stack unit names (e.g. `rovi-teleop.service`, `rovi-nav.service`, …) and explicitly **not** `rovi-core.service`
+- to `StartUnit/StopUnit` **only** for stack unit names (e.g. `rovi-teleop.service`, `rovi-nav.service`, …) and explicitly **not** `rovi-gateway.service`
 
 Pros:
 - No passwordless sudo.
@@ -179,7 +202,7 @@ Note:
 Keep service artifacts at repo root so they are not “hidden” under a ROS package.
 
 Example:
-- `services/rovi-core.service`
+- `services/rovi-gateway.service`
 - `services/rovi-teleop.service`
 - `services/rovi-mapping.service`
 - `services/rovi-localization.service`
@@ -195,7 +218,7 @@ Install script (`install.sh`) responsibilities:
 - Validate a unified environment source exists (see “environment unification” below) and fail with a clear message if missing.
 - Install the polkit rule for stack start/stop (and create the `rovi-ops` group).
 - `systemctl daemon-reload`
-- `systemctl enable --now rovi-core.service`
+- `systemctl enable --now rovi-gateway.service`
 
 Notes:
 - Installation should be idempotent (safe to re-run).
@@ -205,19 +228,28 @@ Notes:
 Keep the “golden rule” parity (real/sim/offline) by ensuring the service split doesn’t change ROS contracts.
 
 Suggested ownership:
-- `rovi-core.service` runs `rovi_bringup/robot_bringup.launch.py` (robot backend + UI bridge + display client).
-- Stack services run stack-specific launches already present in `rovi_bringup`:
-  - `teleop.launch.py`, `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`
+- `rovi-gateway.service` runs `rovi_bringup/gateway.launch.py` (backend + UI bridge + manager + display client).
+- Stack services run via `rovi.launch.py` using `stack:=...` (unified stack contract).
 
-If core currently launches some of these stacks by default, add launch args to gate them so systemd becomes the top-level selector.
+Important:
+- `rovi.launch.py` supports `gateway_enabled:=false` for systemd stack units so stacks can start without starting the gateway plane.
+
+Odometry TF ownership (real robot):
+- The gateway must be configured to avoid TF conflicts with EKF stacks.
+- For mapping/localization/nav (EKF publishes `odom->base_footprint`), configure the gateway service with:
+  - `ROVI_ODOM_INTEGRATOR_PUBLISH_TF=0` and restart `rovi-gateway.service`
+- For teleop (raw odom integrator publishes `odom->base_footprint`), use:
+  - `ROVI_ODOM_INTEGRATOR_PUBLISH_TF=1`
+
+This is intentionally a **restart-time** choice for systemd: switching TF publishers at runtime is out of scope.
 
 ### stack catalog (argument → launch)
 `run_stack.sh` should accept a single stack argument and map it to a `ros2 launch`:
-- `teleop` → `ros2 launch rovi_bringup teleop.launch.py`
-- `mapping` → `ros2 launch rovi_bringup mapping.launch.py`
-- `localization` → `ros2 launch rovi_bringup localization.launch.py`
-- `nav` → `ros2 launch rovi_bringup nav.launch.py`
-- `camera` → `ros2 launch rovi_bringup camera.launch.py` (or a dedicated camera bringup launch if it lives elsewhere)
+- `teleop` → `ros2 launch rovi_bringup rovi.launch.py robot_mode:=real gateway_enabled:=false stack:=teleop rviz:=false`
+- `mapping` → `ros2 launch rovi_bringup rovi.launch.py robot_mode:=real gateway_enabled:=false stack:=mapping rviz:=false`
+- `localization` → `ros2 launch rovi_bringup rovi.launch.py robot_mode:=real gateway_enabled:=false stack:=localization rviz:=false`
+- `nav` → `ros2 launch rovi_bringup rovi.launch.py robot_mode:=real gateway_enabled:=false stack:=nav rviz:=false`
+- `camera` → `ros2 launch rovi_bringup rovi.launch.py robot_mode:=real gateway_enabled:=false stack:=camera rviz:=false`
 
 `rovi-<stack>.service` should pass `<stack>` to `run_stack.sh`.
 
@@ -239,9 +271,9 @@ Example:
 streams:
   status:
     fields:
-      - id: "svc_core"
+      - id: "svc_gateway"
         type: "text"
-        source: { provider: "system", type: "service", service: "rovi-core" }
+        source: { provider: "system", type: "service", service: "rovi-gateway" }
 
       - id: "svc_nav"
         type: "text"
@@ -300,3 +332,14 @@ This should be documented as part of `.env.pc` and `.env.robot` defaults.
 Most ROS nodes do not publish a universal “status”. Avoid node-derived state and rely on process/service presence only:
 - **Service status**: systemd unit state (`active`, `failed`, `inactive`) per stack.
 - **Process presence**: expected process signatures present in the unit cgroup (boolean).
+
+## manager package naming (proposal)
+We want a dedicated package for the stack execution/control plane (systemd D-Bus + policy), separate from `ros_ui_bridge` (observer/transport).
+
+Candidate names:
+- (Chosen) `ros_ui_bridge.conductor`: an in-process module used only by `ros_ui_bridge`.
+
+Initial scope:
+- Python library: systemd unit start/stop/query (D-Bus).
+- In-process “executor” logic invoked by `ros_ui_bridge` (started by `gateway.launch.py`).
+- UI bridge calls into this package to execute actions; polkit remains the privilege boundary.

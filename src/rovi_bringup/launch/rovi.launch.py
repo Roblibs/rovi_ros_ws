@@ -23,7 +23,6 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from rovi_bringup.launch_lib.args import (
-    BACKEND_ARG_NAMES,
     CAMERA_STACK_ARG_NAMES,
     CONTROL_STACK_ARG_NAMES,
     LOCALIZATION_STACK_ARG_NAMES,
@@ -64,7 +63,7 @@ def generate_launch_description() -> LaunchDescription:
     ui_bridge_share = get_package_share_directory('ros_ui_bridge')
     serial_display_share = get_package_share_directory('robot_serial_display')
 
-    robot_bringup_launch = os.path.join(bringup_share, 'launch', 'robot_bringup.launch.py')
+    gateway_launch = os.path.join(bringup_share, 'launch', 'gateway.launch.py')
     teleop_stack_launch = os.path.join(bringup_share, 'launch', 'teleop.launch.py')
     camera_stack_launch = os.path.join(bringup_share, 'launch', 'camera.launch.py')
     mapping_stack_launch = os.path.join(bringup_share, 'launch', 'mapping.launch.py')
@@ -84,6 +83,11 @@ def generate_launch_description() -> LaunchDescription:
         'robot_mode',
         default_value='real',
         description="Robot backend: 'real' (hardware), 'sim' (Gazebo), or 'offline' (model only).",
+    )
+    gateway_enabled = DeclareLaunchArgument(
+        'gateway_enabled',
+        default_value='true',
+        description='Start the always-on gateway plane (backend + UI bridge + display). Set false when systemd owns the gateway.',
     )
     stack = DeclareLaunchArgument(
         'stack',
@@ -191,6 +195,10 @@ def generate_launch_description() -> LaunchDescription:
         default_value='filtered',
         description="Odometry mode: 'raw', 'filtered', or 'fusion_wheels_imu'.",
     )
+
+    # When this launch owns the gateway plane (gateway_enabled:=true), it must also decide
+    # who publishes TF odom->base_footprint to avoid conflicts with EKF stacks.
+    # In systemd mode, the gateway service is configured separately (and may require a restart to change).
     odom_integrator_publish_tf = PythonExpression([
         "'true' if '",
         LaunchConfiguration('stack'),
@@ -222,10 +230,26 @@ def generate_launch_description() -> LaunchDescription:
         "')))",
     ])
 
-    # Backend: always start, even for offline (robot_bringup handles robot_mode=offline).
-    backend_args = launch_config_map(BACKEND_ARG_NAMES)
-    backend_args['odom_integrator_publish_tf'] = odom_integrator_publish_tf
-    backend = include_launch(robot_bringup_launch, launch_arguments=backend_args)
+    # Gateway plane: backend + UI bridge + display.
+    # In systemd mode, rovi-gateway.service owns this and stacks launch with gateway_enabled:=false.
+    gateway = include_launch(
+        gateway_launch,
+        condition=IfCondition(LaunchConfiguration('gateway_enabled')),
+        launch_arguments={
+            'robot_mode': LaunchConfiguration('robot_mode'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'model': LaunchConfiguration('model'),
+            'world': LaunchConfiguration('world'),
+            'gazebo_gui': LaunchConfiguration('gazebo_gui'),
+            'cmd_vel_topic': LaunchConfiguration('cmd_vel_topic'),
+            'odom_integrator_publish_tf': odom_integrator_publish_tf,
+            'ui_bridge_config': LaunchConfiguration('ui_bridge_config'),
+            'ui_bridge_log_level': LaunchConfiguration('ui_bridge_log_level'),
+            'serial_display_config': LaunchConfiguration('serial_display_config'),
+            'serial_display_log_level': LaunchConfiguration('serial_display_log_level'),
+            'serial_display_debug': LaunchConfiguration('serial_display_debug'),
+        },
+    )
 
     # Twist muxing (needed for teleop/mapping/nav; joy can be disabled).
     control_stack = include_launch(
@@ -268,6 +292,7 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         robot_mode,
+        gateway_enabled,
         stack,
         use_sim_time,
         rviz,
@@ -289,7 +314,7 @@ def generate_launch_description() -> LaunchDescription:
         mag_enabled,
         *camera_args,
         odom_mode,
-        backend,
+        gateway,
         control_stack,
         stack_camera,
         stack_mapping,
