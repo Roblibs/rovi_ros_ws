@@ -1,27 +1,6 @@
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
-from pathlib import Path
-
-
-def _ros_home() -> Path:
-    return Path(os.environ.get("ROS_HOME", Path.home() / ".ros")).expanduser()
-
-
-def _current_launch_path() -> Path:
-    return _ros_home() / "rovi" / "session" / "current_launch"
-
-
-def read_current_launch_ref() -> str | None:
-    path = _current_launch_path()
-    if not path.is_file():
-        return None
-    lines = path.read_text(encoding="utf-8").splitlines()
-    if not lines:
-        return None
-    value = lines[0].strip()
-    return value or None
+SESSION_CURRENT_LAUNCH_REF_TOPIC = "/rovi/session/current_launch_ref"
 
 
 def stack_from_launch_ref(launch_ref: str | None) -> str | None:
@@ -52,17 +31,3 @@ def fixed_frame_from_stack(stack: str | None) -> str:
     if key in {"teleop", "offline", "offline_view"}:
         return "odom"
     return "odom"
-
-
-@dataclass(frozen=True)
-class ResolvedSession:
-    current_launch_ref: str | None
-    stack: str | None
-    fixed_frame: str
-
-
-def resolve_session() -> ResolvedSession:
-    current_launch_ref = read_current_launch_ref()
-    stack = stack_from_launch_ref(current_launch_ref)
-    fixed_frame = fixed_frame_from_stack(stack)
-    return ResolvedSession(current_launch_ref=current_launch_ref, stack=stack, fixed_frame=fixed_frame)

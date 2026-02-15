@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import rclpy
+from rclpy.exceptions import ParameterAlreadyDeclaredException
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import CameraInfo
@@ -94,7 +95,11 @@ class CameraInfoPublisher(Node):
         super().__init__("rovi_camera_info_pub")
 
         # Standard ROS param (used implicitly by node clock).
-        self.declare_parameter("use_sim_time", False)
+        # Some ROS setups auto-declare this parameter; avoid crashing if it is already declared.
+        try:
+            self.declare_parameter("use_sim_time", False)
+        except ParameterAlreadyDeclaredException:
+            pass
 
         self.declare_parameter("color_yaml", "")
         self.declare_parameter("depth_yaml", "")

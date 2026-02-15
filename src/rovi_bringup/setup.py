@@ -26,6 +26,7 @@ setup(
 	            'rovi_session = rovi_bringup.cli.session:main',
 	            'rovi_bag = rovi_bringup.cli.bag:main',
 	            'rovi_camera_info_pub = rovi_bringup.camera_info_pub:main',
+	            'rovi_session_state_pub = rovi_bringup.session_state_pub:main',
 	        ],
 	    },
 )

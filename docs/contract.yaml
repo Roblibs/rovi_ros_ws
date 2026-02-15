@@ -1,0 +1,117 @@
+version: 1
+
+# Backend/stack contract for ROVI.
+#
+# This schema is intentionally simple and used by `tools/rovi_contract_test.py`.
+# It is not a general-purpose ROS schema; it’s a project policy file.
+#
+# Notes:
+# - Parity tests are intended for `real` and `sim` (golden rule).
+# - `offline` is optional and can be checked as a lightweight URDF/TF sanity mode.
+
+robot_modes:
+  parity: ["real", "sim"]
+  sanity: ["offline"]
+
+stacks:
+  teleop:
+    required_topics:
+      - {name: "/cmd_vel", type: "geometry_msgs/msg/Twist"}
+      - {name: "/scan", type: "sensor_msgs/msg/LaserScan"}
+      - {name: "/vel_raw", type: "geometry_msgs/msg/Twist"}
+      - {name: "/odom_raw", type: "nav_msgs/msg/Odometry"}
+      - {name: "/robot_description", type: "std_msgs/msg/String"}
+      - {name: "/tf", type: "tf2_msgs/msg/TFMessage"}
+      - {name: "/tf_static", type: "tf2_msgs/msg/TFMessage"}
+    required_topics_by_mode:
+      sim:
+        - {name: "/clock", type: "rosgraph_msgs/msg/Clock"}
+    required_tf:
+      - {parent: "odom", child: "base_footprint"}
+      - {parent: "base_footprint", child: "base_link"}
+      - {parent: "base_link", child: "laser_link"}
+
+  camera:
+    required_topics:
+      - {name: "/cmd_vel", type: "geometry_msgs/msg/Twist"}
+      - {name: "/scan", type: "sensor_msgs/msg/LaserScan"}
+      - {name: "/vel_raw", type: "geometry_msgs/msg/Twist"}
+      - {name: "/odom_raw", type: "nav_msgs/msg/Odometry"}
+      - {name: "/tf", type: "tf2_msgs/msg/TFMessage"}
+      - {name: "/tf_static", type: "tf2_msgs/msg/TFMessage"}
+      - {name: "/camera/color/image", type: "sensor_msgs/msg/Image"}
+      - {name: "/camera/color/camera_info", type: "sensor_msgs/msg/CameraInfo"}
+      - {name: "/camera/depth/image", type: "sensor_msgs/msg/Image"}
+      - {name: "/camera/depth/camera_info", type: "sensor_msgs/msg/CameraInfo"}
+    required_topics_by_mode:
+      sim:
+        - {name: "/clock", type: "rosgraph_msgs/msg/Clock"}
+    required_tf:
+      - {parent: "odom", child: "base_footprint"}
+      - {parent: "base_footprint", child: "base_link"}
+      - {parent: "camera_color_frame", child: "camera_color_optical_frame"}
+      - {parent: "camera_depth_frame", child: "camera_depth_optical_frame"}
+
+  mapping:
+    required_topics:
+      - {name: "/cmd_vel", type: "geometry_msgs/msg/Twist"}
+      - {name: "/scan", type: "sensor_msgs/msg/LaserScan"}
+      - {name: "/vel_raw", type: "geometry_msgs/msg/Twist"}
+      - {name: "/odom_raw", type: "nav_msgs/msg/Odometry"}
+      - {name: "/odometry/filtered", type: "nav_msgs/msg/Odometry"}
+      - {name: "/map", type: "nav_msgs/msg/OccupancyGrid"}
+      - {name: "/tf", type: "tf2_msgs/msg/TFMessage"}
+      - {name: "/tf_static", type: "tf2_msgs/msg/TFMessage"}
+    required_topics_by_mode:
+      sim:
+        - {name: "/clock", type: "rosgraph_msgs/msg/Clock"}
+    required_tf:
+      - {parent: "map", child: "odom"}
+      - {parent: "odom", child: "base_footprint"}
+
+  localization:
+    required_topics:
+      - {name: "/cmd_vel", type: "geometry_msgs/msg/Twist"}
+      - {name: "/scan", type: "sensor_msgs/msg/LaserScan"}
+      - {name: "/vel_raw", type: "geometry_msgs/msg/Twist"}
+      - {name: "/odom_raw", type: "nav_msgs/msg/Odometry"}
+      - {name: "/odometry/filtered", type: "nav_msgs/msg/Odometry"}
+      - {name: "/map", type: "nav_msgs/msg/OccupancyGrid"}
+      - {name: "/tf", type: "tf2_msgs/msg/TFMessage"}
+      - {name: "/tf_static", type: "tf2_msgs/msg/TFMessage"}
+    required_topics_by_mode:
+      sim:
+        - {name: "/clock", type: "rosgraph_msgs/msg/Clock"}
+    required_tf:
+      - {parent: "map", child: "odom"}
+      - {parent: "odom", child: "base_footprint"}
+
+  nav:
+    required_topics:
+      - {name: "/cmd_vel", type: "geometry_msgs/msg/Twist"}
+      - {name: "/cmd_vel_nav", type: "geometry_msgs/msg/Twist"}
+      - {name: "/scan", type: "sensor_msgs/msg/LaserScan"}
+      - {name: "/vel_raw", type: "geometry_msgs/msg/Twist"}
+      - {name: "/odom_raw", type: "nav_msgs/msg/Odometry"}
+      - {name: "/odometry/filtered", type: "nav_msgs/msg/Odometry"}
+      - {name: "/map", type: "nav_msgs/msg/OccupancyGrid"}
+      - {name: "/tf", type: "tf2_msgs/msg/TFMessage"}
+      - {name: "/tf_static", type: "tf2_msgs/msg/TFMessage"}
+    required_topics_by_mode:
+      sim:
+        - {name: "/clock", type: "rosgraph_msgs/msg/Clock"}
+    required_tf:
+      - {parent: "map", child: "odom"}
+      - {parent: "odom", child: "base_footprint"}
+
+offline_sanity:
+  required_topics:
+    - {name: "/robot_description", type: "std_msgs/msg/String"}
+    - {name: "/tf_static", type: "tf2_msgs/msg/TFMessage"}
+  required_tf:
+    - {parent: "odom", child: "base_footprint"}
+    - {parent: "base_footprint", child: "base_link"}
+    - {parent: "base_link", child: "laser_link"}
+    - {parent: "camera_color_frame", child: "camera_color_optical_frame"}
+    - {parent: "camera_depth_frame", child: "camera_depth_optical_frame"}
+

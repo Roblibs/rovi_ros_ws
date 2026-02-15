@@ -3,7 +3,7 @@
 `record` and `play` are lightweight helpers around `ros2 bag`.
 
 - Default bag directory: `~/.ros/rovi/bags/`
-- Current launch is tracked in: `~/.ros/rovi/session/current_launch` (written automatically when running `teleop`, `camera`, `mapping`, `localization`, `nav`)
+- Current launch is published on: `/rovi/session/current_launch_ref` (written automatically when running `teleop`, `camera`, `mapping`, `localization`, `nav`)
 - Topic filters are configured in: `src/rovi_bringup/config/bag_topics.yaml`
 
 `bag_topics.yaml` format: top-level keys are launch *base names* (`teleop`, `nav`, ...), values are the topic list to record.

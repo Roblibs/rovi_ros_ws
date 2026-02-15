@@ -54,3 +54,27 @@ Packaging:
   - `src/rovi_bringup/launch/mapping.launch.py`
   - `src/rovi_bringup/launch/localization.launch.py`
   - `src/rovi_bringup/launch/nav.launch.py`
+
+## Phase 2 implementation (Backend contract schema + tests)
+
+- Added machine-readable contract: `docs/contract.yaml`
+- Added contract test runner (launches stacks and verifies required topics/types + TF edges):
+  - `tools/rovi_contract_test.py`
+  - Default runs `sim` only; use `--robot-mode real` to validate on hardware.
+  - Updated runner to be less noisy and more reliable:
+    - TF checks now scan `/tf` + `/tf_static` edges directly (no tf2 buffer time queries).
+    - Default preset is `--profile quick` (teleop+camera); use `--profile full` for mapping/localization/nav.
+    - Launch logs default to files under `/tmp/rovi_contract_logs` (use `--launch-logs inherit` to stream them).
+
+Additional fixes to satisfy the contract in `sim:camera`:
+- `rovi_camera_info_pub` no longer crashes if `use_sim_time` is already declared: `src/rovi_bringup/rovi_bringup/camera_info_pub.py`.
+- `sim:camera` now publishes TF `odom->base_footprint` via the sim odom bridge (avoid the “teleop-only TF” gap): `src/rovi_bringup/launch/rovi.launch.py`.
+
+## Phase 3 implementation (Session state via ROS topic)
+
+Replaced the hidden file-based coupling (`~/.ros/rovi/session/current_launch`) with an explicit latched topic:
+- Publisher: `rovi_session_state_pub` publishes `std_msgs/msg/String` on `/rovi/session/current_launch_ref` with reliable + transient-local QoS: `src/rovi_bringup/rovi_bringup/session_state_pub.py`.
+- Launch integration: `rovi_bringup/rovi.launch.py` starts the publisher for session stacks and no longer writes any session file: `src/rovi_bringup/launch/rovi.launch.py`.
+- Consumers migrated:
+  - `rovi_bag record` now waits for `/rovi/session/current_launch_ref` instead of reading a file: `src/rovi_bringup/rovi_bringup/cli/bag.py`.
+  - `ros_ui_bridge` now subscribes to `/rovi/session/current_launch_ref` and derives `fixed_frame` from it (no file reads): `src/ros_ui_bridge/ros_ui_bridge/ui_bridge_node.py`, `src/ros_ui_bridge/ros_ui_bridge/robot_state_node.py`, `src/ros_ui_bridge/ros_ui_bridge/session_info.py`.

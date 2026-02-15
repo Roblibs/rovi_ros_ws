@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -50,6 +51,7 @@ class StatusBroadcaster:
         fixed_frame: Optional[str] = None,
     ) -> None:
         self._condition = asyncio.Condition()
+        self._lock = threading.Lock()
         self._seq = 0
         self._latest: Optional[StatusSnapshot] = None
 
@@ -74,6 +76,12 @@ class StatusBroadcaster:
     def fixed_frame(self) -> Optional[str]:
         return self._fixed_frame
 
+    def set_session(self, *, current_launch_ref: Optional[str], stack: Optional[str], fixed_frame: Optional[str]) -> None:
+        with self._lock:
+            self._current_launch_ref = current_launch_ref
+            self._stack = stack
+            self._fixed_frame = fixed_frame
+
     def latest(self) -> Optional[StatusSnapshot]:
         return self._latest
 
@@ -93,13 +101,17 @@ class StatusBroadcaster:
     def build_snapshot(self, *, seq: int, stamp: RosTime, values: list[StatusFieldValue]) -> StatusSnapshot:
         # Update seq tracking for waiters.
         self._seq = seq
+        with self._lock:
+            current_launch_ref = self._current_launch_ref
+            stack = self._stack
+            fixed_frame = self._fixed_frame
         return StatusSnapshot(
             seq=seq,
             stamp=stamp,
             wall_time_unix_ms=int(time.time() * 1000),
             fields=self._fields,
             values=values,
-            current_launch_ref=self._current_launch_ref,
-            stack=self._stack,
-            fixed_frame=self._fixed_frame,
+            current_launch_ref=current_launch_ref,
+            stack=stack,
+            fixed_frame=fixed_frame,
         )

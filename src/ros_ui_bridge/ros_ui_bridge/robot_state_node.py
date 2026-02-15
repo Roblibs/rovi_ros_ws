@@ -8,13 +8,14 @@ from typing import Optional
 
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from rclpy.time import Time
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 from tf2_msgs.msg import TFMessage
 
 from .throttled_forwarder import AsyncStreamBroadcaster, ThrottledForwarder
-from .session_info import resolve_session
+from .session_info import SESSION_CURRENT_LAUNCH_REF_TOPIC, fixed_frame_from_stack, stack_from_launch_ref
 
 
 def _normalize_frame(frame_id: str) -> str:
@@ -146,13 +147,17 @@ class UiBridgeRobotStateNode(Node):
         self._wheel_positions: dict[str, float] = {}
         self._map_to_odom: Optional[_TransformSnapshot] = None
 
-        session = resolve_session()
-        self._fixed_frame = session.fixed_frame
-        self._session_current_launch_ref = session.current_launch_ref
-        self._session_stack = session.stack
-        self.get_logger().info(
-            f"Fixed frame resolved from session: {self._fixed_frame} (stack={self._session_stack or 'unknown'})"
+        self._fixed_frame: str | None = None
+        self._session_current_launch_ref: Optional[str] = None
+        self._session_stack: Optional[str] = None
+
+        session_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
+        self._session_sub = self.create_subscription(String, SESSION_CURRENT_LAUNCH_REF_TOPIC, self._on_session, session_qos)
 
         self._forwarder: ThrottledForwarder[RobotStateData] | None
         if downsampling_period_s is not None and float(downsampling_period_s) > 0:
@@ -194,6 +199,18 @@ class UiBridgeRobotStateNode(Node):
     @property
     def wheel_joint_names(self) -> list[str]:
         return list(self._wheel_joint_names)
+
+    def _on_session(self, msg: String) -> None:
+        ref = str(msg.data or "").strip()
+        if not ref:
+            return
+        stack = stack_from_launch_ref(ref)
+        fixed = fixed_frame_from_stack(stack)
+        with self._lock:
+            self._session_current_launch_ref = ref
+            self._session_stack = stack
+            self._fixed_frame = fixed
+        self.get_logger().info(f"Fixed frame resolved from session: {fixed} (stack={stack or 'unknown'})")
 
     def _on_odom(self, msg: Odometry) -> None:
         """Called on every odom message. Updates state and triggers throttled forward."""
@@ -300,6 +317,10 @@ class UiBridgeRobotStateNode(Node):
             joint_stamp_ns = int(self._joint_stamp_ns)
             map_to_odom = self._map_to_odom
             wheel_positions = dict(self._wheel_positions)
+            fixed_frame = self._fixed_frame
+
+        if not fixed_frame:
+            return None
 
         if odom_pose is None:
             odom_pose = PoseSnapshot(
@@ -316,7 +337,7 @@ class UiBridgeRobotStateNode(Node):
         # Deterministic fixed frame choice is resolved from the launch session.
         # We never publish a mix of odom/map poses in the same stream.
         pose_fixed: Optional[PoseSnapshot]
-        if self._fixed_frame == self._odom_frame or self._fixed_frame == 'odom':
+        if fixed_frame == self._odom_frame or fixed_frame == 'odom':
             pose_fixed = odom_pose
         else:
             pose_fixed = None

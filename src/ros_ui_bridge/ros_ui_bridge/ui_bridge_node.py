@@ -24,9 +24,12 @@ from .robot_state_node import RobotStateData, UiBridgeRobotStateNode
 from .ros_metrics_node import UiBridgeRosNode
 from .status_store import StatusBroadcaster, StatusFieldMeta, StatusFieldValue
 from .throttled_forwarder import AsyncStreamBroadcaster
-from .session_info import resolve_session
+from .session_info import SESSION_CURRENT_LAUNCH_REF_TOPIC, fixed_frame_from_stack, stack_from_launch_ref
 from .conductor.systemd import process_is_running, systemd_is_active
 from .conductor.net import iface_status_text
+
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import String
 
 
 async def _publish_status_loop(
@@ -145,7 +148,6 @@ async def _run_async(
         except NotImplementedError:
             pass
 
-    session = resolve_session()
     fields_meta = [
         StatusFieldMeta(id=f.id, unit=f.unit, value_type=f.value_type, min=f.min, max=f.max, target=f.target)
         for f in cfg.status_stream.fields
@@ -153,10 +155,31 @@ async def _run_async(
     system_fields = [f for f in cfg.status_stream.fields if f.source.provider == 'system']
     status_broadcaster = StatusBroadcaster(
         fields=fields_meta,
-        current_launch_ref=session.current_launch_ref,
-        stack=session.stack,
-        fixed_frame=session.fixed_frame,
+        current_launch_ref=None,
+        stack=None,
+        fixed_frame=None,
     )
+
+    session_qos = QoSProfile(
+        history=HistoryPolicy.KEEP_LAST,
+        depth=1,
+        reliability=ReliabilityPolicy.RELIABLE,
+        durability=DurabilityPolicy.TRANSIENT_LOCAL,
+    )
+
+    def _on_session(msg: String) -> None:
+        ref = str(msg.data or "").strip()
+        if not ref:
+            return
+        stack = stack_from_launch_ref(ref)
+        status_broadcaster.set_session(
+            current_launch_ref=ref,
+            stack=stack,
+            fixed_frame=fixed_frame_from_stack(stack),
+        )
+
+    # Keep the subscription referenced so it stays alive for the executor thread.
+    ros_node._session_sub = ros_node.create_subscription(String, SESSION_CURRENT_LAUNCH_REF_TOPIC, _on_session, session_qos)  # type: ignore[attr-defined]
 
     model_provider = RobotModelProvider(glb_path=cfg.robot_model.glb_path)
 

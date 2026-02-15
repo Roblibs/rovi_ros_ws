@@ -7,12 +7,17 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import String
 
-DEFAULT_LAUNCH_REF = "rovi_bringup/teleop.launch.py"
+SESSION_CURRENT_LAUNCH_REF_TOPIC = "/rovi/session/current_launch_ref"
 
 
 def _ros_home() -> Path:
@@ -23,23 +28,51 @@ def _rovi_dir() -> Path:
     return _ros_home() / "rovi"
 
 
-def _session_current_launch_path() -> Path:
-    return _rovi_dir() / "session" / "current_launch"
-
-
 def _bags_dir() -> Path:
     return _rovi_dir() / "bags"
 
 
-def _read_current_launch_ref() -> str | None:
-    path = _session_current_launch_path()
-    if not path.is_file():
-        return None
-    lines = path.read_text(encoding="utf-8").splitlines()
-    if not lines:
-        return None
-    value = lines[0].strip()
-    return value or None
+class _SessionProbe(Node):
+    def __init__(self) -> None:
+        super().__init__("rovi_bag_session_probe")
+        self.value: str | None = None
+
+        qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(String, SESSION_CURRENT_LAUNCH_REF_TOPIC, self._on_msg, qos)
+
+    def _on_msg(self, msg: String) -> None:
+        value = str(msg.data or "").strip()
+        if value:
+            self.value = value
+
+
+def _wait_current_launch_ref(*, timeout_s: float = 0.0) -> str:
+    timeout_s = float(timeout_s)
+    if timeout_s < 0:
+        raise ValueError("timeout_s must be >= 0")
+
+    rclpy.init(args=None)
+    probe: _SessionProbe | None = None
+    try:
+        probe = _SessionProbe()
+        deadline = None if timeout_s == 0 else (time.monotonic() + timeout_s)
+        while rclpy.ok() and probe.value is None and (deadline is None or time.monotonic() < deadline):
+            rclpy.spin_once(probe, timeout_sec=0.1)
+        if probe.value is None:
+            raise RuntimeError(f"Timed out waiting for session topic: {SESSION_CURRENT_LAUNCH_REF_TOPIC}")
+        return probe.value
+    finally:
+        try:
+            if probe is not None:
+                probe.destroy_node()
+        except Exception:
+            pass
+        rclpy.shutdown()
 
 
 @dataclass(frozen=True)
@@ -168,7 +201,15 @@ def _cmd_record(argv: list[str]) -> int:
     if pass_args and not pass_args[0].startswith("-"):
         selector_arg = pass_args.pop(0)
 
-    launch_ref = selector_arg or _read_current_launch_ref() or DEFAULT_LAUNCH_REF
+    if selector_arg:
+        launch_ref = selector_arg
+    else:
+        try:
+            print(f"[rovi_bag] Waiting for session topic: {SESSION_CURRENT_LAUNCH_REF_TOPIC}", file=sys.stderr)
+            launch_ref = _wait_current_launch_ref(timeout_s=0.0)
+        except Exception as e:
+            print(f"[rovi_bag] {e}", file=sys.stderr)
+            return 2
     selector = _selector_from_ref_or_key(launch_ref)
 
     try:
@@ -328,7 +369,7 @@ Usage:
   rovi_bag play   [<launch_key|bag_dir>]        [ros2 bag play args...]
 
 Zero-arg behavior:
-  record: uses ~/.ros/rovi/session/current_launch (or defaults to teleop)
+  record: waits for /rovi/session/current_launch_ref
   play:   plays the latest bag under ~/.ros/rovi/bags
 """
 

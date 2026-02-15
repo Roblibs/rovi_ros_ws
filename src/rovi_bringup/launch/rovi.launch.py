@@ -13,7 +13,6 @@ Intended usage:
 """
 
 import os
-from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -35,25 +34,25 @@ from rovi_bringup.launch_lib.includes import include_launch
 from rovi_bringup.launch_lib.modes import CONTROL_STACKS, SESSION_STACKS, stack_equals, stack_in
 
 
-def _ros_home() -> Path:
-    return Path(os.environ.get('ROS_HOME', Path.home() / '.ros')).expanduser()
-
-
-def _write_current_launch(context, *args, **kwargs):  # noqa: ANN001
+def _publish_session_state(context, *args, **kwargs):  # noqa: ANN001
     del args, kwargs
-    stack = LaunchConfiguration('stack').perform(context).strip()
+    stack = LaunchConfiguration("stack").perform(context).strip()
+    if stack not in SESSION_STACKS:
+        return []
 
-    # Persist the *stack* launch ref (not rovi.launch.py) so tools can infer intent
-    # (bagging, UI fixed frame policy, etc.). This is deterministic and not TF-dependent.
-    if stack in SESSION_STACKS:
-        launch_ref = f"rovi_bringup/{stack}.launch.py"
-    else:
-        launch_ref = 'rovi_bringup/teleop.launch.py'
-
-    path = _ros_home() / 'rovi' / 'session' / 'current_launch'
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"{launch_ref}\n", encoding='utf-8')
-    return []
+    launch_ref = f"rovi_bringup/{stack}.launch.py"
+    return [
+        Node(
+            package="rovi_bringup",
+            executable="rovi_session_state_pub",
+            name="rovi_session_state_pub",
+            output="screen",
+            parameters=[
+                {"use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)},
+                {"launch_ref": launch_ref},
+            ],
+        )
+    ]
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -202,7 +201,7 @@ def generate_launch_description() -> LaunchDescription:
     odom_integrator_publish_tf = PythonExpression([
         "'true' if '",
         LaunchConfiguration('stack'),
-        "' == 'teleop' else ('true' if '",
+        "' in ['teleop','camera'] else ('true' if '",
         LaunchConfiguration('odom_mode'),
         "' == 'raw' else 'false')",
     ])
@@ -297,7 +296,7 @@ def generate_launch_description() -> LaunchDescription:
         use_sim_time,
         rviz,
         rviz_config,
-        OpaqueFunction(function=_write_current_launch),
+        OpaqueFunction(function=_publish_session_state),
         joy_enabled,
         cmd_vel_topic,
         ui_bridge_config,
