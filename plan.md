@@ -3,7 +3,8 @@
 This file is an index of planning topics. Details live under `docs/plan/`.
 
 ## Camera
-- [Camera preparation (depth → nav)](docs/plan/camera_preparation.md): consolidated phases (contracts → launch refactor → contract tests → session state → hardware readiness → floor-clearance slice).
+- [Camera preparation (depth → nav)](docs/plan/camera_preparation.md): consolidated prep phases (contracts → launch refactor → contract tests → session state → hardware readiness).
+- [Floor clearance from depth](docs/plan/floor_clearance_from_depth.md): depth-only derived metric (kept separate from prep work).
 
 ## Display
 - Resolve startup robustness for UI/display path: `robot_serial_display` initial gRPC connection failure before `ros_ui_bridge` is ready.

@@ -124,7 +124,7 @@ def generate_launch_description() -> LaunchDescription:
             '/rovi/camera/depth/image',
         ],
         remappings=[
-            ('/rovi/camera/color/image', '/camera/color/image_raw'),
+            ('/rovi/camera/color/image', '/camera/color/image'),
             ('/rovi/camera/depth/image', '/camera/depth/image'),
         ],
         parameters=[{'use_sim_time': use_sim_time_param}],

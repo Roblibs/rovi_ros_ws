@@ -1,0 +1,44 @@
+image_width: 640
+image_height: 400
+camera_name: rovi_depth_camera
+
+# Optional verification-only field (ROVI convention).
+# - If empty/missing: no verification is performed.
+# - If set: hard-fail startup if the detected device serial differs.
+device_serial: ""
+
+# NOTE: Placeholder / theoretical calibration.
+# Replace this file with a real calibration from the actual depth camera as soon as available.
+# Keep the format compatible with camera_info_manager.
+
+# Intrinsics (pinhole model, no distortion). These values are a reasonable starting point for sim
+# and for early depth-derived work, but are not authoritative for real hardware.
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [554.2562584220408, 0.0, 319.5, 0.0, 554.2562584220408, 199.5, 0.0, 0.0, 1.0]
+
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [554.2562584220408, 0.0, 319.5, 0.0, 0.0, 554.2562584220408, 199.5, 0.0, 0.0, 0.0, 1.0, 0.0]
+
+binning_x: 0
+binning_y: 0
+roi:
+  x_offset: 0
+  y_offset: 0
+  height: 0
+  width: 0
+  do_rectify: false

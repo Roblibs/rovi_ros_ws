@@ -100,7 +100,7 @@ streams:
         source:
           provider: "ros"
           type: "topic_rate"
-          topic: "/camera/color/image_raw"
+          topic: "/camera/color/image"
           msg_type: "sensor_msgs/msg/Image"
 
       - id: "hz_depth"
@@ -108,7 +108,7 @@ streams:
         source:
           provider: "ros"
           type: "topic_rate"
-          topic: "/camera/depth/image_raw"
+          topic: "/camera/depth/image"
           msg_type: "sensor_msgs/msg/Image"
 
       - id: "hz_slam"

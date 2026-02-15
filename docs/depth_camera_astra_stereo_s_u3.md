@@ -44,7 +44,7 @@ Depth (OpenNI2) under `/camera/depth`:
 - `/camera/depth/camera_info`
 
 Color (UVC) under `/camera/color`:
-- `/camera/color/image_raw`
+- `/camera/color/image`
 - `/camera/color/camera_info`
 
 TF is published by `robot_state_publisher` from `src/rovi_description/urdf/rovi.urdf`:
@@ -127,7 +127,7 @@ cp -f ~/.ros/camera_info/usb_2.0_camera:_usb_camera.yaml \
 
 Simulation publishes camera topics from Gazebo sensors defined in `src/rovi_description/urdf/rovi.urdf` and bridges them via `src/rovi_sim/config/bridge.yaml`:
 
-- Color: `/camera/color/image_raw`
+- Color: `/camera/color/image`
 - Depth: `/camera/depth/image`
 
 To make simulated optics “feel closer” to the real device, tweak the Gazebo sensor settings in the URDF (`horizontal_fov`, `width/height`, `near/far`).

@@ -290,7 +290,8 @@
       <topic>/rovi/camera/color/image</topic>
       <camera>
         <!-- Rough FOV; tweak here if you want closer real-world behavior. -->
-        <horizontal_fov>1.047</horizontal_fov>
+        <!-- Derived from reference RGB calibration (fx) so sim intrinsics + FOV match real. -->
+        <horizontal_fov>1.2711630425505165</horizontal_fov>
         <image>
           <width>640</width>
           <height>480</height>

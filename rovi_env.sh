@@ -158,7 +158,7 @@ calib() {
   ros2 run camera_calibration cameracalibrator \
     --size 8x5 --square 0.028 \
     --ros-args \
-    --remap image:=/camera/color/image_raw \
+    --remap image:=/camera/color/image \
     --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info \
     "$@"
 }

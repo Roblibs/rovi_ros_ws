@@ -1,6 +1,12 @@
 image_width: 640
 image_height: 480
 camera_name: usb_2.0_camera:_usb_camera
+
+# Optional verification-only field (ROVI convention).
+# - If empty/missing: no verification is performed.
+# - If set: hard-fail startup if the detected device serial differs.
+device_serial: ""
+
 camera_matrix:
   rows: 3
   cols: 3

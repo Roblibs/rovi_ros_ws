@@ -47,6 +47,8 @@ def generate_launch_description() -> LaunchDescription:
 
     default_world = os.path.join(sim_share, 'worlds', 'rovi_room.sdf')
     sim_backend_launch = os.path.join(sim_share, 'launch', 'gazebo_sim.launch.py')
+    default_color_info = os.path.join(bringup_share, 'config', 'camera_info', 'color.yaml')
+    default_depth_info = os.path.join(bringup_share, 'config', 'camera_info', 'depth.yaml')
 
     robot_mode_arg = DeclareLaunchArgument(
         'robot_mode',
@@ -68,6 +70,22 @@ def generate_launch_description() -> LaunchDescription:
             "' == 'sim' else 'false'",
         ]),
         description='Use /clock time (auto true for robot_mode=sim).',
+    )
+
+    color_info_arg = DeclareLaunchArgument(
+        'color_camera_info_yaml',
+        default_value=default_color_info,
+        description='Path to camera_info_manager-style YAML for RGB camera model (sim backend publication).',
+    )
+    depth_info_arg = DeclareLaunchArgument(
+        'depth_camera_info_yaml',
+        default_value=default_depth_info,
+        description='Path to camera_info_manager-style YAML for depth camera model (sim backend publication).',
+    )
+    camera_info_period_arg = DeclareLaunchArgument(
+        'camera_info_publish_period_s',
+        default_value='0.0',
+        description='Republish camera_info every N seconds (0 = publish once, transient-local).',
     )
 
     cmd_vel_arg = DeclareLaunchArgument(
@@ -215,6 +233,24 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[{'use_sim_time': use_sim_time_param}],
     )
 
+    sim_camera_info_pub = Node(
+        condition=is_sim,
+        package='rovi_bringup',
+        executable='rovi_camera_info_pub',
+        name='sim_camera_info_pub',
+        output='screen',
+        parameters=[
+            {'use_sim_time': use_sim_time_param},
+            {'color_yaml': LaunchConfiguration('color_camera_info_yaml')},
+            {'depth_yaml': LaunchConfiguration('depth_camera_info_yaml')},
+            {'publish_period_s': ParameterValue(LaunchConfiguration('camera_info_publish_period_s'), value_type=float)},
+            {'color_frame_id': 'camera_color_optical_frame'},
+            {'depth_frame_id': 'camera_depth_optical_frame'},
+            {'color_topic': '/camera/color/camera_info'},
+            {'depth_topic': '/camera/depth/camera_info'},
+        ],
+    )
+
     jsp_gui_node = Node(
         condition=is_offline,
         package='joint_state_publisher_gui',
@@ -341,6 +377,9 @@ def generate_launch_description() -> LaunchDescription:
         robot_mode_arg,
         model_arg,
         use_sim_time_arg,
+        color_info_arg,
+        depth_info_arg,
+        camera_info_period_arg,
         cmd_vel_arg,
         odom_integrator_params_arg,
         odom_integrator_tf_arg,
@@ -359,6 +398,7 @@ def generate_launch_description() -> LaunchDescription:
         *venv_env_actions,
         rsp_node,
         joint_state_pub_sim,
+        sim_camera_info_pub,
         static_odom_tf,
         delayed_jsp_gui,
         odom_integrator_node,
