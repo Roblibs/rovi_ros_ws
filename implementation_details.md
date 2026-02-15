@@ -44,3 +44,13 @@ Packaging:
 - `calib` now remaps to `/camera/color/image`: `rovi_env.sh` and `docs/reference.md`.
 - Updated camera contract notes in `docs/depth_camera_astra_stereo_s_u3.md` to reflect `/camera/color/image`.
 
+## Phase 1 implementation (Flatten stack composition)
+
+- Introduced reusable launch blocks:
+  - State estimation: `src/rovi_bringup/launch/state_estimation.launch.py`
+  - SLAM wiring: `src/rovi_bringup/launch/slam_mode.launch.py`
+  - Perception include slot (empty by default): `src/rovi_bringup/launch/perception.launch.py`
+- Refactored stacks to compose shared blocks (no nested mapping/localization inside nav):
+  - `src/rovi_bringup/launch/mapping.launch.py`
+  - `src/rovi_bringup/launch/localization.launch.py`
+  - `src/rovi_bringup/launch/nav.launch.py`

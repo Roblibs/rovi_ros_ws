@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Navigation stack: slam_toolbox (mapping or localization) + Nav2.
+"""Navigation stack: state estimation + slam_toolbox (mapping or localization) + Nav2.
 
 This launch is backend-agnostic. It assumes the robot backend is already running and provides:
 - /scan
@@ -12,15 +12,15 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration, TextSubstitution
 from rovi_bringup.launch_lib.includes import include_launch
 
 
 def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
-    mapping_launch = os.path.join(bringup_share, 'launch', 'mapping.launch.py')
-    localization_launch = os.path.join(bringup_share, 'launch', 'localization.launch.py')
+    state_estimation_launch = os.path.join(bringup_share, 'launch', 'state_estimation.launch.py')
+    slam_mode_launch = os.path.join(bringup_share, 'launch', 'slam_mode.launch.py')
+    perception_launch = os.path.join(bringup_share, 'launch', 'perception.launch.py')
 
     nav_share = get_package_share_directory('rovi_nav')
     nav_launch = os.path.join(nav_share, 'launch', 'nav.launch.py')
@@ -51,12 +51,8 @@ def generate_launch_description() -> LaunchDescription:
         description='Use /clock time.',
     )
 
-    mapping_selected = IfCondition(PythonExpression(["'", LaunchConfiguration('slam_mode'), "' == 'mapping'"]))
-    localization_selected = IfCondition(PythonExpression(["'", LaunchConfiguration('slam_mode'), "' == 'localization'"]))
-
-    mapping = include_launch(
-        mapping_launch,
-        condition=mapping_selected,
+    state_estimation = include_launch(
+        state_estimation_launch,
         launch_arguments={
             'odom_mode': LaunchConfiguration('odom_mode'),
             'mag_enabled': LaunchConfiguration('mag_enabled'),
@@ -64,19 +60,25 @@ def generate_launch_description() -> LaunchDescription:
         },
     )
 
-    localization = include_launch(
-        localization_launch,
-        condition=localization_selected,
+    slam = include_launch(
+        slam_mode_launch,
         launch_arguments={
-            'odom_mode': LaunchConfiguration('odom_mode'),
-            'mag_enabled': LaunchConfiguration('mag_enabled'),
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'slam_enabled': TextSubstitution(text='true'),
+            'slam_mode': LaunchConfiguration('slam_mode'),
             'map_file_name': LaunchConfiguration('map_file_name'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
         },
     )
 
     nav2 = include_launch(
         nav_launch,
+        launch_arguments={
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        },
+    )
+
+    perception = include_launch(
+        perception_launch,
         launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
         },
@@ -88,7 +90,8 @@ def generate_launch_description() -> LaunchDescription:
         odom_mode,
         mag_enabled,
         use_sim_time,
-        mapping,
-        localization,
+        state_estimation,
+        slam,
         nav2,
+        perception,
     ])

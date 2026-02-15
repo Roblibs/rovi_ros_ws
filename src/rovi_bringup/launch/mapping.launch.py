@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mapping stack: localization (EKF) + slam_toolbox in mapping mode.
+"""Mapping stack: state estimation + slam_toolbox in mapping mode.
 
 This launch is backend-agnostic. It assumes the robot backend is already running and provides:
 - /scan
@@ -17,11 +17,10 @@ from rovi_bringup.launch_lib.includes import include_launch
 
 
 def generate_launch_description() -> LaunchDescription:
-    loc_share = get_package_share_directory('rovi_localization')
-    ekf_launch = os.path.join(loc_share, 'launch', 'ekf.launch.py')
-
-    slam_share = get_package_share_directory('rovi_slam')
-    slam_launch = os.path.join(slam_share, 'launch', 'slam_toolbox.launch.py')
+    bringup_share = get_package_share_directory('rovi_bringup')
+    state_estimation_launch = os.path.join(bringup_share, 'launch', 'state_estimation.launch.py')
+    slam_mode_launch = os.path.join(bringup_share, 'launch', 'slam_mode.launch.py')
+    perception_launch = os.path.join(bringup_share, 'launch', 'perception.launch.py')
 
     slam_enabled = DeclareLaunchArgument(
         'slam_enabled',
@@ -44,8 +43,8 @@ def generate_launch_description() -> LaunchDescription:
         description='Use /clock time.',
     )
 
-    localization = include_launch(
-        ekf_launch,
+    state_estimation = include_launch(
+        state_estimation_launch,
         launch_arguments={
             'odom_mode': LaunchConfiguration('odom_mode'),
             'mag_enabled': LaunchConfiguration('mag_enabled'),
@@ -54,10 +53,17 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     slam = include_launch(
-        slam_launch,
+        slam_mode_launch,
         launch_arguments={
             'slam_enabled': LaunchConfiguration('slam_enabled'),
             'slam_mode': TextSubstitution(text='mapping'),
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        },
+    )
+
+    perception = include_launch(
+        perception_launch,
+        launch_arguments={
             'use_sim_time': LaunchConfiguration('use_sim_time'),
         },
     )
@@ -67,6 +73,7 @@ def generate_launch_description() -> LaunchDescription:
         odom_mode,
         mag_enabled,
         use_sim_time,
-        localization,
+        state_estimation,
         slam,
+        perception,
     ])
