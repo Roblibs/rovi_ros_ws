@@ -4,7 +4,8 @@ This file is an index of planning topics. Details live under `docs/plan/`.
 
 ## Camera
 - [Camera hardware robustness](docs/plan/camera_hardware_robustness.md): bring-up reliability improvements once real camera hardware is in hand.
-- [Floor clearance from depth](docs/plan/floor_clearance_from_depth.md): depth-only derived metric (kept separate from camera bringup work).
+- [Floor diff from depth](docs/plan/floor_diff_from_depth.md): calibrate a per-cell floor LUT and publish `/floor/*` bins/mask (+ optional lasso markers).
+- [Nav2 costmap from `/floor/*`](docs/plan/floor_nav2_costmap_layer.md): custom `nav2_costmap_2d` layer that projects `/floor/mask` into the local costmap.
 
 ## Display
 - Resolve startup robustness for UI/display path: `robot_serial_display` initial gRPC connection failure before `ros_ui_bridge` is ready.
