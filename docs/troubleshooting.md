@@ -89,7 +89,8 @@ Symptom (example):
 
 What to do:
 - Ensure the workspace venv is present and synced: `uv sync`
-- Ensure the node is launched with the venv active (so `$VIRTUAL_ENV` is set), or export it explicitly for non-interactive contexts (e.g. systemd):
+- Ensure `ROVI_ROS_WS_DIR` points at the workspace root (so bringup can find `ROVI_ROS_WS_DIR/.venv` for `robot_mode:=real`).
+- If you are launching a node directly (outside bringup), you may still need to activate the venv or set `PYTHONPATH`/`VIRTUAL_ENV` for that process (e.g. systemd):
   ```bash
   export VIRTUAL_ENV="$HOME/dev/rovi_ros_ws/.venv"
   ```

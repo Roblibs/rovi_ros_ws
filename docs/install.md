@@ -18,8 +18,9 @@ build
 If you want to run `robot_mode:=real` using the workspace venv deps:
 ```bash
 uv sync
-ws_venv
 ```
+
+You do not need to manually activate the venv for normal `robot_mode:=real` launches; bringup will pick up `ROVI_ROS_WS_DIR/.venv` automatically when present.
 
 ## Robot services (systemd)
 

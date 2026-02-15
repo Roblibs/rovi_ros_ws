@@ -158,26 +158,9 @@ activate() {
   source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
 }
 
-ensure_venv() {
-  if [ ! -f "${ROVI_ROS_WS_DIR}/.venv/bin/activate" ]; then
-    echo "[rovi_env] Missing ${ROVI_ROS_WS_DIR}/.venv/bin/activate (run: uv sync)" >&2
-    return 1
-  fi
-  if [ "${VIRTUAL_ENV:-}" != "${ROVI_ROS_WS_DIR}/.venv" ]; then
-    # shellcheck disable=SC1091
-    source "${ROVI_ROS_WS_DIR}/.venv/bin/activate"
-  fi
-}
-
 ws() {
   cd "${ROVI_ROS_WS_DIR}" || return
   setup
-}
-
-ws_venv() {
-  cd "${ROVI_ROS_WS_DIR}" || return
-  setup
-  ensure_venv
 }
 
 record() {
