@@ -11,6 +11,18 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import CameraInfo
 
 
+def _safe_shutdown() -> None:
+    try:
+        try_shutdown = getattr(rclpy, "try_shutdown", None)
+        if callable(try_shutdown):
+            try_shutdown()
+            return
+        if rclpy.ok():
+            rclpy.shutdown()
+    except Exception:
+        pass
+
+
 def _require_key(data: dict[str, Any], key: str) -> Any:
     if key not in data:
         raise KeyError(f"missing key '{key}'")
@@ -156,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
         node = CameraInfoPublisher()
     except Exception as e:
         print(f"[rovi_camera_info_pub] {e}", file=sys.stderr)
-        rclpy.shutdown()
+        _safe_shutdown()
         return 2
     try:
         rclpy.spin(node)
@@ -164,5 +176,5 @@ def main(argv: list[str] | None = None) -> int:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        _safe_shutdown()
     return 0

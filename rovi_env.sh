@@ -26,6 +26,40 @@ export ROS_DOMAIN_ID=0
 export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
 unset ROS_LOCALHOST_ONLY
 
+_rovi_filter_prefix_paths() {
+  # When `install/` is deleted (e.g. after `clean`) but the current shell still
+  # has the overlay in AMENT_PREFIX_PATH/CMAKE_PREFIX_PATH, `colcon` will warn
+  # about non-existent prefix entries. Filter them out to keep the environment
+  # consistent with what's on disk.
+  local install_prefix="${ROVI_ROS_WS_DIR}/install"
+
+  _filter_colon_var() {
+    local var_name="$1"
+    local value="${!var_name:-}"
+    [ -z "${value}" ] && return 0
+
+    local -a parts=()
+    local out=""
+    IFS=':' read -r -a parts <<<"${value}"
+    for p in "${parts[@]}"; do
+      [ -z "${p}" ] && continue
+      case "${p}" in
+        "${install_prefix}"|${install_prefix}/*) continue ;;
+      esac
+      if [ -z "${out}" ]; then
+        out="${p}"
+      else
+        out="${out}:${p}"
+      fi
+    done
+    export "${var_name}=${out}"
+  }
+
+  _filter_colon_var AMENT_PREFIX_PATH
+  _filter_colon_var CMAKE_PREFIX_PATH
+  _filter_colon_var COLCON_PREFIX_PATH
+}
+
 rovi_dds_default() {
   unset RMW_IMPLEMENTATION
   unset CYCLONEDDS_URI
@@ -46,6 +80,7 @@ rovi_dds_default
 
 clean() {
   rm -rf "${ROVI_ROS_WS_DIR}/build" "${ROVI_ROS_WS_DIR}/install" "${ROVI_ROS_WS_DIR}/log"
+  _rovi_filter_prefix_paths
 }
 
 rovi_stop() {
@@ -77,6 +112,8 @@ build() {
   # Runtime can still use the venv (e.g. for Python deps), but build must be
   # stable against venv package drift.
   (
+    _rovi_filter_prefix_paths
+
     _remove_path_entry() {
       local entry="$1"
       local wrapped=":${PATH}:"
