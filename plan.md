@@ -3,7 +3,7 @@
 This file is an index of planning topics. Details live under `docs/plan/`.
 
 ## Camera
-- [Camera stack](docs/plan/camera.md): calibration policy, deterministic device mapping, baseline warnings, and startup robustness for UI/display.
+- [Camera preparation (depth → nav)](docs/plan/camera_preparation.md): consolidated phases (contracts → launch refactor → contract tests → session state → hardware readiness → floor-clearance slice).
 
 ## Display
 - Resolve startup robustness for UI/display path: `robot_serial_display` initial gRPC connection failure before `ros_ui_bridge` is ready.
@@ -19,7 +19,4 @@ This file is an index of planning topics. Details live under `docs/plan/`.
 - [Rosbag profile hardening](docs/plan/improvements/rosbag_profiles.md): validate stack/profile mappings.
 
 ## Refactors
-- [Explicit runtime session state](docs/plan/refactors/session_state.md): replace file-based session coupling.
-- [Flatten stack composition](docs/plan/refactors/flatten_stack_composition.md): shared launch blocks for mapping/localization/nav.
-- [Backend contract schema + tests](docs/plan/refactors/backend_contract_tests.md): enforce real|sim|offline parity.
 - [Split UI bridge planes](docs/plan/refactors/ui_bridge_planes.md): separate data-plane from transport-plane.
