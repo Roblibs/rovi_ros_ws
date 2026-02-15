@@ -4,16 +4,21 @@
 
 * Install uv (Python package and venv manager):
 
-uv needed by the robot for control board python dependencies
+uv is only needed if you rely on workspace `.venv` Python deps (typically `robot_mode:=real` / robot-only drivers).
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 * Recommended: clone this repo under `~/dev/rovi_ros_ws` (robot: `wass` user). The robot systemd units currently hardcode `/home/wass/dev/rovi_ros_ws`; if you move the workspace, update the unit files under `services/` before installing.
-* set `ROVI_ROS_WS_DIR` + source `rovi_env.sh` (see [Config in ~/.bashrc](#config-in-bashrc)), then build (uses system ROS colcon; `.venv` remains active for Python deps):
+* set `ROVI_ROS_WS_DIR` + source `rovi_env.sh` (see [Config in ~/.bashrc](#config-in-bashrc)), then build (uses system ROS colcon):
 ```bash
-uv sync
 ws
 build
+```
+
+If you want to run `robot_mode:=real` using the workspace venv deps:
+```bash
+uv sync
+ws_venv
 ```
 
 ## Robot services (systemd)

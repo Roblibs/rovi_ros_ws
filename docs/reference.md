@@ -11,8 +11,9 @@ All commands in this section are provided by `rovi_env.sh`
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
-| `ws` | Changes to `$ROVI_ROS_WS_DIR`, runs `setup`, and activates `.venv`. |
-| `build` | Runs system `colcon build` (ROS Jazzy toolchain), while keeping the workspace `.venv` active for Python deps. This generates/updates the `install/` overlay used by `ros2 launch`. |
+| `ws` | Changes to `$ROVI_ROS_WS_DIR` and runs `setup` (no venv activation). |
+| `ws_venv` | Like `ws`, but also activates `rovi_ros_ws/.venv` (created by `uv sync`). Intended for robot-only Python deps. |
+| `build` | Runs system `colcon build` (ROS Jazzy toolchain) using `/usr/bin/python3`. This generates/updates the `install/` overlay used by `ros2 launch`. |
 | `stop` | Stops ROS/Gazebo/RViz processes that belong to this workspace (use `stop --all` for an aggressive full user hard-stop). |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack and Python nodes. |

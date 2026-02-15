@@ -6,7 +6,10 @@
 - Current launch is published on: `/rovi/session/current_launch_ref` (written automatically when running `teleop`, `camera`, `mapping`, `localization`, `nav`)
 - Topic filters are configured in: `src/rovi_bringup/config/bag_topics.yaml`
 
-`bag_topics.yaml` format: top-level keys are launch *base names* (`teleop`, `nav`, ...), values are the topic list to record.
+`bag_topics.yaml` format: top-level keys are launch *base names* (`teleop`, `nav`, ...).
+
+- If the value is a list: it is the full topic list to record (legacy override).
+- If the value is a mapping: `add`/`drop` are applied as deltas on top of `docs/contract.yaml` required topics for that stack.
 
 Examples:
 

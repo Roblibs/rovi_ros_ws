@@ -10,11 +10,11 @@ Symptom (example):
 - `rosidl_generator_type_description ... ModuleNotFoundError: No module named 'lark'`
 
 Cause:
-- Some ROS interface generators run under the workspace Python (`.venv`) during `colcon build`.
+- Your system Python is missing a runtime dependency required by ROS interface generators.
 
 Fix:
 ```bash
-uv sync
+sudo apt install python3-lark
 ```
 
 Then re-run the build (or your `build` helper).

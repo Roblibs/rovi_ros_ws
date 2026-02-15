@@ -172,6 +172,11 @@ ensure_venv() {
 ws() {
   cd "${ROVI_ROS_WS_DIR}" || return
   setup
+}
+
+ws_venv() {
+  cd "${ROVI_ROS_WS_DIR}" || return
+  setup
   ensure_venv
 }
 
