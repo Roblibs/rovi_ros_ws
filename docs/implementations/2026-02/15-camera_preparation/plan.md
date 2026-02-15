@@ -187,7 +187,7 @@ Moved from `docs/plan/refactors/backend_contract_tests.md`.
 Contract parity (`/cmd_vel`, key feedback topics, TF chain) is policy-driven but not enforced automatically.
 
 ### Rework
-Define machine-readable contract (`docs/contract.yaml` or equivalent) and add parity tests for `real|sim|offline` launch outputs.
+Define machine-readable contract (`docs/contract.yaml` or equivalent) and add observer checks for `real|sim` session stacks.
 
 ### Independent scope
 - New contract file
@@ -210,10 +210,10 @@ Acceptance criteria:
 Moved from `docs/plan/refactors/session_state.md`.
 
 ### Problem
-Session data is persisted via `~/.ros/rovi/session/current_launch` and consumed by multiple components.
+Session data is consumed by multiple components, and was historically persisted via `~/.ros/rovi/session/current_launch` (hidden global state).
 
 ### Rework
-Publish session info on a ROS topic (latched) or a tiny service (`/rovi/session_info`) and keep file fallback for compatibility.
+Publish session info on a ROS topic (latched) or a tiny service (`/rovi/session_info`) and remove file-based coupling.
 
 ### Independent scope
 - `src/rovi_bringup/rovi_bringup/cli/session.py`
@@ -229,7 +229,7 @@ Why this matters for “nav + depth”:
 - You’ll likely add new stacks/variants (e.g. `nav_depth`) and want UI/bagging to follow deterministically without relying on a global file convention.
 
 Acceptance criteria:
-- UI fixed-frame and bagging selection can resolve session state without reading a file (file remains as fallback only).
+- UI fixed-frame and bagging selection can resolve session state without reading a file.
 
 ---
 
@@ -237,25 +237,7 @@ Acceptance criteria:
 
 Moved from `docs/plan/camera.md`.
 
-### Calibration
-- calibration file has no specific camera id, serial usage to be clarified.
-
-### USB enumeration
-- Keep RGB pinned to stable `/dev/v4l/by-id/...`.
-- Pin depth to stable device identifier where supported; otherwise document bus-path risk and validate runtime selection.
-
-### Controls & config
-- on sttartup control 10092545 is failing with an error
-- list all needed controls and evaluate their usage
-- check if any configuration needed for performance optimization
-
-Acceptance criteria:
-- Deterministic device selection is documented and validated.
-- Startup control failures are either fixed or explicitly gated/ignored with rationale.
-
-Open points to resolve during Phase 4:
-- OP3: What is the authoritative identity for depth camera selection (serial, URI, bus path)?
-- OP4: Where do calibration artifacts live, and how are they selected per device?
+Moved to `docs/plan/camera_hardware_robustness.md`.
 
 ---
 
@@ -271,7 +253,7 @@ Call 3 (contract enforcement):
 - Implement Phase 2 contract schema + tests, including camera contract items.
 
 Call 4 (runtime coupling cleanup):
-- Implement Phase 3 session state interface (topic/service) with file fallback.
+- Implement Phase 3 session state interface (topic/service) and remove the file.
 
 Call 5 (hardware robustness):
-- Implement Phase 4 camera determinism + controls cleanup.
+- Implement Phase 4 camera determinism + controls cleanup (see `docs/plan/camera_hardware_robustness.md`).

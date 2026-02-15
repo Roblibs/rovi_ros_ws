@@ -9,7 +9,7 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 | Capability | gRPC RPC | Notes |
 | --- | --- | --- |
 | Status fields (values + Hz) with metadata | `GetStatus` (single) / `StreamStatus` | Fields carry unit/min/max/target from config. Stream omits metadata and is event-driven (no empty spam). |
-| Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Emits a single fixed-frame `pose` chosen by the bridge from the current launch session (teleop=odom, mapping/localization/nav=map). |
+| Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Emits a single fixed-frame `pose` chosen by the bridge from the current launch session (teleop=odom, mapping/localization/nav=map), provided via `/rovi/session/current_launch_ref`. |
 | Downsampled lidar scans for 3D visualization | `StreamLidar` | Low-rate (2 Hz default) LaserScan stream; optional. |
 | Occupancy grid map (`/map`) as an encoded image | `StreamMap` | Grayscale PNG stream (0=occupied, 255=free, 127=unknown); optional. |
 | Robot model metadata (cache key / sha256, size) | `GetRobotModelMeta` | Use this as an ETag-like key to decide whether to refresh cached assets. |

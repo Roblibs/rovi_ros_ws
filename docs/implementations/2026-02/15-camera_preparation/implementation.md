@@ -60,11 +60,9 @@ Packaging:
 - Added machine-readable contract: `docs/contract.yaml`
 - Added contract test runner (launches stacks and verifies required topics/types + TF edges):
   - `tools/rovi_contract_test.py`
-  - Default runs `sim` only; use `--robot-mode real` to validate on hardware.
-  - Updated runner to be less noisy and more reliable:
-    - TF checks now scan `/tf` + `/tf_static` edges directly (no tf2 buffer time queries).
-    - Default preset is `--profile quick` (teleop+camera); use `--profile full` for mapping/localization/nav.
-    - Launch logs default to files under `/tmp/rovi_contract_logs` (use `--launch-logs inherit` to stream them).
+  - Updated runner to observer-only:
+    - Waits for `/rovi/session/current_launch_ref` and checks the current stack passively (does not launch anything).
+    - TF checks scan `/tf` + `/tf_static` edges directly (no tf2 buffer time queries).
 
 Additional fixes to satisfy the contract in `sim:camera`:
 - `rovi_camera_info_pub` no longer crashes if `use_sim_time` is already declared: `src/rovi_bringup/rovi_bringup/camera_info_pub.py`.
