@@ -179,13 +179,29 @@ camera() {
   ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=camera rviz:=false "$@"
 }
 
-calib() {
+calib_color() {
   ros2 run camera_calibration cameracalibrator \
     --size 8x5 --square 0.028 \
     --ros-args \
     --remap image:=/camera/color/image \
     --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info \
     "$@"
+}
+
+calib_floor() {
+  local local_launch="${ROVI_ROS_WS_DIR}/src/rovi_bringup/launch/floor_calibrate.launch.py"
+  if [ -f "${local_launch}" ]; then
+    ros2 launch rovi_bringup floor_calibrate.launch.py "$@"
+    return
+  fi
+  echo "[rovi_env] Floor calibration launch not found (${local_launch})." >&2
+  echo "[rovi_env] Implement floor_calibrate.launch.py (see docs/plan/floor_diff_from_depth.md) and rebuild." >&2
+  return 1
+}
+
+calib() {
+  echo "[rovi_env] 'calib' is deprecated; use 'calib_color'." >&2
+  calib_color "$@"
 }
 
 keyboard() {

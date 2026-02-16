@@ -20,8 +20,9 @@ polkit.addRule(function(action, subject) {
     return polkit.Result.NOT_HANDLED;
   }
 
-  // Allow only stack units: rovi-<stack>.service, explicitly deny rovi-gateway.service
-  if (unit == "rovi-gateway.service") {
+  // Allow only stack units: rovi-<stack>.service.
+  // Explicitly deny operator control for gateway and non-serviceable stacks.
+  if (unit == "rovi-gateway.service" || unit == "rovi-camera.service" || unit == "rovi-localization.service") {
     return polkit.Result.NOT_HANDLED;
   }
   if (unit.indexOf("rovi-") === 0 && unit.indexOf(".service") === unit.length - 8) {
@@ -30,4 +31,3 @@ polkit.addRule(function(action, subject) {
 
   return polkit.Result.NOT_HANDLED;
 });
-

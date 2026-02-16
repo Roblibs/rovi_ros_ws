@@ -2,6 +2,10 @@
 
 Goal: integrate the depth-derived floor/obstacle outputs into Nav2 without any “fake LiDAR” conversion.
 
+Baseline policy:
+- `stack:=nav` remains LiDAR-first (`/scan`) and must work without any depth/floor data.
+- Depth/floor is an *augmentation*: when `/floor/mask` is available it can add near-field safety; when it is missing, Nav2 should continue normally.
+
 ## Preferred approach (recommended)
 
 Implement a custom `nav2_costmap_2d` plugin layer that:
@@ -23,6 +27,17 @@ Option A (no new topics):
 
 Option B (optional optimization; only if needed):
 - Add a dedicated, already-decimated obstacle sampling output from the floor node (format TBD) so the costmap layer does not need to touch full-res depth at costmap tick rate.
+
+## Graceful behavior (depth optional)
+
+The layer should be robust when floor is missing or calibration is not present:
+
+- `floor_enabled:=false`:
+  - Force-disable the layer even if `/floor/mask` exists (A/B testing).
+- `floor_enabled:=true`:
+  - If `/floor/mask` is available and fresh, apply it.
+  - If `/floor/mask` is missing/stale, do nothing (Nav2 continues LiDAR-only).
+  - Only print warnings when `floor_warn_if_unavailable:=true` (rate-limited).
 
 ## Coordinate policy
 

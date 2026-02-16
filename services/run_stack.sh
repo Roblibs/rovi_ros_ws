@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
-  echo "Usage: run_stack.sh <teleop|mapping|localization|nav|camera> [extra ros2 launch args...]" >&2
+  echo "Usage: run_stack.sh <teleop|mapping|nav> [extra ros2 launch args...]" >&2
   exit 2
 fi
 
@@ -18,7 +18,7 @@ source_ros
 source_ws
 
 case "${STACK}" in
-  teleop|mapping|localization|nav|camera) ;;
+  teleop|mapping|nav) ;;
   *)
     die "Unknown stack: ${STACK}"
     ;;

@@ -106,7 +106,7 @@ UVC cameras typically do not provide usable intrinsics automatically. Calibrate 
 Recommended tool (provided by `rovi_env.sh`):
 ```bash
 camera
-calib
+calib_color
 ```
 
 In the calibrator UI:

@@ -1,3 +1,17 @@
+# Systemd services
+
+Robot-only systemd units live under `services/`. Policy: keep a single always-on baseline, and run stacks as on-demand units.
+
+| Unit | What it runs |
+|---|---|
+| `rovi-gateway.service` | Always-on gateway plane (robot backend + UI bridge + display). |
+| `rovi-teleop.service` | Teleop stack (requires `rovi-gateway.service`). |
+| `rovi-mapping.service` | Mapping stack (requires `rovi-gateway.service`). |
+| `rovi-nav.service` | Nav stack (requires `rovi-gateway.service`). |
+
+Notes:
+- Calibration launches (e.g. camera or floor calibration) should be run on-demand and are not intended to be permanent services.
+
 # Commands
 All commands in this section are provided by `rovi_env.sh`
 
@@ -7,7 +21,8 @@ All commands in this section are provided by `rovi_env.sh`
 | `view` | PC visualization: `view` (default `nav`) or `view teleop|camera|mapping|nav`. Use `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `camera` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=camera` (teleop + depth + RGB; headless; no RViz). |
-| `calib` | Runs camera intrinsics calibration (GUI): `ros2 run camera_calibration cameracalibrator --size 8x5 --square 0.028 --ros-args --remap image:=/camera/color/image --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info`. |
+| `calib_color` | Runs camera intrinsics calibration (GUI): `ros2 run camera_calibration cameracalibrator --size 8x5 --square 0.028 --ros-args --remap image:=/camera/color/image --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info`. |
+| `calib_floor` | Runs floor LUT calibration (writes `~/.ros/rovi/floor/*.png`). |
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |

@@ -19,9 +19,7 @@ install -d /etc/systemd/system
 install -m 0644 "${SCRIPT_DIR}/rovi-gateway.service" /etc/systemd/system/rovi-gateway.service
 install -m 0644 "${SCRIPT_DIR}/rovi-teleop.service" /etc/systemd/system/rovi-teleop.service
 install -m 0644 "${SCRIPT_DIR}/rovi-mapping.service" /etc/systemd/system/rovi-mapping.service
-install -m 0644 "${SCRIPT_DIR}/rovi-localization.service" /etc/systemd/system/rovi-localization.service
 install -m 0644 "${SCRIPT_DIR}/rovi-nav.service" /etc/systemd/system/rovi-nav.service
-install -m 0644 "${SCRIPT_DIR}/rovi-camera.service" /etc/systemd/system/rovi-camera.service
 
 install -d /etc/polkit-1/rules.d
 install -m 0644 "${SCRIPT_DIR}/polkit/10-rovi-stack.rules" /etc/polkit-1/rules.d/10-rovi-stack.rules

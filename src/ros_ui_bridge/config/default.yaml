@@ -4,7 +4,7 @@ grpc:
 control:
   enabled: false
   unit_prefix: "rovi-"
-  allowed_stacks: ["teleop", "mapping", "localization", "nav", "camera"]
+  allowed_stacks: ["teleop", "mapping", "nav"]
 
 ros:
   tf_demux:
@@ -45,17 +45,9 @@ streams:
         type: "text"
         source: { provider: "system", type: "service", service: "rovi-mapping" }
 
-      - id: "svc_localization"
-        type: "text"
-        source: { provider: "system", type: "service", service: "rovi-localization" }
-
       - id: "svc_nav"
         type: "text"
         source: { provider: "system", type: "service", service: "rovi-nav" }
-
-      - id: "svc_camera"
-        type: "text"
-        source: { provider: "system", type: "service", service: "rovi-camera" }
 
       - id: "voltage"
         unit: "V"

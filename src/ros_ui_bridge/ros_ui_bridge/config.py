@@ -229,7 +229,7 @@ def _parse_control(control: dict[str, Any]) -> ControlConfig:
     enabled = bool(control.get('enabled', False))
     unit_prefix = str(control.get('unit_prefix', 'rovi-')).strip() or 'rovi-'
 
-    allowed = control.get('allowed_stacks', ['teleop', 'mapping', 'localization', 'nav', 'camera'])
+    allowed = control.get('allowed_stacks', ['teleop', 'mapping', 'nav'])
     if allowed is None:
         allowed = []
     if not isinstance(allowed, list):
@@ -238,6 +238,8 @@ def _parse_control(control: dict[str, Any]) -> ControlConfig:
     allowed_stacks = [str(s).strip().lower() for s in allowed if str(s).strip()]
     # Never allow controlling the gateway via this path.
     allowed_stacks = [s for s in allowed_stacks if s not in {'gateway', 'core'}]
+    # Policy: do not allow controlling these via the stack control API.
+    allowed_stacks = [s for s in allowed_stacks if s not in {'camera', 'localization'}]
 
     return ControlConfig(enabled=enabled, allowed_stacks=allowed_stacks, unit_prefix=unit_prefix)
 
