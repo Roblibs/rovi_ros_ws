@@ -18,7 +18,7 @@ Driving semantics:
   - `/camera/depth/image`
   - `/camera/depth/camera_info`
   - frame: `camera_depth_optical_frame`
-- Composition slot: `src/rovi_bringup/launch/perception.launch.py`
+- Composition slot: `src/rovi_bringup/launch/perception.launch.py` (included by `mapping|localization|nav`)
 
 Related plan (tracked separately):
 - Nav2 integration (custom layer): `docs/plan/floor_nav2_costmap_layer.md`
@@ -27,23 +27,42 @@ Non-goals:
 - No RGB-D registration.
 - No `PointCloud2` / `LaserScan` emulation.
 
+## Stack wiring policy (camera is optional in “important stacks”)
+
+Camera drivers are currently owned by the debug/test stack `stack:=camera` (`src/rovi_bringup/launch/camera.launch.py`).
+
+For the important stacks (`mapping|localization|nav`), camera usage is added as an **option**:
+
+- New launch arg: `camera_enabled` (bool)
+  - Default: `true` (can be set `false` on robots without a depth camera).
+  - When `false`: do not start camera drivers and do not start floor perception nodes.
+  - When `true`: try to start camera drivers and floor nodes; failures must **degrade gracefully** (log errors, but the stack continues running).
+- New launch arg: `camera_topology_enabled` (bool)
+  - Controls the floor node’s topology/contour work (visualization-only).
+  - Default `false` (heavier + requires TF + camera_info).
+
+Notes:
+- Nav2 costmaps exist only in `stack:=nav` (Nav2). `stack:=localization` is SLAM-toolbox localization and does not run Nav2, so it does not have a costmap.
+- Even when `camera_enabled:=true`, the stack must continue working LiDAR-first when the camera is missing/unavailable.
+
 ## Calibration is explicit (own launch; not on startup)
 
 Calibration is only needed when the camera mount changes or the LUT is known-stale.
 
 - Normal bringup runs runtime only.
 - Calibration runs via its own launch (suitable for oneshot systemd services / remote launch switching).
+  - Depth intrinsics are taken from `/camera/depth/camera_info` “as-is” (no attempt to judge whether they are theoretical or hardware-derived).
 
 ## ROS interface (runtime)
 
 ### Inputs
 
 - `/camera/depth/image` (`sensor_msgs/Image`)
-  - expected `header.frame_id = camera_depth_optical_frame`
+  - expected `header.frame_id = camera_depth_optical_frame` (real + sim target parity)
   - use `header.stamp` (works with `use_sim_time`)
   - accept common encodings (e.g. `32FC1` meters) and convert to mm internally
-- `/camera/depth/camera_info` (`sensor_msgs/CameraInfo`) (required only when `enable_topology:=true`)
-- TF at the depth image timestamp (required only when `enable_topology:=true`):
+- `/camera/depth/camera_info` (`sensor_msgs/CameraInfo`) (required only when `camera_topology_enabled:=true`)
+- TF at the depth image timestamp (required only when `camera_topology_enabled:=true`):
   - `camera_depth_optical_frame` → `base_footprint`
 
 ### Outputs
@@ -51,14 +70,16 @@ Calibration is only needed when the camera mount changes or the LUT is known-sta
 - `/floor/mask` (`sensor_msgs/Image`, `mono8`)
   - `255 = floor (safe)`
   - `0 = not floor (unsafe)` (obstacles + void/cliff + unknown)
-- `/floor/topology` (`visualization_msgs/MarkerArray`) (only when `enable_topology:=true`)
+- `/floor/topology` (`visualization_msgs/MarkerArray`) (only when `camera_topology_enabled:=true`)
   - visualization-only: cleaned contour “lasso” in `base_footprint`
 
-## Launch arg (single)
+## Launch args (runtime node)
 
-- `enable_topology` (bool, default `false`)
+- `camera_topology_enabled` (bool, default `false`)
   - `false`: publish only `/floor/mask`
   - `true`: additionally run topology + publish `/floor/topology`
+
+The perception block itself is enabled by the stack-level `camera_enabled` arg (see above).
 
 ## LUT artifacts (bitmaps, not YAML arrays)
 
@@ -78,7 +99,7 @@ Use 16-bit PNG (`uint16`, mm), same width/height as the depth stream:
   - reference floor depth per pixel (mm) from calibration
 - `t_floor_mm.png`:
   - per-pixel half-width threshold for the “floor band” (mm)
-- `t_obst1_mm.png` (optional, only needed when `enable_topology:=true`):
+- `t_obst1_mm.png` (optional, only needed when `camera_topology_enabled:=true`):
   - boundary for the “+2cm → +5cm” region (per-pixel, mm)
 - `t_obst2_mm.png` (optional):
   - boundary for “+5cm → +10cm” region (per-pixel, mm)
@@ -132,7 +153,7 @@ Per depth frame:
 4) Compute floor mask:
    - `floor = valid && (abs(diff_mm) <= T_floor)`
    - publish `/floor/mask` (`255` floor, `0` otherwise)
-5) If `enable_topology:=true`:
+5) If `camera_topology_enabled:=true`:
    - derive an “unsafe” mask = inverse of floor
    - apply morphology + connected components to stabilize blobs
    - extract contours, simplify, and publish `/floor/topology` as `MarkerArray` in `base_footprint`
@@ -161,6 +182,29 @@ Launch separation (proposal):
 - `floor_runtime.launch.py`: runs runtime node and requires `floor_mm.png` + `t_floor_mm.png`.
 - `floor_calibrate.launch.py`: runs calibration node, writes LUT bitmaps, then exits.
 
+## Graceful degradation (must not break stacks)
+
+`stack:=nav` must remain LiDAR-first and usable when the camera/floor pipeline is absent.
+
+Treat these cases as “camera disabled/unavailable”:
+- depth camera driver not running / not connected
+- `/camera/depth/image` missing/stale
+- LUT files missing/unreadable under `~/.ros/rovi/floor/`
+
+Policy:
+- log clear, rate-limited errors/warnings
+- **do not** bring down the stack
+- floor outputs may be absent; downstream consumers (e.g. Nav2 floor layer) must treat absence as “do nothing”
+
+## Sim/real parity (golden rule: make sim look like real)
+
+Current issue to fix (known tech debt):
+- In simulation today, `/camera/*/image.header.frame_id` does **not** match the optical frame IDs, even though `/camera/*/camera_info.header.frame_id` does.
+
+Plan (bigger change, preferred over workarounds):
+- Rework the sim camera bridging/model so `/camera/depth/image.header.frame_id == camera_depth_optical_frame` and `/camera/color/image.header.frame_id == camera_color_optical_frame`, matching real.
+- If the bridge tooling cannot be configured to emit correct `frame_id`, add a dedicated sim-only rewrite step (remap + republish) as a fallback, but treat that as a temporary compatibility layer.
+
 ## Physical limitations (not algorithmic disadvantages)
 
 Depth sensors can produce:
@@ -182,7 +226,8 @@ Policy: treat invalid/unknown as unsafe; use topology only to clean noise for vi
 
 ## Acceptance criteria
 
-- Runtime node publishes `/floor/mask` in `robot_mode=real|sim` with no remaps.
+- With `camera_enabled:=true` and valid LUTs, runtime publishes `/floor/mask` in `robot_mode=real|sim` with no remaps.
 - Void/cliff regions are not classified as floor (signed diff; no saturating delta).
-- With `enable_topology:=true`, `/floor/topology` renders in `base_footprint` in the 3D robot model viewer.
+- With `camera_topology_enabled:=true`, `/floor/topology` renders in `base_footprint` in the 3D robot model viewer.
 - Calibration is only performed via the calibration launch and produces readable LUT bitmaps under `~/.ros/rovi/floor/`.
+- With missing camera and/or missing LUTs, stacks continue running LiDAR-first (floor outputs may be absent).
