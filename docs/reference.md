@@ -15,6 +15,7 @@ Notes:
 # Commands
 All commands in this section are provided by `rovi_env.sh`
 
+## Launch commands
 | Command | Description |
 |---|---|
 | `sim` | PC simulation: `sim` (default `mapping`) or `sim teleop|camera|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
@@ -26,6 +27,11 @@ All commands in this section are provided by `rovi_env.sh`
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
+
+## Operations commands
+
+| Command | Description |
+|---|---|
 | `ws` | Changes to `$ROVI_ROS_WS_DIR` and runs `setup` (no venv activation). Real-robot launches will still pick up `ROVI_ROS_WS_DIR/.venv` automatically when present. |
 | `build` | Runs system `colcon build` (ROS Jazzy toolchain) using `/usr/bin/python3`. This generates/updates the `install/` overlay used by `ros2 launch`. |
 | `stop` | Stops ROS/Gazebo/RViz processes that belong to this workspace (use `stop --all` for an aggressive full user hard-stop). |
