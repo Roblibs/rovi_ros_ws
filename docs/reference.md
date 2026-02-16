@@ -18,8 +18,8 @@ All commands in this section are provided by `rovi_env.sh`
 ## Launch commands
 | Command | Description |
 |---|---|
-| `sim` | PC simulation: `sim` (default `mapping`) or `sim teleop|camera|mapping|localization|nav` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` and starts Gazebo + RViz by default (`rviz:=false` for headless). |
-| `view` | PC visualization: `view` (default `nav`) or `view teleop|camera|mapping|nav`. Use `view offline` for local URDF inspection (no hardware). |
+| `sim` | PC simulation: `sim` (default `mapping`) or `sim teleop/camera/mapping/localization/nav/calib_floor` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` (or `floor_calibrate_sim.launch.py` for `calib_floor`) and starts Gazebo + RViz by default (`rviz:=false` for headless). |
+| `view` | PC visualization: `view` (default `nav`) or `view teleop/camera/mapping/nav`. Use `view offline` for local URDF inspection (no hardware). |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `camera` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=camera` (teleop + depth + RGB; headless; no RViz). |
 | `calib_color` | Runs camera intrinsics calibration (GUI): `ros2 run camera_calibration cameracalibrator --size 8x5 --square 0.028 --ros-args --remap image:=/camera/color/image --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info`. |
@@ -91,6 +91,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `mapping.launch.py` | `rovi_bringup` | Mapping stack only: EKF + `slam_toolbox` (mapping mode). |
 | `localization.launch.py` | `rovi_bringup` | Localization stack only: EKF + `slam_toolbox` (localization mode, loads `map_file_name`). |
 | `nav.launch.py` | `rovi_bringup` | Navigation stack only: mapping/localization + Nav2 (publishes `/cmd_vel_nav`). |
+| `floor_calibrate_sim.launch.py` | `rovi_bringup` | One-shot sim floor calibration: starts `robot_bringup` with `robot_mode=sim`, runs `floor_calibrate_node`, then shuts down. |
 | `perception.launch.py` | `rovi_bringup` | Perception “slot” included by mapping/localization/nav (currently: `rovi_floor` runtime when `camera_enabled:=true`). |
 | `floor_runtime.launch.py` | `rovi_bringup` | Runs `rovi_floor` runtime: `/camera/depth/image` + LUTs → `/floor/mask` (+ optional `/floor/topology`). |
 | `floor_calibrate.launch.py` | `rovi_bringup` | Runs `rovi_floor` calibration and writes LUT PNGs under `~/.ros/rovi/floor/`, then exits. |

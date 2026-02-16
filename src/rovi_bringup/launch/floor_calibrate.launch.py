@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Floor LUT calibration: writes ~/.ros/rovi/floor/*.png and exits."""
 
-import os
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
@@ -12,11 +10,6 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description() -> LaunchDescription:
     use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="false", description="Use /clock time.")
-    lut_dir = DeclareLaunchArgument(
-        "lut_dir",
-        default_value=os.path.expanduser("~/.ros/rovi/floor"),
-        description="Output directory for LUT PNGs.",
-    )
     capture_duration_s = DeclareLaunchArgument(
         "capture_duration_s",
         default_value="10.0",
@@ -35,7 +28,7 @@ def generate_launch_description() -> LaunchDescription:
         output="screen",
         parameters=[
             {"use_sim_time": ParameterValue(LaunchConfiguration("use_sim_time"), value_type=bool)},
-            {"lut_dir": LaunchConfiguration("lut_dir")},
+            {"robot_mode": "real"},
             {"capture_duration_s": ParameterValue(LaunchConfiguration("capture_duration_s"), value_type=float)},
             {
                 "generate_obstacle_thresholds": ParameterValue(
@@ -47,9 +40,7 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         use_sim_time,
-        lut_dir,
         capture_duration_s,
         generate_obstacle_thresholds,
         node,
     ])
-

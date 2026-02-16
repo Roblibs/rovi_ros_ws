@@ -106,6 +106,7 @@ def generate_launch_description() -> LaunchDescription:
     perception = include_launch(
         perception_launch,
         launch_arguments={
+            'robot_mode': LaunchConfiguration('robot_mode'),
             'use_sim_time': LaunchConfiguration('use_sim_time'),
             'camera_enabled': LaunchConfiguration('camera_enabled'),
             'camera_topology_enabled': LaunchConfiguration('camera_topology_enabled'),

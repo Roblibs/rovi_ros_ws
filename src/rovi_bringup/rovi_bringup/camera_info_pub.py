@@ -7,8 +7,30 @@ from typing import Any
 import rclpy
 from rclpy.exceptions import ParameterAlreadyDeclaredException
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import CameraInfo
+
+
+def _try_get_openni2_depth_serial(node: Node, *, timeout_s: float = 0.25) -> str:
+    try:
+        from openni2_camera.srv import GetSerial  # type: ignore
+    except Exception:
+        return ""
+
+    client = node.create_client(GetSerial, "/camera/openni2_camera/get_serial")
+    if not client.wait_for_service(timeout_sec=timeout_s):
+        return ""
+
+    req = GetSerial.Request()
+    future = client.call_async(req)
+    rclpy.spin_until_future_complete(node, future, timeout_sec=timeout_s)
+    if not future.done():
+        return ""
+    resp = future.result()
+    if resp is None:
+        return ""
+    return str(getattr(resp, "serial", "") or "").strip()
 
 
 def _safe_shutdown() -> None:
@@ -139,13 +161,37 @@ class CameraInfoPublisher(Node):
         self._color_pub = self.create_publisher(CameraInfo, str(self.get_parameter("color_topic").value), qos)
         self._depth_pub = self.create_publisher(CameraInfo, str(self.get_parameter("depth_topic").value), qos)
 
+        color_yaml_data = _load_yaml(color_yaml)
+        depth_yaml_data = _load_yaml(depth_yaml)
+
         self._color_msg = _build_camera_info(
-            _load_yaml(color_yaml),
+            color_yaml_data,
             frame_id=str(self.get_parameter("color_frame_id").value),
         )
         self._depth_msg = _build_camera_info(
-            _load_yaml(depth_yaml),
+            depth_yaml_data,
             frame_id=str(self.get_parameter("depth_frame_id").value),
+        )
+        color_serial = str(color_yaml_data.get("device_serial", "") or "").strip()
+        depth_serial = str(depth_yaml_data.get("device_serial", "") or "").strip()
+
+        detected_depth_serial = _try_get_openni2_depth_serial(self)
+        if detected_depth_serial:
+            depth_serial = detected_depth_serial
+
+        try:
+            self.declare_parameter("color_device_serial", color_serial)
+        except ParameterAlreadyDeclaredException:
+            pass
+        try:
+            self.declare_parameter("depth_device_serial", depth_serial)
+        except ParameterAlreadyDeclaredException:
+            pass
+        self.set_parameters(
+            [
+                Parameter("color_device_serial", Parameter.Type.STRING, color_serial),
+                Parameter("depth_device_serial", Parameter.Type.STRING, depth_serial),
+            ]
         )
 
         period = float(self.get_parameter("publish_period_s").value or 0.0)

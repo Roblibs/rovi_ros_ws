@@ -20,6 +20,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 add_executable(floor_runtime_node src/floor_runtime_node.cpp)
 ament_target_dependencies(floor_runtime_node
@@ -34,6 +35,7 @@ ament_target_dependencies(floor_runtime_node
   cv_bridge
 )
 target_link_libraries(floor_runtime_node ${OpenCV_LIBRARIES})
+target_link_libraries(floor_runtime_node OpenSSL::Crypto)
 
 add_executable(floor_calibrate_node src/floor_calibrate_node.cpp)
 ament_target_dependencies(floor_calibrate_node
@@ -47,6 +49,7 @@ ament_target_dependencies(floor_calibrate_node
   cv_bridge
 )
 target_link_libraries(floor_calibrate_node ${OpenCV_LIBRARIES})
+target_link_libraries(floor_calibrate_node OpenSSL::Crypto)
 
 install(TARGETS
   floor_runtime_node
@@ -55,4 +58,3 @@ install(TARGETS
 )
 
 ament_package()
-

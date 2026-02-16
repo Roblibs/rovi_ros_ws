@@ -23,6 +23,11 @@ def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory("rovi_bringup")
     floor_runtime_launch = os.path.join(bringup_share, "launch", "floor_runtime.launch.py")
 
+    robot_mode = DeclareLaunchArgument(
+        "robot_mode",
+        default_value="real",
+        description="Robot backend string for perception blocks (real|sim|offline).",
+    )
     use_sim_time = DeclareLaunchArgument("use_sim_time", default_value="false", description="Use /clock time.")
     camera_enabled = DeclareLaunchArgument(
         "camera_enabled",
@@ -39,12 +44,14 @@ def generate_launch_description() -> LaunchDescription:
         floor_runtime_launch,
         condition=IfCondition(LaunchConfiguration("camera_enabled")),
         launch_arguments={
+            "robot_mode": LaunchConfiguration("robot_mode"),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
             "camera_topology_enabled": LaunchConfiguration("camera_topology_enabled"),
         },
     )
 
     return LaunchDescription([
+        robot_mode,
         use_sim_time,
         camera_enabled,
         camera_topology_enabled,

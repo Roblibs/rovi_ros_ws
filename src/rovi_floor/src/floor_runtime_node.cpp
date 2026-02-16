@@ -1,10 +1,14 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cctype>
 #include <cstdlib>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -12,7 +16,9 @@
 #include <opencv2/imgproc.hpp>
 
 #include <cv_bridge/cv_bridge.hpp>
+#include <openssl/sha.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/parameter_client.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -49,6 +55,100 @@ std::string expand_user(const std::string & path)
 bool is_depth_encoding_supported(const std::string & encoding)
 {
   return encoding == TYPE_32FC1 || encoding == TYPE_16UC1;
+}
+
+std::string trim_copy(const std::string & s)
+{
+  const auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
+  size_t b = 0;
+  while (b < s.size() && is_space(static_cast<unsigned char>(s[b]))) {
+    ++b;
+  }
+  size_t e = s.size();
+  while (e > b && is_space(static_cast<unsigned char>(s[e - 1]))) {
+    --e;
+  }
+  return s.substr(b, e - b);
+}
+
+std::string strip_quotes(const std::string & s)
+{
+  if (s.size() >= 2 && ((s.front() == '"' && s.back() == '"') || (s.front() == '\'' && s.back() == '\''))) {
+    return s.substr(1, s.size() - 2);
+  }
+  return s;
+}
+
+std::optional<std::string> read_meta_scalar(const std::filesystem::path & path, const std::string & key)
+{
+  std::ifstream in(path);
+  if (!in.is_open()) {
+    return std::nullopt;
+  }
+  std::string line;
+  const std::string prefix = key + ":";
+  while (std::getline(in, line)) {
+    const auto t = trim_copy(line);
+    if (t.rfind(prefix, 0) != 0) {
+      continue;
+    }
+    std::string v = trim_copy(t.substr(prefix.size()));
+    if (v.empty()) {
+      return std::string();
+    }
+    return strip_quotes(v);
+  }
+  return std::nullopt;
+}
+
+std::string sha256_hex(const std::string & input)
+{
+  unsigned char hash[SHA256_DIGEST_LENGTH];
+  SHA256(reinterpret_cast<const unsigned char *>(input.data()), input.size(), hash);
+  std::ostringstream oss;
+  oss << std::hex << std::setfill('0');
+  for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+    oss << std::setw(2) << static_cast<int>(hash[i]);
+  }
+  return oss.str();
+}
+
+std::string canonical_signature_input(
+  const std::string & robot_mode,
+  const std::string & base_frame,
+  const std::string & camera_frame_id,
+  uint32_t width,
+  uint32_t height,
+  const sensor_msgs::msg::CameraInfo & ci,
+  const geometry_msgs::msg::TransformStamped & tf_base_camera)
+{
+  std::ostringstream oss;
+  oss << std::setprecision(17);
+  oss << "schema_version=1\n";
+  oss << "robot_mode=" << robot_mode << "\n";
+  oss << "base_frame=" << base_frame << "\n";
+  oss << "camera_frame_id=" << camera_frame_id << "\n";
+  oss << "width=" << width << "\n";
+  oss << "height=" << height << "\n";
+  oss << "distortion_model=" << ci.distortion_model << "\n";
+  oss << "K=";
+  for (size_t i = 0; i < 9; ++i) { oss << ci.k[i] << (i + 1 < 9 ? "," : "\n"); }
+  oss << "D=";
+  for (size_t i = 0; i < ci.d.size(); ++i) { oss << ci.d[i] << (i + 1 < ci.d.size() ? "," : "\n"); }
+  oss << "R=";
+  for (size_t i = 0; i < 9; ++i) { oss << ci.r[i] << (i + 1 < 9 ? "," : "\n"); }
+  oss << "P=";
+  for (size_t i = 0; i < 12; ++i) { oss << ci.p[i] << (i + 1 < 12 ? "," : "\n"); }
+  oss << "t_base_camera="
+      << tf_base_camera.transform.translation.x << ","
+      << tf_base_camera.transform.translation.y << ","
+      << tf_base_camera.transform.translation.z << "\n";
+  oss << "q_base_camera_xyzw="
+      << tf_base_camera.transform.rotation.x << ","
+      << tf_base_camera.transform.rotation.y << ","
+      << tf_base_camera.transform.rotation.z << ","
+      << tf_base_camera.transform.rotation.w << "\n";
+  return oss.str();
 }
 
 cv::Mat convert_depth_to_mm_u16(const sensor_msgs::msg::Image & msg)
@@ -127,11 +227,13 @@ public:
     topology_topic_ = this->declare_parameter("topology_topic", "/floor/topology");
 
     base_frame_ = this->declare_parameter("base_frame", "base_footprint");
+    robot_mode_ = this->declare_parameter("robot_mode", "real");
     camera_topology_enabled_ = this->declare_parameter("camera_topology_enabled", false);
 
-    lut_dir_ = expand_user(this->declare_parameter("lut_dir", "~/.ros/rovi/floor"));
+    lut_dir_ = expand_user("~/.ros/rovi/floor");
     floor_mm_file_ = this->declare_parameter("floor_mm_file", "floor_mm.png");
     t_floor_mm_file_ = this->declare_parameter("t_floor_mm_file", "t_floor_mm.png");
+    meta_file_ = this->declare_parameter("meta_file", "meta.yaml");
 
     min_contour_area_px_ = this->declare_parameter("min_contour_area_px", 500);
     contour_stride_px_ = this->declare_parameter("contour_stride_px", 4);
@@ -140,12 +242,14 @@ public:
     auto qos = rclcpp::SensorDataQoS();
     mask_pub_ = this->create_publisher<sensor_msgs::msg::Image>(mask_topic_, qos);
 
+    // Always subscribe to camera_info so we can verify LUT meta signatures even when topology is disabled.
+    camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
+      camera_info_topic_,
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
+      [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr msg) { last_camera_info_ = msg; });
+
     if (camera_topology_enabled_) {
       topology_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(topology_topic_, qos);
-      camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        camera_info_topic_,
-        rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local(),
-        [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr msg) { last_camera_info_ = msg; });
     }
 
     depth_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
@@ -173,6 +277,7 @@ private:
     const std::filesystem::path dir(lut_dir_);
     const auto floor_path = (dir / floor_mm_file_).string();
     const auto t_path = (dir / t_floor_mm_file_).string();
+    const auto meta_path = dir / meta_file_;
 
     cv::Mat floor = cv::imread(floor_path, cv::IMREAD_UNCHANGED);
     cv::Mat t = cv::imread(t_path, cv::IMREAD_UNCHANGED);
@@ -194,10 +299,101 @@ private:
       return false;
     }
 
+    if (std::filesystem::exists(meta_path)) {
+      const auto expected_robot_mode = read_meta_scalar(meta_path, "robot_mode");
+      if (expected_robot_mode && !expected_robot_mode->empty() && *expected_robot_mode != robot_mode_) {
+        throttled_error(
+          "LUT meta conflict: robot_mode mismatch (expected " + *expected_robot_mode + ", got " + robot_mode_ + ")");
+        return false;
+      }
+
+      const auto expected_frame = read_meta_scalar(meta_path, "camera_frame_id");
+      if (expected_frame && !expected_frame->empty() && *expected_frame != depth_msg.header.frame_id) {
+        throttled_error(
+          "LUT meta conflict: camera_frame_id mismatch (expected " + *expected_frame + ", got " +
+          depth_msg.header.frame_id + ")");
+        return false;
+      }
+
+      const auto expected_serial = read_meta_scalar(meta_path, "device_serial");
+      if (expected_serial && !expected_serial->empty()) {
+        const std::string current_serial = detect_device_serial();
+        if (!current_serial.empty() && current_serial != *expected_serial) {
+          throttled_error(
+            "LUT meta conflict: device_serial mismatch (expected " + *expected_serial + ", got " + current_serial + ")");
+          return false;
+        }
+      }
+
+      const auto expected_sig = read_meta_scalar(meta_path, "signature_sha256");
+      if (expected_sig && !expected_sig->empty()) {
+        const auto camera_info = last_camera_info_;
+        if (!camera_info) {
+          throttled_error("LUT meta requires /camera/depth/camera_info for signature verification.");
+          return false;
+        }
+        if (camera_info->header.frame_id.empty()) {
+          throttled_error("LUT meta verification failed: camera_info.header.frame_id is empty.");
+          return false;
+        }
+
+        geometry_msgs::msg::TransformStamped tf_base_camera;
+        try {
+          tf_base_camera = tf_buffer_.lookupTransform(
+            base_frame_, camera_info->header.frame_id, tf2::TimePointZero, tf2::durationFromSec(0.25));
+        } catch (const tf2::TransformException & e) {
+          throttled_error(std::string("LUT meta verification TF lookup failed: ") + e.what());
+          return false;
+        }
+
+        const std::string signature_input = canonical_signature_input(
+          robot_mode_, base_frame_, camera_info->header.frame_id, camera_info->width, camera_info->height,
+          *camera_info, tf_base_camera);
+        const std::string got_sig = sha256_hex(signature_input);
+        if (got_sig != *expected_sig) {
+          throttled_error(
+            "LUT meta conflict: signature_sha256 mismatch (expected " + *expected_sig + ", got " + got_sig + ")");
+          return false;
+        }
+      }
+    }
+
     floor_mm_ = floor;
     t_floor_mm_ = t;
     RCLCPP_INFO(this->get_logger(), "Loaded floor LUTs from '%s'.", lut_dir_.c_str());
     return true;
+  }
+
+  std::string detect_device_serial()
+  {
+    if (cached_device_serial_) {
+      return *cached_device_serial_;
+    }
+
+    for (const char * node_name : {"camera_info_pub", "sim_camera_info_pub"}) {
+      try {
+        auto client = std::make_shared<rclcpp::SyncParametersClient>(this->shared_from_this(), node_name);
+        if (!client->wait_for_service(std::chrono::milliseconds(200))) {
+          continue;
+        }
+        const auto vals = client->get_parameters({"depth_device_serial"});
+        if (vals.size() != 1) {
+          continue;
+        }
+        if (vals[0].get_type() != rclcpp::ParameterType::PARAMETER_STRING) {
+          continue;
+        }
+        const std::string serial = vals[0].as_string();
+        if (!serial.empty()) {
+          cached_device_serial_ = serial;
+          return serial;
+        }
+      } catch (const std::exception &) {
+        continue;
+      }
+    }
+    cached_device_serial_ = std::string();
+    return *cached_device_serial_;
   }
 
   void on_depth(sensor_msgs::msg::Image::ConstSharedPtr msg)
@@ -403,11 +599,13 @@ private:
   std::string mask_topic_;
   std::string topology_topic_;
   std::string base_frame_;
+  std::string robot_mode_;
   bool camera_topology_enabled_{false};
 
   std::string lut_dir_;
   std::string floor_mm_file_;
   std::string t_floor_mm_file_;
+  std::string meta_file_;
 
   int min_contour_area_px_{500};
   int contour_stride_px_{4};
@@ -422,6 +620,7 @@ private:
   std::optional<rclcpp::Time> last_error_time_;
 
   sensor_msgs::msg::CameraInfo::ConstSharedPtr last_camera_info_;
+  std::optional<std::string> cached_device_serial_;
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;

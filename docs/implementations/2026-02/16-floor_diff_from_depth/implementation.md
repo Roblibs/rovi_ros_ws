@@ -52,3 +52,8 @@ Implement `docs/plan/floor_diff_from_depth.md`:
 - Sim smoke: `/scan.header.frame_id == laser_link`, `/imu/data_raw.header.frame_id == imu_link`, `/camera/depth/image.header.frame_id == camera_depth_optical_frame`.
 - Sim end-to-end: `floor_calibrate_node` writes LUT PNGs and `floor_runtime_node` publishes `/floor/mask`.
 
+## Follow-up: LUT conflict protection + sim calibration convenience
+
+- Calibration now writes `meta.yaml` next to LUT PNGs and refuses to overwrite LUTs if the signature differs (prevents mixing sim/real or different mounts/intrinsics).
+- Runtime verifies LUT `meta.yaml` signature (when present); on mismatch it degrades gracefully (treats LUT as missing).
+- Added `rovi_bringup/floor_calibrate_sim.launch.py` and `sim calib_floor` for a one-shot sim calibration flow (launch-owned composition).

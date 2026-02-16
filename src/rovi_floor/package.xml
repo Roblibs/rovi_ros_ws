@@ -20,6 +20,8 @@
 
   <build_depend>opencv</build_depend>
   <exec_depend>opencv</exec_depend>
+  <build_depend>openssl</build_depend>
+  <exec_depend>openssl</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
@@ -28,4 +30,3 @@
     <build_type>ament_cmake</build_type>
   </export>
 </package>
-
