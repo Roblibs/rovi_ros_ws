@@ -3,9 +3,8 @@
 ## workflow traceability
 Three types of documents shall be maintained at all times to keep track of past, present and future developmet :
 - present : in `README.md` in any folder with hirerchical scope, always suggest changes to keep readme content up to date but keep it minimal without too much details.
-- past : log all important impactful decisions in `gen.md` which should have the generation log and reasons why design decision was taken and changes made, these are important to know so that design does not keep being changed looping in circles and learn lessons to avoid in future concepts. Additions in `gen.md` are always on demand or subject to confirmations, can be suggested by an agent at the end of the change but never updated spontaneously.
-- All future work is planned in [plan.md](plan.md). It can contain concepts only, todo ideas or depending on maturity detailed plan for handoff. The plan.md file is for an overview only, it can reference other files under [docs/plan](./docs/plan/) for a per topic details.
-Changes in [plan.md](plan.md) are always on demand.
+- All future work is planned in markdown files un [./docs/plan](./docs/plan) folder. It can contain concepts only, todo ideas or depending on maturity detailed plan for handoff. Changes in plans are always on demand, but when working on a plan and others are directly affected, they shall be updated too.
+- past : log all important impactful decisions in `gen.md` which should have the generation log and reasons why design decision was taken and changes made, these are important to know so that design does not keep being changed looping in circles and learn lessons to avoid in future concepts. Additions in `gen.md` are always on demand or subject to confirmations, can be suggested by an agent at the end of the change but never updated spontaneously. Additonally, implementtion details shall be logged on every change on a `implementation.md` file under [./docs/implementations](./docs/implementations) under a folder `yyyy-mm folder/dd-topic`, once the plan competed and verified by the user, it can be moved under `plam.md` of the corresponding folder.
 
 ## What this workspace is
 ROS 2 Jazzy workspace for the ROVI robot with three runtime backends:

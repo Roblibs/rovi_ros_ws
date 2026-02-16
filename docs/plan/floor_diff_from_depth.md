@@ -1,174 +1,188 @@
-# Plan: Depth-floor diff → 3-level bins → topo cleanup → obstacle lasso (ROS 2 Jazzy)
+# Plan: Depth-floor diff → floor mask (+ optional topology) (ROS 2 Jazzy)
 
-This replaces the older “scalar floor clearance” concept. The new approach produces a cheap “stuff above the floor” mask + stable obstacle outlines from depth, without pointcloud/LiDAR emulation.
+This replaces the older “scalar floor clearance” concept. It produces a conservative “safe floor” mask from depth, without pointcloud/LiDAR emulation.
 
 ## Goal
 
-From a depth camera, compute:
+From a depth camera, publish:
 
-- (a) small binned grid image (floor-diff classes)
-- (b) cleaned binary obstacle mask
-- (c) stable per-obstacle contour(s) (“lasso”) for visualization (and potentially downstream logic later)
+- `/floor/mask`: **safe vs unsafe** (unsafe includes obstacles and void/cliffs)
+- `/floor/topology` (optional): topological cleanup + contour (“lasso”) visualization in `base_footprint`
+
+Driving semantics:
+- there is no difference between “T1 / T2 / higher” for motion decisions — anything that is *not floor* is unsafe and should be avoided.
 
 ## Dependencies / contracts (already implemented elsewhere)
 
-- Camera contract (topics + frames): `docs/contract.yaml` (`stack: camera`)
-  - Input depth topic (canonical): `/camera/depth/image`
-  - Required camera model: `/camera/depth/camera_info`
-  - Depth frame: `camera_depth_optical_frame`
-- Bringup composition slot for perception nodes: `src/rovi_bringup/launch/perception.launch.py`
+- Camera contract: `docs/contract.yaml` (`stack: camera`)
+  - `/camera/depth/image`
+  - `/camera/depth/camera_info`
+  - frame: `camera_depth_optical_frame`
+- Composition slot: `src/rovi_bringup/launch/perception.launch.py`
 
-Non-goals (for this plan):
+Related plan (tracked separately):
+- Nav2 integration (custom layer): `docs/plan/floor_nav2_costmap_layer.md`
+
+Non-goals:
 - No RGB-D registration.
-- No publishing `PointCloud2` / `LaserScan` as “depth emulation”.
-- No Nav2 integration in the initial implementation. When integrated, the intended path is a custom costmap layer subscribing to `/floor/mask`.
+- No `PointCloud2` / `LaserScan` emulation.
 
-## Core assumptions
+## Calibration is explicit (own launch; not on startup)
 
-- Calibration happens on known flat ground and may take ~10 seconds.
-- Runtime must be very cheap (small grid; integer math; small-kernel filtering).
-- Ground is treated as the reference (“floor”) and is not identified online.
-- Calibration artifacts are **not committed**: stored under `~/.ros/...` and rebuilt each robot startup by default.
+Calibration is only needed when the camera mount changes or the LUT is known-stale.
+
+- Normal bringup runs runtime only.
+- Calibration runs via its own launch (suitable for oneshot systemd services / remote launch switching).
 
 ## ROS interface (runtime)
 
-### Inputs (subscribers)
+### Inputs
 
 - `/camera/depth/image` (`sensor_msgs/Image`)
-  - Expected to be in `camera_depth_optical_frame` and time-stamped correctly for `use_sim_time`.
-  - Implementation should accept the common encodings (`32FC1` meters is typical here) and convert to integer mm internally.
-- `/camera/depth/camera_info` (`sensor_msgs/CameraInfo`) (required)
-- TF: `camera_depth_optical_frame` → `base_footprint` at the image timestamp (required for `/floor/markers`)
+  - expected `header.frame_id = camera_depth_optical_frame`
+  - use `header.stamp` (works with `use_sim_time`)
+  - accept common encodings (e.g. `32FC1` meters) and convert to mm internally
+- `/camera/depth/camera_info` (`sensor_msgs/CameraInfo`) (required only when `enable_topology:=true`)
+- TF at the depth image timestamp (required only when `enable_topology:=true`):
+  - `camera_depth_optical_frame` → `base_footprint`
 
-### Outputs (publishers)
+### Outputs
 
-Suggested topics (names are part of the contract for downstream users once implemented):
-
-- `/floor/bins` (`sensor_msgs/Image`, `mono8`)
-  - values: `0=invalid`, `1=floor-ish`, `2=low`, `3=high` (3 levels + invalid)
 - `/floor/mask` (`sensor_msgs/Image`, `mono8`)
-  - values: `0` or `255` (cleaned obstacle mask; derived from bins: `mask = (bin >= 2)`)
-- `/floor/markers` (`visualization_msgs/MarkerArray`) (optional)
-  - visualization-only: one `LINE_STRIP` per obstacle contour
-  - publish can be disabled so the core node remains “perception” rather than “UI/viz”
-- `/floor/state` (`std_msgs/String`) (optional but recommended)
-  - `CALIBRATING` → `RUNNING` (+ basic stats / last-write path)
+  - `255 = floor (safe)`
+  - `0 = not floor (unsafe)` (obstacles + void/cliff + unknown)
+- `/floor/topology` (`visualization_msgs/MarkerArray`) (only when `enable_topology:=true`)
+  - visualization-only: cleaned contour “lasso” in `base_footprint`
 
-## Calibration artifacts (YAML under ~/.ros)
+## Launch arg (single)
 
-### Location + lifecycle
+- `enable_topology` (bool, default `false`)
+  - `false`: publish only `/floor/mask`
+  - `true`: additionally run topology + publish `/floor/topology`
 
-- Default directory: `~/.ros/rovi/floor/`
-- Default “latest” file: `~/.ros/rovi/floor/floor_lut.yaml`
-- Default behavior: **auto-calibrate on startup** and overwrite `floor_lut.yaml` once complete.
-  - Provide a runtime toggle to skip calibration (for debugging) and just load the existing LUT if present.
-  - Provide a service to re-calibrate on demand (e.g., after moving the camera mount).
+## LUT artifacts (bitmaps, not YAML arrays)
 
-### YAML schema (proposal)
+Why bitmaps:
+- YAML numeric arrays are large and not visually debuggable.
+- Bitmaps can be opened directly and keep runtime as pure image operations.
 
-Single file contains both the floor reference and the per-cell thresholds (LUT).
+### Location
 
-Notes:
-- The floor reference (`floor_mm`) is necessary to compute “height above floor” cheaply as `delta = max(0, floor_mm - depth_mm)` without per-frame plane fitting.
-- Use `cell_size_px` as the *configuration knob*. `grid.w/h` may still be stored for validation/debugging.
+- Directory: `~/.ros/rovi/floor/`
 
-- `version: 1`
-- `cell_size_px: <int>` (e.g. 8, 10, 12)
-- `grid: {w: <int>, h: <int>}` (derived from image size and `cell_size_px`)
-- `floor_mm: [w*h uint16]` (row-major)
-- `t1_mm: [w*h uint16]`, `t2_mm: [w*h uint16]` (row-major)
+### File set (proposal)
 
-Rationale:
-- Threshold values are configured via YAML (not ROS params).
-- Per-cell thresholds allow compensating for perspective/quantization without runtime plane fitting.
+Use 16-bit PNG (`uint16`, mm), same width/height as the depth stream:
 
-### Node parameters (runtime policy)
+- `floor_mm.png`:
+  - reference floor depth per pixel (mm) from calibration
+- `t_floor_mm.png`:
+  - per-pixel half-width threshold for the “floor band” (mm)
+- `t_obst1_mm.png` (optional, only needed when `enable_topology:=true`):
+  - boundary for the “+2cm → +5cm” region (per-pixel, mm)
+- `t_obst2_mm.png` (optional):
+  - boundary for “+5cm → +10cm” region (per-pixel, mm)
 
-Keep runtime behavior tweakable via ROS params (small and safe to tune), while the calibration YAML stays focused on the LUT:
+Optional metadata sidecar is OK if it stays small (no big arrays), e.g. `meta.yaml`:
+- `width`, `height`, `units: mm`, `camera_frame_id`, `created_at`
 
-- `close_iters` (default 1), `open_iters` (default 0)
-- `min_component_area` (default: a few cells)
-- `simplify_epsilon_cells` (default: ~0.5), `max_contour_points` (default: capped)
-- `publish_markers` (default false on-robot; true for viewer/debug)
+### Size estimate (640x400)
+
+- One `uint16` image: `640*400*2` ≈ **512 KB** raw (PNG typically smaller).
+- 2–4 images: on the order of **1–3 MB** total on disk.
+
+## Threshold semantics (signed diff; void is unsafe)
+
+Old pitfall to avoid:
+- `delta = max(0, F - D)` hides the case `D > F`, which is exactly how void/cliffs show up.
+
+Use signed depth difference in mm:
+- `diff_mm = D_mm - F_mm`
+  - `diff_mm ≈ 0`: floor-like
+  - `diff_mm < 0`: something closer than the floor (obstacle above floor)
+  - `diff_mm > 0`: something farther than the floor (void/cliff, or missing returns)
+
+Floor definition:
+- floor iff `valid_depth && (abs(diff_mm) <= t_floor_mm[pixel])`
+- everything else is unsafe
+
+Stairs-down / void behavior:
+- void returns (far depth or invalid) fail the floor test → unsafe (robot will not drive into the void thinking it’s floor).
+
+## “Only if topology enabled, compute more thresholds”
+
+- Base runtime (no topology) uses only `floor_mm.png` + `t_floor_mm.png` to produce `/floor/mask`.
+- When topology is enabled, the node may also load and use `t_obst1_mm.png` / `t_obst2_mm.png` to classify unsafe regions for visualization and more stable contours.
+
+## Direction bias and per-threshold images
+
+Depth is measured along rays. A constant mm delta along the ray does not correspond to a constant physical “height above floor” across the image.
+
+Per-pixel threshold maps (`t_*_mm.png`) compensate for this perspective effect **if** they are derived from camera geometry + the calibrated floor reference (plane/ray math in calibration is fine; runtime stays cheap).
 
 ## Algorithm (runtime)
 
-Per incoming depth frame:
+Per depth frame:
 
-1) Downsample depth image into a small grid `D[cell]` in **mm** (uint16), using `cell_size_px`.
-   - Use stride sampling or block-reduce of valid pixels (median preferred; mean acceptable).
-2) Load floor reference + thresholds from LUT:
-   - `F[cell]`, `T1[cell]`, `T2[cell]`
-3) Delta-from-floor:
-   - `delta = max(0, F - D)`; if `D==0` or `F==0`, mark invalid.
-4) Bin into `code`:
-   - `0 = invalid`
-   - `1 = delta < T1`
-   - `2 = T1 <= delta < T2`
-   - `3 = delta >= T2`
-5) Create obstacle mask `M`:
-   - `M = (code >= 2)`
-6) Topological cleanup on `M` (small grid):
-   - Closing (3x3) to fill small holes/bridges, then optional opening to remove speckles.
-   - Connected components: drop blobs with area < `min_component_area`.
-7) Lasso / contour extraction:
-   - For each component, find boundary cells (edge where a 4-neighbor is empty).
-   - Order into a loop (border-follow / Moore neighbor tracing).
-   - Optional simplification in grid coordinates (RDP) with `simplify_epsilon_cells`.
-8) Publish:
-   - `bins` image (mono8)
-   - cleaned `mask` (mono8)
-   - optional contour markers as `LINE_STRIP` in `base_footprint`
-     - Backprojection proposal per contour vertex:
-       - Use the cell-center pixel `(u, v)` for that grid cell (derived from `cell_size_px` and the image size).
-       - Use `Z = D[cell]` (mm → meters) as the representative depth.
-       - Backproject to `camera_depth_optical_frame` using `camera_info` intrinsics, then TF-transform to `base_footprint`.
+1) Convert depth to `D_mm` (mm integer; invalid=0).
+2) Load LUT images in memory:
+   - always: `F_mm = floor_mm.png`, `T_floor = t_floor_mm.png`
+   - if topology: `T_obst1`, `T_obst2`
+3) Compute signed difference: `diff_mm = D_mm - F_mm`.
+4) Compute floor mask:
+   - `floor = valid && (abs(diff_mm) <= T_floor)`
+   - publish `/floor/mask` (`255` floor, `0` otherwise)
+5) If `enable_topology:=true`:
+   - derive an “unsafe” mask = inverse of floor
+   - apply morphology + connected components to stabilize blobs
+   - extract contours, simplify, and publish `/floor/topology` as `MarkerArray` in `base_footprint`
+     - backproject contour points using `camera_info` + `D_mm` and TF-transform to `base_footprint`
 
-Implementation note:
-- Keep computations in integers (mm) once the depth image is downsampled.
-- Grid sizes like `80x60` or `64x48` keep this CPU-cheap on a Pi.
+## Algorithm (calibration) + launch wiring
 
-Marker frame guidance:
-- Default: publish `/floor/markers` in `base_footprint` so it renders naturally with the robot model (independent of camera displays).
-- This requires backprojection (using `camera_info`) and a TF transform at the image timestamp.
-- If TF/camera_info is unavailable, the node should still publish `/floor/bins` + `/floor/mask`, and set `/floor/state` to reflect that markers are suppressed.
+Calibration runs explicitly and writes the LUT images under `~/.ros/rovi/floor/`.
 
-## Algorithm (calibration on startup)
+Calibration steps (expensive OK):
 
-Goal: build `floor_lut.yaml` for the current mount/scene and derive per-cell thresholds.
+1) Capture ~10s of depth on known flat floor.
+2) Build `floor_mm.png` via per-pixel median (or trimmed mean) of valid samples.
+3) Build `t_floor_mm.png` for the “floor band” (default corresponds to ~±2cm physical tolerance).
+4) Optionally (for topology/levels), build `t_obst1_mm.png` and `t_obst2_mm.png` for:
+   - +2→+5 cm and +5→+10 cm regions (per-pixel)
+5) Write outputs atomically (temp + rename).
 
-Calibration steps:
+Deriving “cm above floor” into per-pixel `*_mm.png`:
+- To avoid ray-angle (perspective) bias, compute these maps during calibration using camera geometry:
+  - backproject the calibrated floor pixels with `camera_info`
+  - fit a floor plane in a stable frame (e.g. `base_footprint`) using TF from the URDF
+  - for each pixel ray, solve the expected depth at heights {2cm, 5cm, 10cm} above that plane and convert into per-pixel depth-delta thresholds
 
-1) Use the same grid/downsample operator as runtime.
-2) For ~10 seconds while stationary on flat floor, accumulate valid depth samples per cell.
-3) Set `F[cell] = median(samples)` (or trimmed mean).
-4) Derive `T1/T2` per cell from a small set of global “target” thresholds (mm) and/or heuristics.
-   - Exact derivation is free to evolve as long as outputs remain stable; store the final per-cell values in YAML.
-5) Write `floor_lut.yaml` under `~/.ros/rovi/floor/` and switch to `RUNNING`.
-   - Default: `~/.ros/rovi/floor/floor_lut.yaml`.
+Launch separation (proposal):
+- `floor_runtime.launch.py`: runs runtime node and requires `floor_mm.png` + `t_floor_mm.png`.
+- `floor_calibrate.launch.py`: runs calibration node, writes LUT bitmaps, then exits.
 
-Guardrails:
-- Cells with insufficient samples get `F=0` and are forced to `invalid` at runtime.
-- If depth is invalid on shiny floors (0/NaN), treat as invalid (not obstacle).
+## Physical limitations (not algorithmic disadvantages)
 
-Calibration policy suggestion (startup behavior):
-- Default: run a short “sanity sample” first (e.g., ~1s) and compare against the existing LUT if present.
-  - If the median per-cell residual is small (configurable), keep the existing LUT and start `RUNNING` immediately.
-  - Otherwise (validation fails), run the full ~10s calibration and overwrite `floor_lut.yaml`.
-- Always provide an explicit “recalibrate now” service for when the robot is placed on a known flat floor.
-- Store minimal metadata in the YAML for safety checks (e.g., `cell_size_px`, derived `grid.w/h`, `camera_frame_id`, and a timestamp) so a mismatch can trigger recalibration automatically.
+Depth sensors can produce:
+- flying pixels at object edges (false near)
+- depth shadows / holes behind obstacles (invalid or far)
+- specular/transparent/black surfaces (invalid or wrong depth)
+- sunlight/IR interference and range-dependent noise
+- camera pitch/roll change vs calibration (invalidates `floor_mm.png`)
 
-## Where this plugs into the stack
+Policy: treat invalid/unknown as unsafe; use topology only to clean noise for visualization.
 
-- Implement as a new node (prefer C++ for Pi safety; Python acceptable at small grids if profiling says OK).
-- Start it from `src/rovi_bringup/launch/perception.launch.py` so it can be composed into `teleop|camera|mapping|localization|nav` without copy/paste.
-- Once stable, consider extending `docs/contract.yaml` to require the `/floor/*` outputs for a dedicated stack variant (e.g., a future `stack:=depth_perception`).
+## Implementation constraints (C++)
+
+- Implement in C++ (rclcpp).
+- Dependencies (recommended for this “bitmap + topology” approach):
+  - OpenCV (PNG I/O, morphology, contours)
+  - `tf2_ros`
+  - `image_transport`
 
 ## Acceptance criteria
 
-- Runs in `robot_mode=real` and `robot_mode=sim` with **no remaps** (same topics/frames).
-- Uses only canonical depth inputs (`/camera/depth/image`, `/camera/depth/camera_info`) and the required TF frames.
-- Auto-calibrates on startup and reliably writes `~/.ros/rovi/floor/floor_lut.yaml`.
-- Produces stable contours (no flicker) in a static scene at the chosen grid resolution.
-- When enabled, publishes `/floor/markers` in `base_footprint`.
-
+- Runtime node publishes `/floor/mask` in `robot_mode=real|sim` with no remaps.
+- Void/cliff regions are not classified as floor (signed diff; no saturating delta).
+- With `enable_topology:=true`, `/floor/topology` renders in `base_footprint` in the 3D robot model viewer.
+- Calibration is only performed via the calibration launch and produces readable LUT bitmaps under `~/.ros/rovi/floor/`.

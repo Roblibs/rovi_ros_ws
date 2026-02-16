@@ -6,8 +6,8 @@ Goal: integrate the depth-derived floor/obstacle outputs into Nav2 without any �
 
 Implement a custom `nav2_costmap_2d` plugin layer that:
 
-- Subscribes to `/floor/mask` (and optionally `/floor/bins`) as the gating signal.
-- Uses `/camera/depth/image` + `/camera/depth/camera_info` + TF to project obstacle cells into `base_footprint`.
+- Subscribes to `/floor/mask` as the gating signal.
+- Uses `/camera/depth/image` + `/camera/depth/camera_info` + TF to project *unsafe pixels* into `base_footprint` (with stride sampling to bound CPU).
 - Marks projected points (or small stamped polygons) as lethal obstacles in the local costmap.
 
 Rationale:
@@ -19,12 +19,10 @@ Rationale:
 
 Option A (no new topics):
 - Layer subscribes to `/floor/mask`, `/camera/depth/image`, `/camera/depth/camera_info`.
-- It repeats the same grid downsample (based on the calibration LUT metadata, e.g. `cell_size_px`) to get a representative `Z` per occupied cell for backprojection.
+- It stride-samples unsafe pixels from `/floor/mask` (e.g. every N pixels), looks up the corresponding depth `Z`, backprojects to the camera frame, and TF-transforms to the costmap frame.
 
-Option B (add one helper output, recommended if CPU becomes tight):
-- Extend the floor node to publish a small “downsampled depth grid” (e.g. `/floor/depth_grid_mm` as `sensor_msgs/Image` `mono16`, mm).
-- Costmap layer subscribes to `/floor/mask` + `/floor/depth_grid_mm` + `/camera/depth/camera_info`.
-- Layer backprojects occupied cells using the provided grid `Z` without re-reading/downsampling the full depth image.
+Option B (optional optimization; only if needed):
+- Add a dedicated, already-decimated obstacle sampling output from the floor node (format TBD) so the costmap layer does not need to touch full-res depth at costmap tick rate.
 
 ## Coordinate policy
 
@@ -34,4 +32,4 @@ Option B (add one helper output, recommended if CPU becomes tight):
 ## Acceptance criteria
 
 - When running `stack:=nav` in `robot_mode=real|sim`, enabling this layer causes nearby obstacles detected by depth to appear in the local costmap and influence planning/controller behavior.
-- CPU impact stays bounded (grid-sized work, not full-res depth processing per costmap tick).
+- CPU impact stays bounded (stride sampling + simple backprojection; no full-res per-pixel costmap updates).
