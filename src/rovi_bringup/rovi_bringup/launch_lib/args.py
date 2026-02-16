@@ -54,28 +54,37 @@ CAMERA_STACK_ARG_NAMES: tuple[str, ...] = (
 
 # Mapping stack args from rovi.launch.py -> mapping.launch.py
 MAPPING_STACK_ARG_NAMES: tuple[str, ...] = (
+    "robot_mode",
     "use_sim_time",
     "odom_mode",
     "slam_enabled",
     "mag_enabled",
+    "camera_enabled",
+    "camera_topology_enabled",
 )
 
 # Localization stack args from rovi.launch.py -> localization.launch.py
 LOCALIZATION_STACK_ARG_NAMES: tuple[str, ...] = (
+    "robot_mode",
     "use_sim_time",
     "odom_mode",
     "slam_enabled",
     "mag_enabled",
     "map_file_name",
+    "camera_enabled",
+    "camera_topology_enabled",
 )
 
 # Nav stack args from rovi.launch.py -> nav.launch.py
 NAV_STACK_ARG_NAMES: tuple[str, ...] = (
+    "robot_mode",
     "use_sim_time",
     "odom_mode",
     "slam_mode",
     "map_file_name",
     "mag_enabled",
+    "camera_enabled",
+    "camera_topology_enabled",
 )
 
 

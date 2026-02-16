@@ -47,12 +47,14 @@ Packages of this repo are listed in this table
 |---|---|
 | `rovi_bringup` | Top-level launch entry points (teleop, camera, visualization, mapping/localization stacks) |
 | `rovi_sim` | Gazebo Sim backend: worlds + bridges + `rovi_sim_base` + `rovi_gz_odom`; spawns the shared robot model from `rovi_description` into Gazebo Sim |
+| `rovi_gz_sensors_bridge` | Sim-only Gazebo Transport → ROS 2 sensor bridge enforcing stable `header.frame_id` for `/scan`, `/imu/data_raw`, and `/camera/*/image` (golden rule parity). |
 | `rovi_description` | URDF + meshes + RViz configs; provides static TF like `base_footprint -> base_link -> laser_link` |
 | `rosmaster_driver` | Hardware bridge: `/cmd_vel` → MCU, publishes `/vel_raw`, `/joint_states`, `/imu/data_raw`, `/imu/mag`, etc. |
 | `rovi_odom_integrator` | Odometry integrator (real robot): `/vel_raw` → `/odom_raw`; can publish TF `odom -> base_footprint` (raw odom). In simulation, `/odom_raw` comes from Gazebo ground truth. |
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
+| `rovi_floor` | Depth-floor diff perception: publishes `/floor/mask` (+ optional `/floor/topology`) and provides LUT calibration (`calib_floor`). |
 | `ros_ui_bridge` | UI bridge: status fields (CPU + ROS topic values/rates + TF rates) with ROS-time staleness filtering and gRPC streaming; also serves robot pose, lidar, map, and model metadata |
 | `robot_serial_display` | Serial UI client: consumes `ros_ui_bridge` gRPC status stream and pushes JSON lines to the ESP32-S3 display |
 
@@ -70,7 +72,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `ros-jazzy-rviz2` | Used by `view` (PC viewer command) and by `rovi_bringup/rovi.launch.py` in `robot_mode=sim|offline` (optional auto-start). |
 | `ros-jazzy-rplidar-ros` | Used by `rovi_bringup/robot_bringup.launch.py` (robot_mode=real, `lidar_enabled:=true`) to publish `/scan` for SLAM and Nav2. |
 | `ros-jazzy-ros-gz-sim` | Used by `rovi_sim/gazebo_sim.launch.py` to start Gazebo Sim and spawn the simulated robot + world. |
-| `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo topics (e.g., LiDAR + `/clock`) into ROS 2 topics like `/scan` and `/clock`. |
+| `ros-jazzy-ros-gz-bridge` | Used by `rovi_sim/gazebo_sim.launch.py` to bridge Gazebo Transport topics like `/clock` and `/model/rovi/odometry` into ROS 2 (sensor frame IDs are enforced by `rovi_gz_sensors_bridge`). |
 | `ros-jazzy-foxglove-bridge` | Optional WebSocket bridge for Foxglove Studio (run via the `foxglove` command). |
 | `python3-psutil` | Used by `ros_ui_bridge` to read CPU utilization. |
 | `pyserial` | Used by `robot_serial_display` to talk to the ESP32-S3 display over USB serial. |
@@ -89,6 +91,9 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `mapping.launch.py` | `rovi_bringup` | Mapping stack only: EKF + `slam_toolbox` (mapping mode). |
 | `localization.launch.py` | `rovi_bringup` | Localization stack only: EKF + `slam_toolbox` (localization mode, loads `map_file_name`). |
 | `nav.launch.py` | `rovi_bringup` | Navigation stack only: mapping/localization + Nav2 (publishes `/cmd_vel_nav`). |
+| `perception.launch.py` | `rovi_bringup` | Perception “slot” included by mapping/localization/nav (currently: `rovi_floor` runtime when `camera_enabled:=true`). |
+| `floor_runtime.launch.py` | `rovi_bringup` | Runs `rovi_floor` runtime: `/camera/depth/image` + LUTs → `/floor/mask` (+ optional `/floor/topology`). |
+| `floor_calibrate.launch.py` | `rovi_bringup` | Runs `rovi_floor` calibration and writes LUT PNGs under `~/.ros/rovi/floor/`, then exits. |
 | `offline_view.launch.py` | `rovi_bringup` | Legacy offline inspection: `robot_mode=offline` + RViz (superseded by `view offline` / `rovi.launch.py`). |
 | `joy.launch.py` | `rovi_bringup` | Debug joystick → `/cmd_vel` only (no hardware required) |
 | `gazebo_sim.launch.py` | `rovi_sim` | Gazebo Sim backend: starts Gazebo + bridges + spawns the robot model (used when `robot_mode=sim`) |
@@ -111,8 +116,11 @@ ROS nodes started by the launches above (some are conditional based on params). 
 | `robot_state_publisher` | `robot_state_publisher` | Publishes the robot TF tree from the URDF (`robot_description`) and `/joint_states`. |
 | `rovi_local_joint_states` | `rovi_sim` | Local (stub) publisher for `/joint_states` in `robot_mode=sim` (zeros for non-fixed URDF joints). Exists to avoid a known noisy shutdown race in upstream `joint_state_publisher` on Jazzy. |
 | `rplidar_composition` | `rplidar_ros` | Publishes `/scan` (`sensor_msgs/msg/LaserScan`) from an RPLIDAR (only when `lidar_enabled:=true`). |
-| `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/scan`, `/clock`, and `/imu/data_raw`). |
+| `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/clock`, `/odom_gz`, and `/cmd_vel_sim`). |
+| `rovi_gz_sensors_bridge` | `rovi_gz_sensors_bridge` | Sim sensor bridge: publishes `/scan`, `/imu/data_raw`, `/camera/color/image`, `/camera/depth/image` from Gazebo while enforcing real-robot `header.frame_id`. |
 | `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_odom_integrator`). |
+| `rovi_floor_runtime` | `rovi_floor` | Runtime floor perception: loads LUT PNGs and publishes `/floor/mask` (+ optional `/floor/topology`). |
+| `rovi_floor_calibrate` | `rovi_floor` | One-shot calibration: captures depth frames, builds LUT PNGs under `~/.ros/rovi/floor/`, then exits. |
 | `imu_filter` | `imu_filter_madgwick` | Filters `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` (only when `odom_mode:=fusion_wheels_imu`). |
 | `ekf_filter_node` | `robot_localization` | EKF that produces `/odometry/filtered` and TF `odom -> base_footprint` from `/odom_raw` (and `/imu/data` in `fusion_wheels_imu`). |
 | `slam_toolbox` | `slam_toolbox` | Lifecycle SLAM node that publishes TF `map -> odom` and (in mapping mode) `/map` (only when `slam_enabled:=true`). |
@@ -144,6 +152,8 @@ Only the parameters toggling node activation are listed here.
 | `slam_enabled` | `rovi_slam` | `slam_toolbox.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
 | `slam_mode` | `rovi_slam` | `slam_toolbox.launch.py` | `mapping` | Selects SLAM mode: `mapping` or `localization`. |
 | `slam_mode` | `rovi_bringup` | `nav.launch.py`, `rovi.launch.py` | `mapping` | Selects SLAM mode when running Nav2. |
+| `camera_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `true` | Enables the optional camera pipeline (camera drivers in `robot_mode=real`, and camera-dependent perception like `rovi_floor` runtime). Must degrade gracefully if camera/LUTs are missing. |
+| `camera_topology_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `false` | Enables the heavier visualization-only topology output (`/floor/topology`) in the floor perception node. |
 | `odom_mode` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `filtered` | Selects the odometry filter pipeline (and whether IMU is used). TF publisher selection depends on how the gateway plane is started (single-command `rovi.launch.py` vs systemd `rovi-gateway.service`). |
 | `odom_mode` | `rovi_localization` | `ekf.launch.py` | `filtered` | Same as above, but for running the odometry pipeline without SLAM |
 | `mag_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `false` | Enables magnetometer input for the IMU filter (used in `odom_mode=fusion_wheels_imu`; disabled by default due to interference risk) |

@@ -17,6 +17,7 @@
   <exec_depend>rosgraph_msgs</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>rovi_gz_sensors_bridge</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>rovi_description</exec_depend>

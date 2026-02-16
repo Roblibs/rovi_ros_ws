@@ -3,7 +3,8 @@
 
 This launch is intentionally *not* a full stack bringup. It only starts:
 - Gazebo Sim (server + optional GUI)
-- ros_gz_bridge (parameter_bridge) to bridge /clock, /scan, /imu/data_raw, /odom_gz and cmd_vel
+- ros_gz_bridge (parameter_bridge) to bridge /clock, /odom_gz, /cmd_vel_sim and /camera/*/camera_info
+- rovi_gz_sensors_bridge_node to bridge /scan, /imu/data_raw and /camera/*/image with stable frame IDs
 - Robot spawn from the shared URDF (rovi_description)
 
 Higher-level bringup (teleop / mapping / nav) is expected to run separately and remain unchanged.
@@ -113,20 +114,12 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # Bridge image topics via ros_gz_image (more reliable than parameter_bridge for images).
-    camera_image_bridge = Node(
-        package='ros_gz_image',
-        executable='image_bridge',
-        name='ros_gz_image_bridge',
+    # Bridge Gazebo sensor topics while enforcing stable ROS frame IDs (golden rule parity).
+    sensors_bridge = Node(
+        package='rovi_gz_sensors_bridge',
+        executable='rovi_gz_sensors_bridge_node',
+        name='rovi_gz_sensors_bridge',
         output='screen',
-        arguments=[
-            '/rovi/camera/color/image',
-            '/rovi/camera/depth/image',
-        ],
-        remappings=[
-            ('/rovi/camera/color/image', '/camera/color/image'),
-            ('/rovi/camera/depth/image', '/camera/depth/image'),
-        ],
         parameters=[{'use_sim_time': use_sim_time_param}],
     )
 
@@ -168,7 +161,7 @@ def generate_launch_description() -> LaunchDescription:
         gazebo_server,
         gazebo_client,
         bridge,
-        camera_image_bridge,
+        sensors_bridge,
         delayed_spawn,
         graceful_shutdown,
     ])

@@ -203,7 +203,7 @@ Current issue to fix (known tech debt):
 
 Plan (bigger change, preferred over workarounds):
 - Rework the sim camera bridging/model so `/camera/depth/image.header.frame_id == camera_depth_optical_frame` and `/camera/color/image.header.frame_id == camera_color_optical_frame`, matching real.
-- If the bridge tooling cannot be configured to emit correct `frame_id`, add a dedicated sim-only rewrite step (remap + republish) as a fallback, but treat that as a temporary compatibility layer.
+- No republish “frame_id rewrite” fallback: fix this at the sim backend / bridge so the published ROS topics are correct at the origin.
 
 ## Physical limitations (not algorithmic disadvantages)
 

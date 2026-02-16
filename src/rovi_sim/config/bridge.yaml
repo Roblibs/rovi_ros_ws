@@ -2,25 +2,14 @@
 #
 # This simulation intentionally keeps the ROS-side contract the same as the real robot:
 # - /cmd_vel input (from twist_mux) -> rovi_sim_base -> Gazebo (/model/rovi/cmd_vel)
-# - /scan + /clock bridged from Gazebo to ROS for SLAM / Nav2 and use_sim_time
+# - /clock bridged from Gazebo to ROS for use_sim_time
+# - /scan + /imu + /camera/*/image bridged by rovi_gz_sensors_bridge_node with stable frame IDs
 # - ground-truth odometry bridged from Gazebo as /odom_gz (adapted to /odom_raw by rovi_gz_odom)
 
 - ros_topic_name: "clock"
   gz_topic_name: "/world/rovi_room/clock"
   ros_type_name: "rosgraph_msgs/msg/Clock"
   gz_type_name: "gz.msgs.Clock"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "scan"
-  gz_topic_name: "/rovi/scan"
-  ros_type_name: "sensor_msgs/msg/LaserScan"
-  gz_type_name: "gz.msgs.LaserScan"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "imu/data_raw"
-  gz_topic_name: "/rovi/imu"
-  ros_type_name: "sensor_msgs/msg/Imu"
-  gz_type_name: "gz.msgs.IMU"
   direction: GZ_TO_ROS
 
 - ros_topic_name: "odom_gz"
@@ -35,4 +24,4 @@
   gz_type_name: "gz.msgs.Twist"
   direction: ROS_TO_GZ
 
-# Simulated cameras are bridged via ros_gz_image (see rovi_sim gazebo_sim.launch.py).
+# Sensors with frame IDs (/scan, /imu, /camera/*/image) are bridged by rovi_gz_sensors_bridge_node.

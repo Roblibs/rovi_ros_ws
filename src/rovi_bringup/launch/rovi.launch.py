@@ -169,6 +169,16 @@ def generate_launch_description() -> LaunchDescription:
         default_value='true',
         description='Start slam_toolbox and publish TF map->odom.',
     )
+    camera_enabled = DeclareLaunchArgument(
+        'camera_enabled',
+        default_value='true',
+        description='Enable optional camera pipeline for mapping/localization/nav stacks (must degrade gracefully if camera/LUTs are missing).',
+    )
+    camera_topology_enabled = DeclareLaunchArgument(
+        'camera_topology_enabled',
+        default_value='false',
+        description='Enable floor topology visualization (/floor/topology) when camera pipeline is enabled.',
+    )
     slam_mode = DeclareLaunchArgument(
         'slam_mode',
         default_value='mapping',
@@ -308,6 +318,8 @@ def generate_launch_description() -> LaunchDescription:
         world,
         gazebo_gui,
         slam_enabled,
+        camera_enabled,
+        camera_topology_enabled,
         slam_mode,
         map_file_name,
         mag_enabled,

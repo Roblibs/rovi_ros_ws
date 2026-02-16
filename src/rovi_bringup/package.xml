@@ -29,6 +29,7 @@
   <exec_depend>twist_mux</exec_depend>
   <exec_depend>rovi_nav</exec_depend>
   <exec_depend>rovi_sim</exec_depend>
+  <exec_depend>rovi_floor</exec_depend>
   <exec_depend>ros_ui_bridge</exec_depend>
   <exec_depend>robot_serial_display</exec_depend>
 
