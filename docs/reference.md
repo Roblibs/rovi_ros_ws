@@ -18,8 +18,8 @@ All commands in this section are provided by `rovi_env.sh`
 ## Launch commands
 | Command | Description |
 |---|---|
-| `sim` | PC simulation: `sim` (default `mapping`) or `sim teleop/camera/mapping/localization/nav/calib_floor` runs `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=...` (or `floor_calibrate_sim.launch.py` for `calib_floor`) and starts Gazebo + RViz by default (`rviz:=false` for headless). |
-| `view` | PC visualization: `view` (default `nav`) or `view teleop/camera/mapping/nav`. Use `view offline` for local URDF inspection (no hardware). |
+| `sim` | PC simulation launcher. Default subcommand is `mapping`. Use extra args to pass `ros2 launch` overrides (example: `rviz:=false` for headless). See subcommands table below. |
+| `view` | PC visualization helper. Default subcommand is `nav`. See subcommands table below. |
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `camera` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=camera` (teleop + depth + RGB; headless; no RViz). |
 | `calib_color` | Runs camera intrinsics calibration (GUI): `ros2 run camera_calibration cameracalibrator --size 8x5 --square 0.028 --ros-args --remap image:=/camera/color/image --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info`. |
@@ -27,6 +27,24 @@ All commands in this section are provided by `rovi_env.sh`
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
+
+### Launch subcommands
+
+| Command | Subcommand | What it does |
+|---|---|---|
+| `sim` | `mapping` | Starts simulation stack `mapping` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=mapping joy_enabled:=false`. This is the default when no subcommand is provided. |
+| `sim` | `localization` | Starts simulation stack `localization` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=localization joy_enabled:=false`. |
+| `sim` | `nav` | Starts simulation stack `nav` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=nav joy_enabled:=false`. |
+| `sim` | `teleop` | Starts simulation stack `teleop` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=teleop joy_enabled:=false`. |
+| `sim` | `camera` | Starts simulation stack `camera` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=camera joy_enabled:=false`. |
+| `sim` | `calib_floor` | Runs floor calibration in simulation via `rovi_bringup/floor_calibrate_sim.launch.py`. |
+| `sim` | `gazebo` | Starts Gazebo Sim backend via `rovi_sim/gazebo_sim.launch.py`. |
+| `sim` | `backend` | Alias of `sim gazebo`. |
+| `view` | `nav` | Opens RViz with `rovi_description/rviz/rovi_nav.rviz`. This is the default when no subcommand is provided. |
+| `view` | `mapping` | Opens RViz with `rovi_description/rviz/rovi_map.rviz`. |
+| `view` | `teleop` | Opens RViz with `rovi_description/rviz/rovi_odom.rviz`. |
+| `view` | `camera` | Opens RViz with `rovi_description/rviz/rovi_camera.rviz`. |
+| `view` | `offline` | Runs URDF inspection launch via `rovi_bringup/rovi.launch.py robot_mode:=offline stack:=offline`. |
 
 ## Operations commands
 
