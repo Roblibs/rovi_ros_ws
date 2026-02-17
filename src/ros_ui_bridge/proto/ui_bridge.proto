@@ -281,14 +281,12 @@ message MapUpdate {
   bytes png = 8;
 }
 
-message FloorTopologyUpdate {
-  // Unix epoch time in milliseconds when this snapshot was produced.
-  int64 timestamp_unix_ms = 1;
+message FloorPolyline {
+  // Marker identity (best-effort). Useful for debugging or stable UI labeling.
+  string ns = 1;
+  uint32 id = 2;
 
-  // Monotonic snapshot sequence number (starts at 1).
-  uint64 seq = 2;
-
-  // Frame in which the topology is expressed (typically "base_footprint").
+  // Frame in which the polyline is expressed (typically "base_footprint").
   string frame_id = 3;
 
   // Polyline points in meters.
@@ -296,4 +294,15 @@ message FloorTopologyUpdate {
 
   // True when the polyline forms a closed loop.
   bool closed = 5;
+}
+
+message FloorTopologyUpdate {
+  // Unix epoch time in milliseconds when this snapshot was produced.
+  int64 timestamp_unix_ms = 1;
+
+  // Monotonic snapshot sequence number (starts at 1).
+  uint64 seq = 2;
+
+  // Snapshot of all currently-known polylines.
+  repeated FloorPolyline polylines = 3;
 }

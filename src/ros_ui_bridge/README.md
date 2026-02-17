@@ -12,7 +12,7 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 | Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Emits a single fixed-frame `pose` chosen by the bridge from the current launch session (teleop=odom, mapping/localization/nav=map), provided via `/rovi/session/current_launch_ref`. |
 | Downsampled lidar scans for 3D visualization | `StreamLidar` | Low-rate (2 Hz default) LaserScan stream; optional. |
 | Occupancy grid map (`/map`) as an encoded image | `StreamMap` | Grayscale PNG stream (0=occupied, 255=free, 127=unknown); optional. |
-| Floor topology polyline (from `/floor/topology`) | `StreamFloorTopology` | Best-effort polyline stream; idle when the topic is not published. |
+| Floor topology polylines (from `/floor/topology`) | `StreamFloorTopology` | Best-effort polyline snapshot stream; idle when the topic is not published. |
 | Robot model metadata (cache key / sha256, size) | `GetRobotModelMeta` | Use this as an ETag-like key to decide whether to refresh cached assets. |
 | Robot model asset (GLB / binary glTF) | `GetRobotModel` | Chunked stream to avoid gRPC message size limits. |
 

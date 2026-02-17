@@ -1,4 +1,8 @@
-"""Floor topology node: subscribes to /floor/topology (MarkerArray), extracts a polyline, notifies gRPC."""
+"""Floor topology node: subscribes to /floor/topology (MarkerArray), extracts polylines, notifies gRPC.
+
+This stream is snapshot-oriented: each gRPC publish represents the full current set of polylines
+after applying MarkerArray actions (ADD/DELETE/DELETEALL).
+"""
 
 from __future__ import annotations
 
@@ -25,11 +29,18 @@ class Point3Data:
 
 
 @dataclass(frozen=True)
-class FloorTopologyData:
-    timestamp_ms: int
+class FloorPolylineData:
+    ns: str
+    id: int
     frame_id: str
     points: tuple[Point3Data, ...]
     closed: bool
+
+
+@dataclass(frozen=True)
+class FloorTopologyData:
+    timestamp_ms: int
+    polylines: tuple[FloorPolylineData, ...]
 
 
 def _is_closed(points: tuple[Point3Data, ...], eps: float = 1e-6) -> bool:
@@ -55,6 +66,22 @@ def _signature(points: tuple[Point3Data, ...]) -> tuple[tuple[float, float, floa
     head = tuple(r(p) for p in points[:n])
     tail = tuple(r(p) for p in points[-n:])
     return head + tail
+
+
+def _polylines_signature(polylines: tuple[FloorPolylineData, ...]) -> tuple:
+    out = []
+    for pl in polylines:
+        out.append(
+            (
+                str(pl.ns),
+                int(pl.id),
+                str(pl.frame_id),
+                bool(pl.closed),
+                len(pl.points),
+                _signature(pl.points),
+            )
+        )
+    return tuple(out)
 
 
 class UiBridgeFloorTopologyNode(Node):
@@ -83,7 +110,8 @@ class UiBridgeFloorTopologyNode(Node):
         else:
             self._forwarder = None
 
-        self._last_signature: Optional[tuple[str, bool, int, tuple[tuple[float, float, float], ...]]] = None
+        self._state_by_key: dict[tuple[str, int], FloorPolylineData] = {}
+        self._last_signature: Optional[tuple] = None
 
         qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
         self._sub = self.create_subscription(MarkerArray, self._topic, self._on_msg, qos_best_effort)
@@ -107,32 +135,55 @@ class UiBridgeFloorTopologyNode(Node):
             self._forwarder.on_timer()
 
     def _on_forward(self, msg: MarkerArray) -> None:
-        marker = self._select_line_strip_marker(msg)
-        if marker is None:
-            frame_id = self._fallback_frame_id(msg) or self._frame_id_fallback
-            stamp_ns = self._fallback_stamp_ns(msg)
-            if stamp_ns <= 0:
-                stamp_ns = self.get_clock().now().nanoseconds
-            timestamp_ms = int(stamp_ns // 1_000_000)
-            points: tuple[Point3Data, ...] = ()
-            closed = False
-        else:
-            frame_id = _normalize_frame(marker.header.frame_id) or self._frame_id_fallback
-            stamp_ns = Time.from_msg(marker.header.stamp).nanoseconds
-            if stamp_ns <= 0:
-                stamp_ns = self.get_clock().now().nanoseconds
-            timestamp_ms = int(stamp_ns // 1_000_000)
-            points = tuple(Point3Data(x=float(p.x), y=float(p.y), z=float(p.z)) for p in marker.points)
-            closed = _is_closed(points)
+        stamp_ns = 0
 
-        sig = (frame_id, closed, len(points), _signature(points))
+        if any(int(m.action) == int(Marker.DELETEALL) for m in msg.markers):
+            self._state_by_key.clear()
+
+        for m in msg.markers:
+            if int(m.type) != int(Marker.LINE_STRIP):
+                continue
+
+            ns = str(m.ns or '')
+            marker_id = int(m.id)
+            key = (ns, marker_id)
+
+            if int(m.action) == int(Marker.DELETE):
+                self._state_by_key.pop(key, None)
+                continue
+            if int(m.action) != int(Marker.ADD):
+                continue
+
+            frame_id = _normalize_frame(m.header.frame_id) or self._frame_id_fallback
+            points = tuple(Point3Data(x=float(p.x), y=float(p.y), z=float(p.z)) for p in m.points)
+            if not points:
+                self._state_by_key.pop(key, None)
+                continue
+
+            closed = _is_closed(points)
+            self._state_by_key[key] = FloorPolylineData(
+                ns=ns,
+                id=marker_id,
+                frame_id=frame_id,
+                points=points,
+                closed=closed,
+            )
+
+            m_stamp_ns = Time.from_msg(m.header.stamp).nanoseconds
+            if m_stamp_ns > stamp_ns:
+                stamp_ns = int(m_stamp_ns)
+
+        if stamp_ns <= 0:
+            stamp_ns = self.get_clock().now().nanoseconds
+        timestamp_ms = int(stamp_ns // 1_000_000)
+
+        polylines = tuple(self._state_by_key[k] for k in sorted(self._state_by_key.keys()))
+        sig = _polylines_signature(polylines)
         if self._last_signature == sig:
             return
         self._last_signature = sig
 
-        self._grpc_broadcaster.publish_sync(
-            FloorTopologyData(timestamp_ms=timestamp_ms, frame_id=frame_id, points=points, closed=closed)
-        )
+        self._grpc_broadcaster.publish_sync(FloorTopologyData(timestamp_ms=timestamp_ms, polylines=polylines))
 
     def _fallback_frame_id(self, msg: MarkerArray) -> str:
         for m in msg.markers:
@@ -162,4 +213,3 @@ class UiBridgeFloorTopologyNode(Node):
             if selected is None:
                 selected = m
         return selected
-

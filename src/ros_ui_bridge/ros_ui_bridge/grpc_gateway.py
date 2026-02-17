@@ -15,7 +15,7 @@ import grpc
 from .api import ui_bridge_pb2, ui_bridge_pb2_grpc
 from .config import ControlConfig
 from .conductor.systemd import UnitStatus, control_unit, get_unit_status, stack_to_unit
-from .floor_topology_node import FloorTopologyData
+from .floor_topology_node import FloorPolylineData, FloorTopologyData
 from .lidar_node import LidarScanData
 from .map_node import MapData
 from .robot_model_provider import RobotModelProvider
@@ -472,8 +472,18 @@ def _floor_topology_to_proto(topo: FloorTopologyData, seq: int) -> ui_bridge_pb2
     msg = ui_bridge_pb2.FloorTopologyUpdate(
         timestamp_unix_ms=topo.timestamp_ms,
         seq=seq,
-        frame_id=str(topo.frame_id),
-        closed=bool(topo.closed),
     )
-    msg.points.extend(ui_bridge_pb2.Point3(x=float(p.x), y=float(p.y), z=float(p.z)) for p in topo.points)
+
+    msg.polylines.extend(_floor_polyline_to_proto(pl) for pl in topo.polylines)
+    return msg
+
+
+def _floor_polyline_to_proto(pl: FloorPolylineData) -> ui_bridge_pb2.FloorPolyline:
+    msg = ui_bridge_pb2.FloorPolyline(
+        ns=str(pl.ns),
+        id=int(pl.id),
+        frame_id=str(pl.frame_id),
+        closed=bool(pl.closed),
+    )
+    msg.points.extend(ui_bridge_pb2.Point3(x=float(p.x), y=float(p.y), z=float(p.z)) for p in pl.points)
     return msg
