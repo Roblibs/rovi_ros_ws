@@ -136,6 +136,10 @@ streams:
     downsampling_rate_hz: 0.5
     topic: "/map"
 
+  floor_topology:
+    #downsampling_rate_hz: 2.0
+    topic: "/floor/topology"
+
 robot_model:
   # Path to a pre-generated GLB (binary glTF). Examples:
   # - absolute: /path/to/robot.glb

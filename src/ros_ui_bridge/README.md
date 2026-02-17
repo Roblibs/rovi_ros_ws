@@ -12,6 +12,7 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 | Robot pose + wheel joint angles (for Three.js / 3D rendering) | `StreamRobotState` | Emits a single fixed-frame `pose` chosen by the bridge from the current launch session (teleop=odom, mapping/localization/nav=map), provided via `/rovi/session/current_launch_ref`. |
 | Downsampled lidar scans for 3D visualization | `StreamLidar` | Low-rate (2 Hz default) LaserScan stream; optional. |
 | Occupancy grid map (`/map`) as an encoded image | `StreamMap` | Grayscale PNG stream (0=occupied, 255=free, 127=unknown); optional. |
+| Floor topology polyline (from `/floor/topology`) | `StreamFloorTopology` | Best-effort polyline stream; idle when the topic is not published. |
 | Robot model metadata (cache key / sha256, size) | `GetRobotModelMeta` | Use this as an ETag-like key to decide whether to refresh cached assets. |
 | Robot model asset (GLB / binary glTF) | `GetRobotModel` | Chunked stream to avoid gRPC message size limits. |
 
@@ -53,6 +54,9 @@ grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -prot
 
 # Lidar stream
 grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamLidar
+
+# Floor topology stream
+grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamFloorTopology
 
 # Stack control (requires `control.enabled: true` in the UI bridge config and a polkit allowlist on the robot)
 grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto -d '{"stack":"nav"}' localhost:50051 roblibs.ui_bridge.v1.UiBridge/StartStack

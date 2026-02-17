@@ -84,6 +84,11 @@ class UiBridgeStub(object):
                 request_serializer=ui__bridge__pb2.MapRequest.SerializeToString,
                 response_deserializer=ui__bridge__pb2.MapUpdate.FromString,
                 _registered_method=True)
+        self.StreamFloorTopology = channel.unary_stream(
+                '/roblibs.ui_bridge.v1.UiBridge/StreamFloorTopology',
+                request_serializer=ui__bridge__pb2.FloorTopologyRequest.SerializeToString,
+                response_deserializer=ui__bridge__pb2.FloorTopologyUpdate.FromString,
+                _registered_method=True)
         self.GetRobotModelMeta = channel.unary_unary(
                 '/roblibs.ui_bridge.v1.UiBridge/GetRobotModelMeta',
                 request_serializer=ui__bridge__pb2.RobotModelRequest.SerializeToString,
@@ -165,6 +170,13 @@ class UiBridgeServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StreamFloorTopology(self, request, context):
+        """Streams floor topology suitable for UI rendering (best-effort; idle when topic is absent).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetRobotModelMeta(self, request, context):
         """Returns metadata for the current robot model (no GLB bytes).
         """
@@ -231,6 +243,11 @@ def add_UiBridgeServicer_to_server(servicer, server):
                     servicer.StreamMap,
                     request_deserializer=ui__bridge__pb2.MapRequest.FromString,
                     response_serializer=ui__bridge__pb2.MapUpdate.SerializeToString,
+            ),
+            'StreamFloorTopology': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamFloorTopology,
+                    request_deserializer=ui__bridge__pb2.FloorTopologyRequest.FromString,
+                    response_serializer=ui__bridge__pb2.FloorTopologyUpdate.SerializeToString,
             ),
             'GetRobotModelMeta': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRobotModelMeta,
@@ -513,6 +530,33 @@ class UiBridge(object):
             '/roblibs.ui_bridge.v1.UiBridge/StreamMap',
             ui__bridge__pb2.MapRequest.SerializeToString,
             ui__bridge__pb2.MapUpdate.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamFloorTopology(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/roblibs.ui_bridge.v1.UiBridge/StreamFloorTopology',
+            ui__bridge__pb2.FloorTopologyRequest.SerializeToString,
+            ui__bridge__pb2.FloorTopologyUpdate.FromString,
             options,
             channel_credentials,
             insecure,

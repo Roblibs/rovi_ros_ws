@@ -15,6 +15,7 @@ import grpc
 from .api import ui_bridge_pb2, ui_bridge_pb2_grpc
 from .config import ControlConfig
 from .conductor.systemd import UnitStatus, control_unit, get_unit_status, stack_to_unit
+from .floor_topology_node import FloorTopologyData
 from .lidar_node import LidarScanData
 from .map_node import MapData
 from .robot_model_provider import RobotModelProvider
@@ -33,6 +34,7 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
         lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
         map_broadcaster: Optional[AsyncStreamBroadcaster[MapData]],
+        floor_topology_broadcaster: Optional[AsyncStreamBroadcaster[FloorTopologyData]],
         model_provider: RobotModelProvider,
         model_chunk_size_bytes: int,
         odom_frame: str,
@@ -45,6 +47,7 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
         self._robot_state_broadcaster = robot_state_broadcaster
         self._lidar_broadcaster = lidar_broadcaster
         self._map_broadcaster = map_broadcaster
+        self._floor_topology_broadcaster = floor_topology_broadcaster
         self._model_provider = model_provider
         self._model_chunk_size_bytes = int(model_chunk_size_bytes)
         self._odom_frame = str(odom_frame)
@@ -262,6 +265,25 @@ class UiBridgeService(ui_bridge_pb2_grpc.UiBridgeServicer):
             seq += 1
             yield _map_to_proto(m, seq)
 
+    async def StreamFloorTopology(  # noqa: N802 - gRPC interface name
+        self,
+        request: ui_bridge_pb2.FloorTopologyRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> AsyncIterator[ui_bridge_pb2.FloorTopologyUpdate]:
+        """Stream floor topology updates. Queue-based, no stale data on subscribe."""
+        del request
+
+        if self._floor_topology_broadcaster is None:
+            await context.abort(grpc.StatusCode.UNAVAILABLE, "Floor topology stream not configured")
+            return
+
+        seq = 0
+        async for topo in self._floor_topology_broadcaster.subscribe():
+            if context.cancelled():
+                return
+            seq += 1
+            yield _floor_topology_to_proto(topo, seq)
+
     async def GetRobotModelMeta(  # noqa: N802 - gRPC interface name
         self,
         request: ui_bridge_pb2.RobotModelRequest,
@@ -444,3 +466,14 @@ def _map_to_proto(m: MapData, seq: int) -> ui_bridge_pb2.MapUpdate:
         ),
         png=bytes(m.png),
     )
+
+
+def _floor_topology_to_proto(topo: FloorTopologyData, seq: int) -> ui_bridge_pb2.FloorTopologyUpdate:
+    msg = ui_bridge_pb2.FloorTopologyUpdate(
+        timestamp_unix_ms=topo.timestamp_ms,
+        seq=seq,
+        frame_id=str(topo.frame_id),
+        closed=bool(topo.closed),
+    )
+    msg.points.extend(ui_bridge_pb2.Point3(x=float(p.x), y=float(p.y), z=float(p.z)) for p in topo.points)
+    return msg

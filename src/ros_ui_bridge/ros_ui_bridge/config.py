@@ -142,6 +142,12 @@ class MapStreamConfig:
 
 
 @dataclass(frozen=True)
+class FloorTopologyStreamConfig:
+    downsampling_period_s: float | None  # Optional max rate cap (forward on arrival, capped)
+    topic: str
+
+
+@dataclass(frozen=True)
 class UiBridgeConfig:
     grpc_bind: str
     control: ControlConfig
@@ -150,6 +156,7 @@ class UiBridgeConfig:
     robot_state_stream: RobotStateStreamConfig
     lidar_stream: Optional[LidarStreamConfig]
     map_stream: Optional[MapStreamConfig]
+    floor_topology_stream: Optional[FloorTopologyStreamConfig]
     robot_model: RobotModelConfig
 
 
@@ -195,6 +202,10 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
     robot_state_cfg = _parse_robot_state_stream(streams.get('robot_state'))
     lidar_cfg = _parse_lidar_stream(streams.get('lidar'))
     map_cfg = _parse_map_stream(streams.get('map'))
+    floor_topology_value = streams.get('floor_topology')
+    if 'floor_topology' not in streams:
+        floor_topology_value = {}
+    floor_topology_cfg = _parse_floor_topology_stream(floor_topology_value)
     robot_model_cfg = _parse_robot_model(robot_model)
 
     return UiBridgeConfig(
@@ -205,6 +216,7 @@ def load_config(path: str | Path | None) -> UiBridgeConfig:
         robot_state_stream=robot_state_cfg,
         lidar_stream=lidar_cfg,
         map_stream=map_cfg,
+        floor_topology_stream=floor_topology_cfg,
         robot_model=robot_model_cfg,
     )
 
@@ -442,6 +454,20 @@ def _parse_map_stream(value: Any) -> Optional[MapStreamConfig]:
     downsampling_period_s = _parse_downsampling_period_s(value)
     topic = str(value.get('topic', '/map'))
     return MapStreamConfig(downsampling_period_s=downsampling_period_s, topic=topic)
+
+
+def _parse_floor_topology_stream(value: Any) -> Optional[FloorTopologyStreamConfig]:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise RuntimeError("Invalid 'streams.floor_topology' section (expected mapping)")
+
+    if not bool(value.get('enabled', True)):
+        return None
+
+    downsampling_period_s = _parse_downsampling_period_s(value)
+    topic = str(value.get('topic', '/floor/topology'))
+    return FloorTopologyStreamConfig(downsampling_period_s=downsampling_period_s, topic=topic)
 
 
 def _parse_lidar_stream(value: Any) -> Optional[LidarStreamConfig]:

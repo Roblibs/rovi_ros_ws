@@ -25,6 +25,9 @@ service UiBridge {
   // Streams an encoded occupancy grid map suitable for UI rendering.
   rpc StreamMap(MapRequest) returns (stream MapUpdate);
 
+  // Streams floor topology suitable for UI rendering (best-effort; idle when topic is absent).
+  rpc StreamFloorTopology(FloorTopologyRequest) returns (stream FloorTopologyUpdate);
+
   // Returns metadata for the current robot model (no GLB bytes).
   rpc GetRobotModelMeta(RobotModelRequest) returns (RobotModelMeta);
 
@@ -150,7 +153,15 @@ message LidarRequest {}
 
 message MapRequest {}
 
+message FloorTopologyRequest {}
+
 message RobotModelRequest {}
+
+message Point3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
 
 message Pose3D {
   // Frame in which this pose is expressed (e.g. "odom", "map").
@@ -268,4 +279,21 @@ message MapUpdate {
   // Grayscale PNG-encoded occupancy image.
   // Convention: 0=occupied, 255=free, 127=unknown.
   bytes png = 8;
+}
+
+message FloorTopologyUpdate {
+  // Unix epoch time in milliseconds when this snapshot was produced.
+  int64 timestamp_unix_ms = 1;
+
+  // Monotonic snapshot sequence number (starts at 1).
+  uint64 seq = 2;
+
+  // Frame in which the topology is expressed (typically "base_footprint").
+  string frame_id = 3;
+
+  // Polyline points in meters.
+  repeated Point3 points = 4;
+
+  // True when the polyline forms a closed loop.
+  bool closed = 5;
 }

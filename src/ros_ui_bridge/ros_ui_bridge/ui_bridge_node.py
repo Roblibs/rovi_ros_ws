@@ -17,6 +17,7 @@ from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from .api import ui_bridge_pb2_grpc
 from .config import UiBridgeConfig, load_config
 from .grpc_gateway import UiBridgeService
+from .floor_topology_node import FloorTopologyData, UiBridgeFloorTopologyNode
 from .lidar_node import LidarScanData, UiBridgeLidarNode
 from .map_node import MapData, UiBridgeMapNode
 from .robot_model_provider import RobotModelProvider
@@ -130,6 +131,7 @@ async def _run_async(
     robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData],
     lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]],
     map_broadcaster: Optional[AsyncStreamBroadcaster[MapData]],
+    floor_topology_broadcaster: Optional[AsyncStreamBroadcaster[FloorTopologyData]],
     logger,
 ) -> None:
     stop_event = asyncio.Event()
@@ -141,6 +143,8 @@ async def _run_async(
         lidar_broadcaster.set_loop(loop)
     if map_broadcaster is not None:
         map_broadcaster.set_loop(loop)
+    if floor_topology_broadcaster is not None:
+        floor_topology_broadcaster.set_loop(loop)
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
@@ -188,6 +192,7 @@ async def _run_async(
         robot_state_broadcaster=robot_state_broadcaster,
         lidar_broadcaster=lidar_broadcaster,
         map_broadcaster=map_broadcaster,
+        floor_topology_broadcaster=floor_topology_broadcaster,
         model_provider=model_provider,
         model_chunk_size_bytes=cfg.robot_model.chunk_size_bytes,
         odom_frame=cfg.robot_state_stream.odom_frame,
@@ -236,6 +241,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     robot_state_broadcaster: AsyncStreamBroadcaster[RobotStateData] = AsyncStreamBroadcaster()
     lidar_broadcaster: Optional[AsyncStreamBroadcaster[LidarScanData]] = None
     map_broadcaster: Optional[AsyncStreamBroadcaster[MapData]] = None
+    floor_topology_broadcaster: Optional[AsyncStreamBroadcaster[FloorTopologyData]] = None
 
     state_node = UiBridgeRobotStateNode(
         odom_topic=cfg.robot_state_stream.odom_topic,
@@ -269,6 +275,15 @@ def main(argv: Optional[list[str]] = None) -> None:
             grpc_broadcaster=map_broadcaster,
         )
 
+    floor_topology_node: Optional[UiBridgeFloorTopologyNode] = None
+    if cfg.floor_topology_stream is not None:
+        floor_topology_broadcaster = AsyncStreamBroadcaster()
+        floor_topology_node = UiBridgeFloorTopologyNode(
+            topic=cfg.floor_topology_stream.topic,
+            downsampling_period_s=cfg.floor_topology_stream.downsampling_period_s,
+            grpc_broadcaster=floor_topology_broadcaster,
+        )
+
     executor = SingleThreadedExecutor()
     executor.add_node(ros_node)
     executor.add_node(state_node)
@@ -276,6 +291,8 @@ def main(argv: Optional[list[str]] = None) -> None:
         executor.add_node(lidar_node)
     if map_node is not None:
         executor.add_node(map_node)
+    if floor_topology_node is not None:
+        executor.add_node(floor_topology_node)
 
     spin_thread = threading.Thread(target=executor.spin, name='ros_ui_bridge_ros_spin', daemon=True)
     spin_thread.start()
@@ -292,6 +309,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                     robot_state_broadcaster=robot_state_broadcaster,
                     lidar_broadcaster=lidar_broadcaster,
                     map_broadcaster=map_broadcaster,
+                    floor_topology_broadcaster=floor_topology_broadcaster,
                     logger=logger,
                 )
             )
@@ -322,6 +340,12 @@ def main(argv: Optional[list[str]] = None) -> None:
         if map_node is not None:
             try:
                 map_node.destroy_node()
+            except Exception:
+                pass
+
+        if floor_topology_node is not None:
+            try:
+                floor_topology_node.destroy_node()
             except Exception:
                 pass
 
