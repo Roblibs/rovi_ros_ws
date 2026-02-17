@@ -111,7 +111,9 @@ class UiBridgeFloorTopologyNode(Node):
             self._forwarder = None
 
         self._state_by_key: dict[tuple[str, int], FloorPolylineData] = {}
-        self._last_signature: Optional[tuple] = None
+        # NOTE: Do not dedupe publishes here.
+        # UIs often drop "stale" overlays; if the topology is stable, we still want a steady stream
+        # so consumers can treat lack of updates as "frozen".
 
         qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
         self._sub = self.create_subscription(MarkerArray, self._topic, self._on_msg, qos_best_effort)
@@ -178,11 +180,6 @@ class UiBridgeFloorTopologyNode(Node):
         timestamp_ms = int(stamp_ns // 1_000_000)
 
         polylines = tuple(self._state_by_key[k] for k in sorted(self._state_by_key.keys()))
-        sig = _polylines_signature(polylines)
-        if self._last_signature == sig:
-            return
-        self._last_signature = sig
-
         self._grpc_broadcaster.publish_sync(FloorTopologyData(timestamp_ms=timestamp_ms, polylines=polylines))
 
     def _fallback_frame_id(self, msg: MarkerArray) -> str:

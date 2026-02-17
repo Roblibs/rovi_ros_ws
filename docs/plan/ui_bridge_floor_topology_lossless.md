@@ -1,15 +1,12 @@
-# Plan: Make `StreamFloorTopology` lossless (multiple polylines + MarkerArray semantics)
+# Plan: `StreamFloorTopology` clean snapshot (polylines in meters)
 
-## Problem
-Current `StreamFloorTopology` is **lossy**:
-- `FloorTopologyUpdate` carries only one `points[]` polyline, so multiple LINE_STRIP markers in one `/floor/topology` `MarkerArray` get dropped.
-- The bridge selects a single marker (`ns=="floor_topology"` else first LINE_STRIP), which can be “wrong” if publishers ever emit more than one relevant strip or use multiple namespaces/ids.
+## Problem (original)
+`/floor/topology` is published as `visualization_msgs/msg/MarkerArray` for RViz convenience, but UI clients should not have to deal with Marker semantics.
 
 ## Goal
-Forward `/floor/topology` to UI **without destructive selection**:
-- If the topic publishes multiple polylines, UI receives all of them for that update.
-- If the topic is absent, the stream stays idle (no errors).
-- Preserve MarkerArray “clear/delete” meaning so UI doesn’t accumulate stale geometry.
+Expose floor topology over gRPC as a **clean, typed snapshot**:
+- Each gRPC event contains all polylines for “now” (meters).
+- UI clears the overlay when the snapshot is empty.
 
 ## Approach (breaking change): update `FloorTopologyUpdate` to a snapshot message
 Update the existing stream payload to be a **snapshot** of the current set of polylines:
@@ -23,7 +20,7 @@ Each `FloorPolyline` contains:
 - (Optional, nice-to-have) style: `float width_m`, `ColorRGBA color`
 
 Snapshot semantics:
-- Each V2 message replaces the UI’s previous set of polylines entirely.
+- Each message replaces the UI’s previous set of polylines entirely.
 - If the publisher sends only a clear (DELETEALL) and no line strips, the UI gets `polylines=[]` and clears.
 
 Why snapshot semantics:
@@ -68,3 +65,6 @@ Update `src/ros_ui_bridge/ros_ui_bridge/floor_topology_node.py` (or add a `floor
 ## UI client expectations
 - Render all `polylines[]`.
 - Treat `polylines=[]` as “clear overlay”.
+
+## Status
+Implemented.

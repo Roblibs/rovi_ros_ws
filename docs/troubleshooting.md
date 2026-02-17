@@ -80,6 +80,48 @@ What to do:
 
 See also: `docs/runtime.md`
 
+### UI: floor topology not showing
+
+Symptom:
+- Your UI does not show the floor topology overlay.
+
+Checklist (ROS side):
+```bash
+# Topic exists and has data?
+ros2 topic list | rg "/floor"
+ros2 topic info /floor/topology -v
+ros2 topic hz /floor/topology
+ros2 topic echo --once /floor/topology
+
+# Is the floor node running and is topology enabled?
+ros2 node list | rg "rovi_floor_runtime"
+ros2 param get /rovi_floor_runtime camera_topology_enabled
+```
+
+Checklist (RViz sanity):
+```bash
+# If RViz can’t show it either, the issue is upstream of the UI bridge.
+# In RViz: add a "MarkerArray" display and set topic to /floor/topology.
+```
+
+Checklist (gRPC / UI bridge):
+```bash
+# Is the gRPC server listening?
+ss -lntp | rg ":50051" || true
+
+# Does the floor topology stream produce updates?
+# (Install grpcurl if needed: sudo snap install --edge grpcurl)
+grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -proto ui_bridge.proto \
+  localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamFloorTopology
+```
+
+If `grpcurl` shows nothing for a long time:
+- Confirm `/floor/topology` is publishing (see ROS checklist above).
+- Note: `grpcurl` waits for the next streamed event; it will not print anything if the stream is idle.
+
+If `grpcurl` shows `FloorTopologyUpdate{ polylines: ... }` but the UI still shows nothing:
+- Confirm the UI client is using the current proto: `FloorTopologyUpdate` now carries `polylines[]` (not a single `points[]`).
+
 ## Runtime environment
 
 ### Python deps missing at runtime (e.g. `rosmaster_driver` import errors)
