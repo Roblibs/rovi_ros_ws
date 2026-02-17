@@ -11,6 +11,7 @@ Higher-level bringup (teleop / mapping / nav) is expected to run separately and 
 """
 
 import os
+import uuid
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
@@ -21,6 +22,7 @@ from launch.actions import (
     EmitEvent,
     IncludeLaunchDescription,
     RegisterEventHandler,
+    SetEnvironmentVariable,
     TimerAction,
 )
 from launch.conditions import IfCondition
@@ -71,6 +73,16 @@ def generate_launch_description() -> LaunchDescription:
         description='ros_gz_bridge YAML config file.',
     )
 
+    default_partition = f"rovi_{os.environ.get('USER', 'user')}_{uuid.uuid4().hex[:8]}"
+    gz_partition_arg = DeclareLaunchArgument(
+        'gz_partition',
+        default_value=default_partition,
+        description=(
+            'Gazebo Transport partition (isolates multiple gz sim instances). '
+            'Keep the default unless you intentionally want to share transport topics.'
+        ),
+    )
+
     use_sim_time_param = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
 
     # Make package:// URIs resolvable in Gazebo by ensuring the parent "share" dirs are in the resource path.
@@ -79,6 +91,14 @@ def generate_launch_description() -> LaunchDescription:
     set_gz_paths = [
         AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH', sim_share_parent),
         AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH', desc_share_parent),
+    ]
+
+    # Ensure we never accidentally bridge to a different running Gazebo instance on the same host.
+    # Gazebo Transport topics are partition-scoped, not ROS-domain-scoped.
+    set_gz_partition = [
+        SetEnvironmentVariable('GZ_PARTITION', LaunchConfiguration('gz_partition')),
+        # Compatibility with older tooling / naming.
+        SetEnvironmentVariable('IGN_PARTITION', LaunchConfiguration('gz_partition')),
     ]
 
     gz_launch = os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')
@@ -157,7 +177,9 @@ def generate_launch_description() -> LaunchDescription:
         model_arg,
         robot_name_arg,
         bridge_cfg_arg,
+        gz_partition_arg,
         *set_gz_paths,
+        *set_gz_partition,
         gazebo_server,
         gazebo_client,
         bridge,

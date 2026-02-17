@@ -21,12 +21,29 @@ from launch_ros.parameter_descriptions import ParameterValue
 def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory("rovi_bringup")
     robot_bringup_launch = os.path.join(bringup_share, "launch", "robot_bringup.launch.py")
+    sim_share = get_package_share_directory("rovi_sim")
+    default_calib_world = os.path.join(sim_share, "worlds", "rovi_floor_only.sdf")
 
     gazebo_gui = DeclareLaunchArgument("gazebo_gui", default_value="false", description="Start Gazebo GUI client.")
+    world = DeclareLaunchArgument(
+        "world",
+        default_value=default_calib_world,
+        description="Full path to the Gazebo world SDF file (calibration defaults to a floor-only world).",
+    )
     capture_duration_s = DeclareLaunchArgument(
         "capture_duration_s",
-        default_value="10.0",
+        default_value="2.0",
         description="Capture duration in seconds (steady-clock wall duration).",
+    )
+    max_frames = DeclareLaunchArgument(
+        "max_frames",
+        default_value="5",
+        description="Stop capture once this many depth frames are collected.",
+    )
+    min_valid_samples = DeclareLaunchArgument(
+        "min_valid_samples",
+        default_value="1",
+        description="Minimum non-zero samples per pixel needed to accept a depth value (sim can use 1).",
     )
     generate_obstacle_thresholds = DeclareLaunchArgument(
         "generate_obstacle_thresholds",
@@ -40,6 +57,7 @@ def generate_launch_description() -> LaunchDescription:
             "robot_mode": "sim",
             "use_sim_time": "true",
             "gazebo_gui": LaunchConfiguration("gazebo_gui"),
+            "world": LaunchConfiguration("world"),
         }.items(),
     )
 
@@ -52,6 +70,8 @@ def generate_launch_description() -> LaunchDescription:
             {"use_sim_time": True},
             {"robot_mode": "sim"},
             {"capture_duration_s": ParameterValue(LaunchConfiguration("capture_duration_s"), value_type=float)},
+            {"max_frames": ParameterValue(LaunchConfiguration("max_frames"), value_type=int)},
+            {"min_valid_samples": ParameterValue(LaunchConfiguration("min_valid_samples"), value_type=int)},
             {
                 "generate_obstacle_thresholds": ParameterValue(
                     LaunchConfiguration("generate_obstacle_thresholds"), value_type=bool
@@ -71,7 +91,10 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         gazebo_gui,
+        world,
         capture_duration_s,
+        max_frames,
+        min_valid_samples,
         generate_obstacle_thresholds,
         backend,
         delayed_calibrate,

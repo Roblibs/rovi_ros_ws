@@ -109,7 +109,7 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `mapping.launch.py` | `rovi_bringup` | Mapping stack only: EKF + `slam_toolbox` (mapping mode). |
 | `localization.launch.py` | `rovi_bringup` | Localization stack only: EKF + `slam_toolbox` (localization mode, loads `map_file_name`). |
 | `nav.launch.py` | `rovi_bringup` | Navigation stack only: mapping/localization + Nav2 (publishes `/cmd_vel_nav`). |
-| `floor_calibrate_sim.launch.py` | `rovi_bringup` | One-shot sim floor calibration: starts `robot_bringup` with `robot_mode=sim`, runs `floor_calibrate_node`, then shuts down. |
+| `floor_calibrate_sim.launch.py` | `rovi_bringup` | One-shot sim floor calibration: starts `robot_bringup` with `robot_mode=sim` using a floor-only world by default, runs `floor_calibrate_node` with sim-friendly short capture defaults, then shuts down. |
 | `perception.launch.py` | `rovi_bringup` | Perception “slot” included by mapping/localization/nav (currently: `rovi_floor` runtime when `camera_enabled:=true`). |
 | `floor_runtime.launch.py` | `rovi_bringup` | Runs `rovi_floor` runtime: `/camera/depth/image` + LUTs → `/floor/mask` (+ optional `/floor/topology`). |
 | `floor_calibrate.launch.py` | `rovi_bringup` | Runs `rovi_floor` calibration and writes LUT PNGs under `~/.ros/rovi/floor/`, then exits. |
