@@ -18,6 +18,19 @@ It is designed to be generic and reusable: it reads from ROS topics / TF and str
 
 Proto: `proto/ui_bridge.proto` (`package roblibs.ui_bridge.v1`)
 
+## Proto generation (important)
+
+This repo does not check in generated `*_pb2*.py` stubs.
+They are generated during `colcon build` into the build/install overlay using system `protoc` + the gRPC Python plugin (Ubuntu packages `protobuf-compiler` + `protobuf-compiler-grpc`), so the generated code matches the local system `python3-protobuf` runtime.
+
+If you see protobuf import errors (for example missing `runtime_version`), install the generator and rebuild:
+
+```bash
+sudo apt install -y protobuf-compiler protobuf-compiler-grpc python3-protobuf python3-grpcio
+clean
+build
+```
+
 ## ROS inputs (high level)
 
 - Status fields are configurable: CPU (`system` provider), ROS topic values (`topic_value`), topic Hz (`topic_rate`), and TF Hz (`tf_rate`). Staleness is enforced in the bridge using ROS time; stale fields simply disappear from the stream.

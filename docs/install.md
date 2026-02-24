@@ -1,10 +1,14 @@
 # Install
 
-* Install : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
+## Dependency policy
+
+- PC sim/view: use `apt` (no `pip`, no workspace `.venv` required).
+- Robot real: use `apt` first; use workspace `.venv` via `uv sync` only for robot-only Python deps that are not packaged as Ubuntu/ROS debs.
+
+* Install ros jazzy : https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html
 
 * Install uv (Python package and venv manager):
 
-uv is only needed if you rely on workspace `.venv` Python deps (typically `robot_mode:=real` / robot-only drivers).
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
@@ -22,7 +26,7 @@ uv sync
 
 You do not need to manually activate the venv for normal `robot_mode:=real` launches; bringup will pick up `ROVI_ROS_WS_DIR/.venv` automatically when present.
 
-## Robot services (systemd)
+## Robot services
 
 Install the robot systemd units + polkit rules:
 
@@ -48,6 +52,8 @@ sudo apt install -y \
   ros-jazzy-rosbag2 \
   ros-jazzy-rosbag2-compression-zstd \
   ros-jazzy-diagnostic-updater \
+  protobuf-compiler \
+  protobuf-compiler-grpc \
   python3-grpcio \
   python3-protobuf \
   python3-psutil \
@@ -74,6 +80,12 @@ sudo apt install -y \
 Notes:
 - PC sim/view stacks are intended to run without workspace `.venv`. Keep Python runtime deps like `grpcio` installed via `apt` (system Python).
 - The workspace `.venv` (via `uv sync`) is reserved for robot-only Python deps that are not packaged as Ubuntu/ROS debs (for example GitHub-only libs).
+
+### Protobuf/gRPC codegen note (PC builds)
+
+`ros_ui_bridge` generates Python gRPC/protobuf stubs from `src/ros_ui_bridge/proto/ui_bridge.proto` during `colcon build` using system `protoc` + the gRPC Python plugin (from `protobuf-compiler` / `protobuf-compiler-grpc`).
+
+If you see older instructions suggesting `python3 -m pip install --user grpcio-tools ...`, you can ignore them on Ubuntu: we intentionally rely on `apt` for both runtime (`python3-protobuf`, `python3-grpcio`) and codegen (`protobuf-compiler`, `protobuf-compiler-grpc`).
 
 ## USB device setup (robot)
 Connect the Rosmaster control board, RPLidar, and the ESP32-S3 display, then run:
