@@ -48,7 +48,14 @@ sudo apt install -y \
   ros-jazzy-rosbag2 \
   ros-jazzy-rosbag2-compression-zstd \
   ros-jazzy-diagnostic-updater \
+  python3-grpcio \
+  python3-protobuf \
   python3-psutil \
+  python3-serial \
+  python3-yaml \
+  python3-catkin-pkg \
+  python3-lark \
+  python3-numpy \
   ros-jazzy-robot-state-publisher \
   ros-jazzy-joint-state-publisher-gui \
   ros-jazzy-rviz2 \
@@ -63,6 +70,10 @@ sudo apt install -y \
   ros-jazzy-nav2-rviz-plugins \
   ros-jazzy-imu-filter-madgwick
 ```
+
+Notes:
+- PC sim/view stacks are intended to run without workspace `.venv`. Keep Python runtime deps like `grpcio` installed via `apt` (system Python).
+- The workspace `.venv` (via `uv sync`) is reserved for robot-only Python deps that are not packaged as Ubuntu/ROS debs (for example GitHub-only libs).
 
 ## USB device setup (robot)
 Connect the Rosmaster control board, RPLidar, and the ESP32-S3 display, then run:
