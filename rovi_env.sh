@@ -108,6 +108,7 @@ _rovi_launch_real_stack() {
   # make stack launches "stack-only" automatically to avoid a second gateway.
   if ! _rovi_args_have_gateway_enabled "$@"; then
     if _rovi_gateway_service_active; then
+      echo "[rovi_env] rovi-gateway.service is active; adding gateway_enabled:=false (stack-only launch)" >&2
       launch_args+=(gateway_enabled:=false)
     fi
   fi
