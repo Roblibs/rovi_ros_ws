@@ -74,6 +74,47 @@ ensure_ros2_daemon() {
   fi
 }
 
+_rovi_args_have_gateway_enabled() {
+  local arg
+  for arg in "$@"; do
+    if [[ "${arg}" == gateway_enabled:=* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+_rovi_gateway_service_active() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  systemctl is-active --quiet rovi-gateway.service >/dev/null 2>&1
+}
+
+_rovi_launch_real_stack() {
+  if [ $# -lt 1 ]; then
+    echo "[rovi_env] Usage: _rovi_launch_real_stack <stack> [ros2 launch args...]" >&2
+    return 2
+  fi
+
+  local stack="$1"
+  shift || true
+
+  local -a launch_args=(
+    robot_mode:=real
+    stack:="${stack}"
+    rviz:=false
+  )
+
+  # If the always-on gateway plane is already running under systemd,
+  # make stack launches "stack-only" automatically to avoid a second gateway.
+  if ! _rovi_args_have_gateway_enabled "$@"; then
+    if _rovi_gateway_service_active; then
+      launch_args+=(gateway_enabled:=false)
+    fi
+  fi
+
+  ros2 launch rovi_bringup rovi.launch.py "${launch_args[@]}" "$@"
+}
+
 # Default DDS mode for this workspace:
 rovi_dds_default
 #ensure_ros2_daemon
@@ -172,11 +213,11 @@ play() {
 }
 
 teleop() {
-  ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=teleop rviz:=false "$@"
+  _rovi_launch_real_stack teleop "$@"
 }
 
 camera() {
-  ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=camera rviz:=false "$@"
+  _rovi_launch_real_stack camera "$@"
 }
 
 calib_color() {
@@ -209,15 +250,15 @@ keyboard() {
 }
 
 mapping() {
-  ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=mapping rviz:=false "$@"
+  _rovi_launch_real_stack mapping "$@"
 }
 
 localization() {
-  ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=localization rviz:=false "$@"
+  _rovi_launch_real_stack localization "$@"
 }
 
 nav() {
-  ros2 launch rovi_bringup rovi.launch.py robot_mode:=real stack:=nav rviz:=false "$@"
+  _rovi_launch_real_stack nav "$@"
 }
 
 sim() {

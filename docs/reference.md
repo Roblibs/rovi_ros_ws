@@ -28,6 +28,9 @@ All commands in this section are provided by `rovi_env.sh`
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
 
+Notes:
+- If `rovi-gateway.service` is active (systemd mode), the `teleop`/`camera`/`mapping`/`localization`/`nav` commands automatically add `gateway_enabled:=false` unless you explicitly pass `gateway_enabled:=...`.
+
 ### Launch subcommands
 
 | Command | Subcommand | What it does |
