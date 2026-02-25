@@ -190,35 +190,27 @@ def generate_launch_description() -> LaunchDescription:
 
     if venv_site and os.path.isdir(venv_site):
         venv_env_actions = [
-            GroupAction(
+            SetEnvironmentVariable(
                 condition=is_real,
-                actions=[
-                    SetEnvironmentVariable(
-                        name='PYTHONPATH',
-                        value=[
-                            TextSubstitution(text=venv_site),
-                            TextSubstitution(text=':'),
-                            EnvironmentVariable('PYTHONPATH', default_value=''),
-                        ],
-                    ),
-                    SetEnvironmentVariable(name='PYTHONUNBUFFERED', value='1'),
-                    LogInfo(msg=f"robot_mode=real: using venv site-packages: {venv_site}"),
+                name='PYTHONPATH',
+                value=[
+                    TextSubstitution(text=venv_site),
+                    TextSubstitution(text=':'),
+                    EnvironmentVariable('PYTHONPATH', default_value=''),
                 ],
-            )
+            ),
+            SetEnvironmentVariable(condition=is_real, name='PYTHONUNBUFFERED', value='1'),
+            LogInfo(condition=is_real, msg=f"robot_mode=real: using venv site-packages: {venv_site}"),
         ]
     else:
         venv_env_actions = [
-            GroupAction(
+            LogInfo(
                 condition=is_real,
-                actions=[
-                    LogInfo(
-                        msg=(
-                            "robot_mode=real: no venv site-packages found "
-                            "(expected VIRTUAL_ENV or $ROVI_ROS_WS_DIR/.venv); using existing PYTHONPATH"
-                        )
-                    ),
-                ],
-            )
+                msg=(
+                    "robot_mode=real: no venv site-packages found "
+                    "(expected VIRTUAL_ENV or $ROVI_ROS_WS_DIR/.venv); using existing PYTHONPATH"
+                ),
+            ),
         ]
 
     robot_description = ParameterValue(

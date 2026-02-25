@@ -219,7 +219,7 @@ def _patch_rosmaster_receive(Rosmaster) -> None:
     def _safe_receive(self):  # noqa: ANN001
         try:
             original(self)
-        except (serial.SerialException, OSError):
+        except (serial.SerialException, OSError, TypeError, IndexError):
             return
 
     setattr(Rosmaster, attr, _safe_receive)
@@ -422,6 +422,14 @@ def main() -> int:
             f"idProduct={display_product}",
         ],
     ]
+    # Also trigger "add" events for the exact /dev nodes we just identified so
+    # udev applies MODE/SYMLINK immediately without requiring a replug.
+    for dev in (rosmaster_dev, lidar_dev):
+        sysname = Path(dev["devnode"]).name
+        cmds.append(["udevadm", "trigger", "--action=add", f"--name-match={sysname}", "--settle"])
+    if display_device is not None:
+        sysname = Path(display_device["devnode"]).name
+        cmds.append(["udevadm", "trigger", "--action=add", f"--name-match={sysname}", "--settle"])
     for cmd in cmds:
         try:
             subprocess.run(cmd, check=True)
@@ -430,10 +438,15 @@ def main() -> int:
             print(f"[error] Failed to run {' '.join(cmd)}: {exc}")
             return 1
 
-    print(
-        "[setup] Done. Unplug/replug devices to ensure symlinks appear as "
-        "/dev/robot_control, /dev/robot_lidar, /dev/robot_display."
-    )
+    missing = [p for p in ("/dev/robot_control", "/dev/robot_lidar", "/dev/robot_display") if not Path(p).exists()]
+    if missing:
+        print(f"[setup] Done, but missing symlink(s): {', '.join(missing)}")
+        print(
+            "[setup] Unplug/replug the missing device(s) so udev re-enumerates them, then verify:\n"
+            "  ls -l /dev/robot_control /dev/robot_lidar /dev/robot_display"
+        )
+    else:
+        print("[setup] Done. Verified symlinks exist: /dev/robot_control /dev/robot_lidar /dev/robot_display")
     return 0
 
 
