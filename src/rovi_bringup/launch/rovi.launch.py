@@ -172,7 +172,7 @@ def generate_launch_description() -> LaunchDescription:
     camera_enabled = DeclareLaunchArgument(
         'camera_enabled',
         default_value='true',
-        description='Enable optional camera pipeline for mapping/localization/nav stacks (must degrade gracefully if camera/LUTs are missing).',
+        description='Enable optional camera pipeline for mapping/localization/nav stacks (must degrade gracefully if camera is missing).',
     )
     camera_topology_enabled = DeclareLaunchArgument(
         'camera_topology_enabled',

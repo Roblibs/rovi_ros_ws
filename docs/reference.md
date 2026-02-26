@@ -10,7 +10,7 @@ Robot-only systemd units live under `services/`. Policy: keep a single always-on
 | `rovi-nav.service` | Nav stack (requires `rovi-gateway.service`). |
 
 Notes:
-- Calibration launches (e.g. camera or floor calibration) should be run on-demand and are not intended to be permanent services.
+- Calibration launches (e.g. camera calibration) should be run on-demand and are not intended to be permanent services.
 
 # Commands
 All commands in this section are provided by `rovi_env.sh`
@@ -23,7 +23,6 @@ All commands in this section are provided by `rovi_env.sh`
 | `teleop` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=teleop` (headless; no RViz). |
 | `camera` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=camera` (teleop + depth + RGB; headless; no RViz). |
 | `calib_color` | Runs camera intrinsics calibration (GUI): `ros2 run camera_calibration cameracalibrator --size 8x5 --square 0.028 --ros-args --remap image:=/camera/color/image --remap camera/set_camera_info:=/camera/color/v4l2_camera/set_camera_info`. |
-| `calib_floor` | Runs floor LUT calibration (writes `~/.ros/rovi/floor/*.png`). |
 | `mapping` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=mapping` (headless; no RViz). |
 | `localization` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=localization` (headless; no RViz). |
 | `nav` | Robot (Pi): runs `rovi_bringup/rovi.launch.py` with `robot_mode:=real stack:=nav` (headless; no RViz). |
@@ -40,7 +39,6 @@ Notes:
 | `sim` | `nav` | Starts simulation stack `nav` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=nav joy_enabled:=false`. |
 | `sim` | `teleop` | Starts simulation stack `teleop` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=teleop joy_enabled:=false`. |
 | `sim` | `camera` | Starts simulation stack `camera` via `rovi_bringup/rovi.launch.py robot_mode:=sim stack:=camera joy_enabled:=false`. |
-| `sim` | `calib_floor` | Runs floor calibration in simulation via `rovi_bringup/floor_calibrate_sim.launch.py`. |
 | `sim` | `gazebo` | Starts Gazebo Sim backend via `rovi_sim/gazebo_sim.launch.py`. |
 | `sim` | `backend` | Alias of `sim gazebo`. |
 | `view` | `nav` | Opens RViz with `rovi_description/rviz/rovi_nav.rviz`. This is the default when no subcommand is provided. |
@@ -76,7 +74,7 @@ Packages of this repo are listed in this table
 | `rovi_localization` | Odometry filtering pipeline: IMU orientation filter + EKF; publishes `/odometry/filtered` and TF `odom -> base_footprint` |
 | `rovi_slam` | SLAM pipeline (`slam_toolbox`): publishes `/map` and TF `map -> odom` when enabled |
 | `rovi_nav` | Nav2 integration package: configuration + component launch for autonomous navigation |
-| `rovi_floor` | Depth-floor diff perception: publishes `/floor/mask` (+ optional `/floor/topology`) and provides LUT calibration (`calib_floor`). |
+| `rovi_floor` | Depth-based obstacle perception: publishes `/floor/mask` (obstacle-only) + optional `/floor/topology` visualization. |
 | `ros_ui_bridge` | UI bridge: status fields (CPU + ROS topic values/rates + TF rates) with ROS-time staleness filtering and gRPC streaming; also serves robot pose, lidar, map, and model metadata |
 | `robot_serial_display` | Serial UI client: consumes `ros_ui_bridge` gRPC status stream and pushes JSON lines to the ESP32-S3 display |
 
@@ -113,10 +111,8 @@ External ROS packages installed via apt (and a couple of local tools) and how th
 | `mapping.launch.py` | `rovi_bringup` | Mapping stack only: EKF + `slam_toolbox` (mapping mode). |
 | `localization.launch.py` | `rovi_bringup` | Localization stack only: EKF + `slam_toolbox` (localization mode, loads `map_file_name`). |
 | `nav.launch.py` | `rovi_bringup` | Navigation stack only: mapping/localization + Nav2 (publishes `/cmd_vel_nav`). |
-| `floor_calibrate_sim.launch.py` | `rovi_bringup` | One-shot sim floor calibration: starts `robot_bringup` with `robot_mode=sim` using a floor-only world by default, runs `floor_calibrate_node` with sim-friendly short capture defaults, then shuts down. |
 | `perception.launch.py` | `rovi_bringup` | Perception “slot” included by mapping/localization/nav (currently: `rovi_floor` runtime when `camera_enabled:=true`). |
-| `floor_runtime.launch.py` | `rovi_bringup` | Runs `rovi_floor` runtime: `/camera/depth/image` + LUTs → `/floor/mask` (+ optional `/floor/topology`). |
-| `floor_calibrate.launch.py` | `rovi_bringup` | Runs `rovi_floor` calibration and writes LUT PNGs under `~/.ros/rovi/floor/`, then exits. |
+| `floor_runtime.launch.py` | `rovi_bringup` | Runs `rovi_floor` runtime: `/camera/depth/image` → `/floor/mask` (+ optional `/floor/topology`). |
 | `offline_view.launch.py` | `rovi_bringup` | Legacy offline inspection: `robot_mode=offline` + RViz (superseded by `view offline` / `rovi.launch.py`). |
 | `joy.launch.py` | `rovi_bringup` | Debug joystick → `/cmd_vel` only (no hardware required) |
 | `gazebo_sim.launch.py` | `rovi_sim` | Gazebo Sim backend: starts Gazebo + bridges + spawns the robot model (used when `robot_mode=sim`) |
@@ -142,8 +138,7 @@ ROS nodes started by the launches above (some are conditional based on params). 
 | `parameter_bridge` | `ros_gz_bridge` | Bridges Gazebo Transport topics into ROS 2 topics (used by simulation for `/clock`, `/odom_gz`, and `/cmd_vel_sim`). |
 | `rovi_gz_sensors_bridge` | `rovi_gz_sensors_bridge` | Sim sensor bridge: publishes `/scan`, `/imu/data_raw`, `/camera/color/image`, `/camera/depth/image` from Gazebo while enforcing real-robot `header.frame_id`. |
 | `rovi_sim_base` | `rovi_sim` | Simulation base: subscribes `/cmd_vel`, applies acceleration limits, and publishes `/cmd_vel_sim` (to Gazebo) + `/vel_raw` (to `rovi_odom_integrator`). |
-| `rovi_floor_runtime` | `rovi_floor` | Runtime floor perception: loads LUT PNGs and publishes `/floor/mask` (+ optional `/floor/topology`). |
-| `rovi_floor_calibrate` | `rovi_floor` | One-shot calibration: captures depth frames, builds LUT PNGs under `~/.ros/rovi/floor/`, then exits. |
+| `rovi_floor_runtime` | `rovi_floor` | Runtime obstacle perception from depth: publishes `/floor/mask` (+ optional `/floor/topology`). |
 | `imu_filter` | `imu_filter_madgwick` | Filters `/imu/data_raw` (and optionally `/imu/mag`) into `/imu/data` (only when `odom_mode:=fusion_wheels_imu`). |
 | `ekf_filter_node` | `robot_localization` | EKF that produces `/odometry/filtered` and TF `odom -> base_footprint` from `/odom_raw` (and `/imu/data` in `fusion_wheels_imu`). |
 | `slam_toolbox` | `slam_toolbox` | Lifecycle SLAM node that publishes TF `map -> odom` and (in mapping mode) `/map` (only when `slam_enabled:=true`). |
@@ -175,7 +170,7 @@ Only the parameters toggling node activation are listed here.
 | `slam_enabled` | `rovi_slam` | `slam_toolbox.launch.py` | `true` | Starts `slam_toolbox`; publishes TF `map -> odom` (and `/map` in mapping mode) |
 | `slam_mode` | `rovi_slam` | `slam_toolbox.launch.py` | `mapping` | Selects SLAM mode: `mapping` or `localization`. |
 | `slam_mode` | `rovi_bringup` | `nav.launch.py`, `rovi.launch.py` | `mapping` | Selects SLAM mode when running Nav2. |
-| `camera_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `true` | Enables the optional camera pipeline (camera drivers in `robot_mode=real`, and camera-dependent perception like `rovi_floor` runtime). Must degrade gracefully if camera/LUTs are missing. |
+| `camera_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `true` | Enables the optional camera pipeline (camera drivers in `robot_mode=real`, and camera-dependent perception like `rovi_floor` runtime). Must degrade gracefully if camera is missing. |
 | `camera_topology_enabled` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `false` | Enables the heavier visualization-only topology output (`/floor/topology`) in the floor perception node. |
 | `odom_mode` | `rovi_bringup` | `mapping.launch.py`, `localization.launch.py`, `nav.launch.py`, `rovi.launch.py` | `filtered` | Selects the odometry filter pipeline (and whether IMU is used). TF publisher selection depends on how the gateway plane is started (single-command `rovi.launch.py` vs systemd `rovi-gateway.service`). |
 | `odom_mode` | `rovi_localization` | `ekf.launch.py` | `filtered` | Same as above, but for running the odometry pipeline without SLAM |

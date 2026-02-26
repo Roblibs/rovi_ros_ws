@@ -32,7 +32,7 @@ def generate_launch_description() -> LaunchDescription:
     camera_enabled = DeclareLaunchArgument(
         "camera_enabled",
         default_value="true",
-        description="Enable perception blocks that depend on the camera (must degrade gracefully if camera/LUTs are missing).",
+        description="Enable perception blocks that depend on the camera (must degrade gracefully if the camera is missing).",
     )
     camera_topology_enabled = DeclareLaunchArgument(
         "camera_topology_enabled",
@@ -44,7 +44,6 @@ def generate_launch_description() -> LaunchDescription:
         floor_runtime_launch,
         condition=IfCondition(LaunchConfiguration("camera_enabled")),
         launch_arguments={
-            "robot_mode": LaunchConfiguration("robot_mode"),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
             "camera_topology_enabled": LaunchConfiguration("camera_topology_enabled"),
         },

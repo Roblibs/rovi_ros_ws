@@ -93,7 +93,3 @@ Remove:
 5) Verify:
    - sim: place small objects and confirm they appear as obstacles at the expected thresholds
    - real: confirm black/unknown floor does not create false obstacles and does not clear costmap
-
-## Open points
-
-1) Topology marker convention: preferred visualization (contours vs point clouds) for levels `1` and `2`?
