@@ -11,6 +11,9 @@ display:
     - id: "voltage"
       scale: 10
     - id: "hz_driver"
+    - id: "hz_color"
+    - id: "hz_depth"
     - id: "hz_slam"
+
 
 reconnect_delay_s: 2.0

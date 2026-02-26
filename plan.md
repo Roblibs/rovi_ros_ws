@@ -4,6 +4,7 @@ This file is an index of planning topics. Details live under `docs/plan/`.
 
 ## Camera
 - [Camera hardware robustness](docs/plan/camera_hardware_robustness.md): bring-up reliability improvements once real camera hardware is in hand.
+- [Camera viewer decorrelation (Wi‑Fi)](docs/plan/camera_viewer_decorrelation.md): introduce throttled/renamed *_view topics and make RViz subscribe to those, not the raw 30 Hz feeds (see `docs/depth_camera_analysis.md` for current-state analysis).
 - [Floor diff from depth](docs/plan/floor_diff_from_depth.md): calibrate a per-cell floor LUT and publish `/floor/*` bins/mask (+ optional lasso markers).
 - [Nav2 costmap from `/floor/*`](docs/plan/floor_nav2_costmap_layer.md): custom `nav2_costmap_2d` layer that projects `/floor/mask` into the local costmap.
 
