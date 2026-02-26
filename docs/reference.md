@@ -55,6 +55,7 @@ Notes:
 |---|---|
 | `ws` | Changes to `$ROVI_ROS_WS_DIR` and runs `setup` (no venv activation). Real-robot launches will still pick up `ROVI_ROS_WS_DIR/.venv` automatically when present. |
 | `build` | Runs system `colcon build` (ROS Jazzy toolchain) using `/usr/bin/python3`. This generates/updates the `install/` overlay used by `ros2 launch`. |
+| `check` | Lists one line per known `rovi-*.service` with its systemd state (`active`, `sub`, `result`, `enabled`, `pid`, exit `code`). |
 | `stop` | Stops ROS/Gazebo/RViz processes that belong to this workspace (use `stop --all` for an aggressive full user hard-stop). |
 | `setup` | Sources `rovi_ros_ws/install/setup.bash` (after a successful build). This overlays workspace packages (e.g., `rovi_bringup`) into your current shell. |
 | `activate` | Activates `rovi_ros_ws/.venv` (created by `uv sync`). This provides Python dependencies needed by the real-robot stack and Python nodes. |

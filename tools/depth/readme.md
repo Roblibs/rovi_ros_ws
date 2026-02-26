@@ -43,6 +43,10 @@ Note: the saved depth image is 16-bit (`.pgm` with maxval 65535). Many image vie
 
 List the OpenNI2 device’s supported video modes (resolution/fps/pixel format) for depth/IR/color.
 
+Run (preferred, via `rovi_env.sh`):
+
+`depth list`
+
 Build (uses the Orbbec OpenNI2 SDK headers/libs):
 
 `g++ -std=c++17 openni2_list_modes.cpp -I$HOME/OpenNI/OpenNI_2.3.0/sdk/Include -L$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer -lOpenNI2 -Wl,-rpath,$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer -o openni2_list_modes`
@@ -50,6 +54,27 @@ Build (uses the Orbbec OpenNI2 SDK headers/libs):
 Run:
 
 `OPENNI2_REDIST=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer LD_LIBRARY_PATH=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer:$LD_LIBRARY_PATH ./openni2_list_modes`
+
+## openni2_snapshot_depth
+
+Capture a single depth frame directly via OpenNI2 (no ROS) and save it to disk.
+
+Run (preferred, via `rovi_env.sh`):
+
+`depth snapshot --out-dir output/openni2_snapshot`
+
+Build/run manually:
+
+```bash
+g++ -std=c++17 openni2_snapshot_depth.cpp \
+  -I$HOME/OpenNI/OpenNI_2.3.0/sdk/Include -L$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer \
+  -lOpenNI2 -Wl,-rpath,$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer \
+  -O2 -o openni2_snapshot_depth
+
+OPENNI2_REDIST=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer \
+LD_LIBRARY_PATH=$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer:$LD_LIBRARY_PATH \
+./openni2_snapshot_depth --out-dir output/openni2_snapshot
+```
 
 runlog
 ```bash

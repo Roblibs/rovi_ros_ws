@@ -312,6 +312,7 @@ def main() -> int:
     print("[scan] Looking for attached devices...")
     ch340_devices = _scan_devices("/dev/ttyUSB*", CH340_VENDOR, CH340_PRODUCT)
     display_devices = _scan_devices("/dev/ttyACM*", display_vendor, display_product)
+    display_device: Optional[Dict[str, str]] = display_devices[0] if len(display_devices) == 1 else None
 
     print(f"[scan] CH340 devices ({len(ch340_devices)}):")
     for dev in ch340_devices:

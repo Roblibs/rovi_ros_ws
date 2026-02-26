@@ -46,6 +46,89 @@ What to do:
 
 See also: `docs/runtime.md`
 
+### ROS depth image looks “corrupted” (striped / mostly black), but `depth snapshot` looks fine
+
+If `depth snapshot` (direct OpenNI2) produces a good image but RViz/rqt/ROS topics look corrupted, the hardware is likely fine.
+The goal is to determine whether the corruption is:
+- **In the ROS message itself** (OpenNI2 → ROS conversion / encoding / step / endianness), or
+- **Only in the viewer/subscriber path** (image_transport selection, RViz transport hint, decoding plugins).
+
+#### Step 0 — Confirm OpenNI2 hardware path (non-ROS)
+```bash
+ws
+depth snapshot --out-dir output/openni2_snapshot
+depth view   # NiViewer (optional)
+```
+
+If `depth snapshot` and/or NiViewer are bad too, stop here and troubleshoot OpenNI2 first:
+`docs/depth_camera_astra_stereo_s_u3.md`.
+
+#### Step 1 — Start the ROS camera launch in isolation
+```bash
+ws
+ros2 launch rovi_bringup camera.launch.py robot_mode:=real
+```
+
+#### Step 2 — Sanity-check the topic graph and rates
+```bash
+ros2 node list | rg "openni2|camera"
+ros2 topic list | rg "^/camera/(depth|ir|openni2)"
+ros2 topic hz /camera/depth/image_raw
+ros2 topic hz /camera/depth/image
+```
+
+If `/camera/depth/image_raw` is missing or has 0 Hz, the issue is in the driver/SDK path (not transport).
+
+#### Step 3 — Inspect the `sensor_msgs/Image` metadata (encoding/step)
+Capture one message and check fields:
+```bash
+ros2 topic echo --once /camera/depth/image_raw | rg "encoding:|width:|height:|step:|is_bigendian:"
+ros2 topic echo --once /camera/depth/image | rg "encoding:|width:|height:|step:|is_bigendian:"
+```
+
+Expected (typical):
+- `/camera/depth/image_raw.encoding` is `16UC1` (or `mono16`), and `step == width*2`
+- `/camera/depth/image.encoding` is often `32FC1`, and `step == width*4`
+
+Red flags that usually cause “striped/corrupted” displays:
+- `encoding` says 8-bit (e.g. `mono8`) but `step` matches 16-bit (`width*2`)
+- `step` does not match `width * bytes_per_pixel`
+
+If the metadata is wrong, treat this as an **OpenNI2 → ROS conversion/publisher bug** (or wrong OpenNI2 library being loaded).
+
+#### Step 4 — Snapshot ROS images to disk (bypasses RViz UI confusion)
+This uses the message *as published* and saves it to disk + prints basic stats:
+```bash
+python3 tools/depth/ros_snapshot.py --topic /camera/depth/image_raw --out-dir output/cam_snapshot_ros
+python3 tools/depth/ros_snapshot.py --topic /camera/depth/image --out-dir output/cam_snapshot_ros
+ls -la output/cam_snapshot_ros
+```
+
+Interpretation:
+- If the saved `_viz.pgm` files look **corrupted too** → the corruption is in the **published ROS message** (conversion/encoding/step).
+- If the saved `_viz.pgm` files look **fine** but RViz/rqt looks corrupted → the issue is likely **viewer/image_transport**.
+
+#### Step 5 — Rule out image_transport / viewer transport hints
+Check if any transport plugins are being used by your viewer:
+```bash
+ros2 topic list | rg "/camera/depth/image(_raw)?/.+"
+```
+
+Then try forcing “raw” transport in the tool:
+- RViz Image display: set **Transport Hint** to `raw`
+- `rqt_image_view`: choose the `raw` transport in the transport drop-down
+
+If “raw” is fine but a compressed transport is corrupted, focus on the corresponding transport plugin/decoder.
+
+#### Step 6 — Confirm which OpenNI2 library the ROS driver is loading
+If this started “since yesterday”, a library path change can cause subtle breakage.
+```bash
+ros2 pkg prefix openni2_camera
+ldd "$(ros2 pkg prefix openni2_camera)"/lib/openni2_camera/openni2_camera_driver | rg "OpenNI2|orbbec|usb" || true
+```
+
+If `openni2_camera_driver` is not loading the expected `libOpenNI2.so.0` from `OPENNI2_REDIST`, re-check `rovi_env.sh` OpenNI2 env setup and rebuild (`clean && build`).
+
 ### `v4l2_camera`: control read `Permission denied (13)`
 
 Symptom (example):

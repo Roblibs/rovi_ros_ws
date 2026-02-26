@@ -375,3 +375,156 @@ install_ros_deps() {
     sudo apt install -y "${pkgs[@]}"
   fi
 }
+
+check() {
+  command -v systemctl >/dev/null 2>&1 || {
+    echo "[rovi_env] systemctl not found; systemd service checks are unavailable on this host." >&2
+    return 1
+  }
+
+  local services_dir="${ROVI_ROS_WS_DIR}/services"
+  local -a units=()
+  if [ -d "${services_dir}" ]; then
+    local f
+    for f in "${services_dir}"/rovi-*.service; do
+      [ -e "${f}" ] || continue
+      units+=("$(basename "${f}")")
+    done
+  fi
+
+  if [ "${#units[@]}" -eq 0 ]; then
+    echo "[rovi_env] No known rovi-*.service units found under ${services_dir}." >&2
+    return 1
+  fi
+
+  local unit
+  for unit in "${units[@]}"; do
+    local active enabled sub_state result main_pid exec_status
+
+    active="$(systemctl is-active "${unit}" 2>/dev/null || true)"
+    enabled="$(systemctl is-enabled "${unit}" 2>/dev/null || echo "n/a")"
+
+    if [ "${active}" = "unknown" ] || [ -z "${active}" ]; then
+      active="not-found"
+      sub_state="-"
+      result="-"
+      main_pid="-"
+      exec_status="-"
+    else
+      sub_state="$(systemctl show -p SubState --value "${unit}" 2>/dev/null || echo "-")"
+      result="$(systemctl show -p Result --value "${unit}" 2>/dev/null || echo "-")"
+      main_pid="$(systemctl show -p MainPID --value "${unit}" 2>/dev/null || echo "-")"
+      exec_status="$(systemctl show -p ExecMainStatus --value "${unit}" 2>/dev/null || echo "-")"
+      [ -z "${sub_state}" ] && sub_state="-"
+      [ -z "${result}" ] && result="-"
+      [ -z "${main_pid}" ] && main_pid="-"
+      [ -z "${exec_status}" ] && exec_status="-"
+    fi
+
+    printf "%s active=%s sub=%s result=%s enabled=%s pid=%s code=%s\n" \
+      "${unit}" "${active}" "${sub_state}" "${result}" "${enabled}" "${main_pid}" "${exec_status}"
+  done
+}
+
+_rovi_require_openni2() {
+  if [ "${ROVI_SKIP_OPENNI2:-}" = "1" ]; then
+    echo "[rovi_env] OpenNI2 helpers disabled (ROVI_SKIP_OPENNI2=1)." >&2
+    return 2
+  fi
+  if [ -z "${OPENNI2_REDIST:-}" ] || [ ! -d "${OPENNI2_REDIST}" ]; then
+    echo "[rovi_env] OPENNI2_REDIST is not set or missing." >&2
+    echo "[rovi_env] Expected: \$HOME/OpenNI/OpenNI_2.3.0/tools/NiViewer" >&2
+    return 2
+  fi
+  return 0
+}
+
+_rovi_build_openni2_tool() {
+  local src_rel="$1"
+  local out_rel="$2"
+
+  _rovi_require_openni2 || return $?
+
+  local src="${ROVI_ROS_WS_DIR}/${src_rel}"
+  local out="${ROVI_ROS_WS_DIR}/${out_rel}"
+
+  command -v g++ >/dev/null 2>&1 || {
+    echo "[rovi_env] Missing g++ (install build-essential)." >&2
+    return 1
+  }
+
+  if [ ! -f "${src}" ]; then
+    echo "[rovi_env] Missing source: ${src}" >&2
+    return 1
+  fi
+
+  if [ -x "${out}" ] && [ "${out}" -nt "${src}" ]; then
+    return 0
+  fi
+
+  local inc="${HOME}/OpenNI/OpenNI_2.3.0/sdk/Include"
+  if [ ! -d "${inc}" ]; then
+    echo "[rovi_env] Missing OpenNI2 headers: ${inc}" >&2
+    return 1
+  fi
+
+  (
+    cd "$(dirname "${out}")" || exit 1
+    g++ -std=c++17 "$(basename "${src}")" \
+      -I"${inc}" -L"${OPENNI2_REDIST}" \
+      -lOpenNI2 -Wl,-rpath,"${OPENNI2_REDIST}" \
+      -O2 -o "$(basename "${out}")"
+  )
+}
+
+depth() {
+  local sub="${1:-}"
+  if [ -n "${sub}" ]; then
+    shift
+  fi
+
+  case "${sub}" in
+    list)
+      _rovi_require_openni2 || return $?
+      "${ROVI_ROS_WS_DIR}/tools/depth/openni2_list_modes" "$@"
+      ;;
+    snapshot|snap)
+      _rovi_build_openni2_tool tools/depth/openni2_snapshot_depth.cpp tools/depth/openni2_snapshot_depth || return $?
+      "${ROVI_ROS_WS_DIR}/tools/depth/openni2_snapshot_depth" "$@"
+      ;;
+    ros_snapshot|ros-snapshot)
+      python3 "${ROVI_ROS_WS_DIR}/tools/depth/ros_snapshot.py" "$@"
+      ;;
+    view|viewer)
+      _rovi_require_openni2 || return $?
+      "${OPENNI2_REDIST}/NiViewer" "$@"
+      ;;
+    *)
+      echo "[rovi_env] Usage: depth {list|snapshot|ros_snapshot|view} [...args]" >&2
+      echo "[rovi_env] Examples:" >&2
+      echo "  depth list" >&2
+      echo "  depth snapshot --out-dir output/openni2_snapshot" >&2
+      echo "  depth ros_snapshot --topic /camera/depth/image_raw --out-dir output/cam_snapshot_ros" >&2
+      echo "  depth view" >&2
+      return 2
+      ;;
+  esac
+}
+
+tools() {
+  local domain="${1:-}"
+  if [ -n "${domain}" ]; then
+    shift
+  fi
+
+  case "${domain}" in
+    depth)
+      depth "$@"
+      ;;
+    *)
+      echo "[rovi_env] Usage: tools depth <subcommand> [...args]" >&2
+      echo "[rovi_env] Example: tools depth snapshot" >&2
+      return 2
+      ;;
+  esac
+}
