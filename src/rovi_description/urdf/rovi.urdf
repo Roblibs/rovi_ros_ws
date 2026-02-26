@@ -200,8 +200,8 @@
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <!-- Match the previous bringup defaults (formerly in camera.launch.py). -->
-    <origin xyz="0.129 0 0.10" rpy="0 0 0"/>
+    <!-- Camera mount: optical centers are ~11.5 cm above the floor (base_footprint z=0). -->
+    <origin xyz="0.129 0 0.086" rpy="0 0 0"/>
   </joint>
 
   <!-- Astra internal offsets (approx; good enough to visualize until measured). -->

@@ -10,9 +10,9 @@ Baseline policy:
 
 Implement a custom `nav2_costmap_2d` plugin layer that:
 
-- Subscribes to `/floor/mask` as the gating signal.
-- Uses `/camera/depth/image` + `/camera/depth/camera_info` + TF to project *unsafe pixels* into `base_footprint` (with stride sampling to bound CPU).
-- Marks projected points (or small stamped polygons) as lethal obstacles in the local costmap.
+- Subscribes to `/floor/mask` as the gating signal (`mono8`, `255=obstacle`, `0=ignore`).
+- Uses `/camera/depth/image` + `/camera/depth/camera_info` + TF to project *obstacle pixels* into `base_footprint` (with stride sampling to bound CPU).
+- Marks projected points (or small stamped polygons) as lethal obstacles in the local costmap (**mark-only**).
 
 Rationale:
 - Keeps the “no `PointCloud2`/`LaserScan` emulation” rule.
@@ -23,7 +23,8 @@ Rationale:
 
 Option A (no new topics):
 - Layer subscribes to `/floor/mask`, `/camera/depth/image`, `/camera/depth/camera_info`.
-- It stride-samples unsafe pixels from `/floor/mask` (e.g. every N pixels), looks up the corresponding depth `Z`, backprojects to the camera frame, and TF-transforms to the costmap frame.
+- It stride-samples obstacle pixels where `/floor/mask == 255`, looks up the corresponding depth `Z`, backprojects to the camera frame, and TF-transforms to the costmap frame.
+  - It does **not** clear free space when `/floor/mask == 0` (unknown/no contribution policy).
 
 Option B (optional optimization; only if needed):
 - Add a dedicated, already-decimated obstacle sampling output from the floor node (format TBD) so the costmap layer does not need to touch full-res depth at costmap tick rate.

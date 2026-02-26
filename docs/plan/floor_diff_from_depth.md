@@ -1,5 +1,7 @@
 # Plan: Depth-floor diff → floor mask (+ optional topology) (ROS 2 Jazzy)
 
+**Status:** superseded by `docs/plan/camera_floor_known_geometry.md` (depth camera is obstacle-only; no LUT calibration).
+
 This replaces the older “scalar floor clearance” concept. It produces a conservative “safe floor” mask from depth, without pointcloud/LiDAR emulation.
 
 ## Goal

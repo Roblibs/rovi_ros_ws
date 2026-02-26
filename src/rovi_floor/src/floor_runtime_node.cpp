@@ -230,6 +230,13 @@ public:
     robot_mode_ = this->declare_parameter("robot_mode", "real");
     camera_topology_enabled_ = this->declare_parameter("camera_topology_enabled", false);
 
+    floor_model_ = this->declare_parameter("floor_model", "auto");
+    unknown_depth_is_floor_ = this->declare_parameter("unknown_depth_is_floor", true);
+    floor_band_height_m_ = this->declare_parameter("floor_band_height_m", 0.02);
+    max_floor_depth_m_ = this->declare_parameter("max_floor_depth_m", 2.5);
+    t_floor_min_mm_ = this->declare_parameter("t_floor_min_mm", 10);
+    t_floor_max_mm_ = this->declare_parameter("t_floor_max_mm", 400);
+
     lut_dir_ = expand_user("~/.ros/rovi/floor");
     floor_mm_file_ = this->declare_parameter("floor_mm_file", "floor_mm.png");
     t_floor_mm_file_ = this->declare_parameter("t_floor_mm_file", "t_floor_mm.png");
@@ -268,12 +275,8 @@ private:
     }
   }
 
-  bool ensure_lut_loaded(const sensor_msgs::msg::Image & depth_msg)
+  bool try_load_disk_lut(const sensor_msgs::msg::Image & depth_msg)
   {
-    if (floor_mm_.has_value() && t_floor_mm_.has_value()) {
-      return true;
-    }
-
     const std::filesystem::path dir(lut_dir_);
     const auto floor_path = (dir / floor_mm_file_).string();
     const auto t_path = (dir / t_floor_mm_file_).string();
@@ -360,8 +363,139 @@ private:
 
     floor_mm_ = floor;
     t_floor_mm_ = t;
+    floor_model_active_ = "lut";
     RCLCPP_INFO(this->get_logger(), "Loaded floor LUTs from '%s'.", lut_dir_.c_str());
     return true;
+  }
+
+  bool try_build_plane_model(const sensor_msgs::msg::Image & depth_msg)
+  {
+    const auto camera_info = last_camera_info_;
+    if (!camera_info) {
+      throttled_error("floor_model requires /camera/depth/camera_info but none received yet.");
+      return false;
+    }
+    if (camera_info->header.frame_id.empty()) {
+      throttled_error("floor_model requires camera_info.header.frame_id but it is empty.");
+      return false;
+    }
+    if (camera_info->width != depth_msg.width || camera_info->height != depth_msg.height) {
+      throttled_error("camera_info dimensions do not match depth image dimensions.");
+      return false;
+    }
+
+    const double fx = camera_info->k[0];
+    const double fy = camera_info->k[4];
+    const double cx = camera_info->k[2];
+    const double cy = camera_info->k[5];
+    if (fx <= 0.0 || fy <= 0.0) {
+      throttled_error("Invalid camera intrinsics (fx/fy <= 0).");
+      return false;
+    }
+
+    geometry_msgs::msg::TransformStamped tf_base_camera;
+    try {
+      tf_base_camera = tf_buffer_.lookupTransform(
+        base_frame_, camera_info->header.frame_id, tf2::TimePointZero, tf2::durationFromSec(0.25));
+    } catch (const tf2::TransformException & e) {
+      throttled_error(std::string("TF lookup failed (base->camera): ") + e.what());
+      return false;
+    }
+
+    const std::string signature_input = canonical_signature_input(
+      robot_mode_, base_frame_, camera_info->header.frame_id, camera_info->width, camera_info->height,
+      *camera_info, tf_base_camera);
+    const std::string sig = sha256_hex(signature_input);
+    if (plane_model_sig_ && *plane_model_sig_ == sig &&
+      floor_mm_.has_value() && t_floor_mm_.has_value() &&
+      floor_mm_->rows == static_cast<int>(depth_msg.height) && floor_mm_->cols == static_cast<int>(depth_msg.width))
+    {
+      return true;
+    }
+
+    tf2::Transform T;
+    tf2::fromMsg(tf_base_camera.transform, T);
+    const tf2::Vector3 t = T.getOrigin();
+    const tf2::Matrix3x3 R = T.getBasis();
+    const tf2::Vector3 row_z = R.getRow(2);
+
+    const int rows = static_cast<int>(depth_msg.height);
+    const int cols = static_cast<int>(depth_msg.width);
+    cv::Mat floor(rows, cols, CV_16UC1, cv::Scalar(0));
+    cv::Mat t_floor(rows, cols, CV_16UC1, cv::Scalar(0));
+
+    const double height_m = std::max(0.0, floor_band_height_m_);
+    const int t_min = std::max(0, t_floor_min_mm_);
+    const int t_max = std::max(t_min, t_floor_max_mm_);
+
+    for (int v = 0; v < rows; ++v) {
+      uint16_t * f = floor.ptr<uint16_t>(v);
+      uint16_t * tt = t_floor.ptr<uint16_t>(v);
+      const double y = (static_cast<double>(v) - cy) / fy;
+      for (int u = 0; u < cols; ++u) {
+        const double x = (static_cast<double>(u) - cx) / fx;
+        const double denom = row_z.x() * x + row_z.y() * y + row_z.z();
+        if (denom >= -1e-9) {
+          f[u] = 0;
+          tt[u] = 0;
+          continue;
+        }
+        const double z0 = -t.z() / denom;  // expected depth (Z in camera optical frame) at base z=0.
+        if (!(z0 > 0.0) || z0 > max_floor_depth_m_) {
+          f[u] = 0;
+          tt[u] = 0;
+          continue;
+        }
+
+        const double z_mm = z0 * 1000.0;
+        const int z_i = static_cast<int>(std::lround(std::clamp(z_mm, 0.0, 65535.0)));
+        f[u] = static_cast<uint16_t>(z_i);
+
+        // Depth delta (in mm) corresponding to a +/-height_m band in base Z.
+        const double t_mm = std::abs(height_m / denom) * 1000.0;
+        const int t_i = static_cast<int>(std::lround(std::clamp(t_mm, static_cast<double>(t_min), static_cast<double>(t_max))));
+        tt[u] = static_cast<uint16_t>(t_i);
+      }
+    }
+
+    floor_mm_ = std::move(floor);
+    t_floor_mm_ = std::move(t_floor);
+    plane_model_sig_ = sig;
+    floor_model_active_ = "plane";
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Built plane floor model in-memory (height=%.3fm max_depth=%.2fm unknown_depth_is_floor=%s).",
+      floor_band_height_m_, max_floor_depth_m_, unknown_depth_is_floor_ ? "true" : "false");
+    return true;
+  }
+
+  bool ensure_floor_model_ready(const sensor_msgs::msg::Image & depth_msg)
+  {
+    const int rows = static_cast<int>(depth_msg.height);
+    const int cols = static_cast<int>(depth_msg.width);
+    if (floor_mm_.has_value() && t_floor_mm_.has_value()) {
+      if (floor_mm_->rows == rows && floor_mm_->cols == cols &&
+        t_floor_mm_->rows == rows && t_floor_mm_->cols == cols)
+      {
+        return true;
+      }
+      floor_mm_.reset();
+      t_floor_mm_.reset();
+      plane_model_sig_.reset();
+      floor_model_active_.clear();
+    }
+
+    const std::string mode = trim_copy(floor_model_);
+    const bool want_lut = (mode.empty() || mode == "auto" || mode == "lut");
+    const bool want_plane = (mode.empty() || mode == "auto" || mode == "plane");
+
+    if (want_lut && try_load_disk_lut(depth_msg)) {
+      return true;
+    }
+    if (want_plane && try_build_plane_model(depth_msg)) {
+      return true;
+    }
+    return false;
   }
 
   std::string detect_device_serial()
@@ -407,7 +541,7 @@ private:
       return;
     }
 
-    if (!ensure_lut_loaded(*msg)) {
+    if (!ensure_floor_model_ready(*msg)) {
       return;
     }
 
@@ -431,7 +565,11 @@ private:
       for (int x = 0; x < depth_mm.cols; ++x) {
         const uint16_t D = d[x];
         const uint16_t F = f[x];
-        if (D == 0 || F == 0) {
+        if (D == 0) {
+          m[x] = unknown_depth_is_floor_ ? 255 : 0;
+          continue;
+        }
+        if (F == 0) {
           m[x] = 0;
           continue;
         }
@@ -602,6 +740,14 @@ private:
   std::string robot_mode_;
   bool camera_topology_enabled_{false};
 
+  std::string floor_model_;
+  std::string floor_model_active_;
+  bool unknown_depth_is_floor_{true};
+  double floor_band_height_m_{0.02};
+  double max_floor_depth_m_{2.5};
+  int t_floor_min_mm_{10};
+  int t_floor_max_mm_{400};
+
   std::string lut_dir_;
   std::string floor_mm_file_;
   std::string t_floor_mm_file_;
@@ -616,6 +762,7 @@ private:
 
   std::optional<cv::Mat> floor_mm_;
   std::optional<cv::Mat> t_floor_mm_;
+  std::optional<std::string> plane_model_sig_;
 
   std::optional<rclcpp::Time> last_error_time_;
 
