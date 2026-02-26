@@ -32,9 +32,7 @@ Goal: keep the higher-level stack (`rovi_localization`, `rovi_slam`, `rovi_nav`,
 - `/clock` (sim only, with `use_sim_time:=true`)
 
 ## Modes (overview)
-- `robot_mode=real`: starts real drivers (`rosmaster_driver`, `rplidar_ros`, etc.).
-- `robot_mode=sim`: starts Gazebo Sim + `ros_gz_bridge`, and provides the same ROS topics (`/scan`, `/imu/data_raw`, `/clock`) as the real robot.
-- `robot_mode=offline`: starts only URDF visualization nodes (no hardware, no simulation) for model inspection.
+See [stacks.md](./stacks.md) for the full `robot_mode` + `stack` matrix, RViz policy, and sensor/topic expectations (real vs sim).
 
 ## Control inputs
 All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` topic:
@@ -43,10 +41,7 @@ All velocity sources feed into `twist_mux` and produce the single `/cmd_vel` top
 - navigation: `/cmd_vel_nav`
 
 ## Status
-`rovi_bringup/rovi.launch.py` is the single entrypoint that selects `robot_mode` and owns RViz startup policy:
-- `robot_mode=real`: intended for the robot (headless; RViz default off)
-- `robot_mode=sim`: Gazebo backend + stacks (RViz default on)
-- `robot_mode=offline`: URDF inspection (RViz default on)
+See [stacks.md](./stacks.md) for stack composition and RViz defaults per `robot_mode`.
 
 # rosmaster driver
 ![package_flow](./rosmaster.drawio.svg)
