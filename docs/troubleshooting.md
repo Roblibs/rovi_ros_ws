@@ -198,6 +198,44 @@ You can also confirm what `mapping` is doing:
 systemctl is-active rovi-gateway.service && echo "gateway service active"
 ```
 
+## Gateway lidar
+
+This section helps confirm whether lidar data is making it “out of the UI gateway” (the `ros_ui_bridge` gRPC server).
+
+### Step 1 — Confirm the robot is publishing scans
+```bash
+ros2 topic list | rg "^/scan$"
+ros2 topic hz /scan
+ros2 topic echo --once /scan
+```
+
+If `/scan` is missing or 0 Hz, troubleshoot the lidar driver / sim first (the gateway can’t stream what doesn’t exist).
+
+### Step 2 — Confirm the gateway is ingesting scans (ROS-side)
+The gateway’s lidar stream also republishes a throttled scan topic for RViz (default: `/viz/scan`).
+
+```bash
+ros2 node list | rg "ros_ui_bridge|ui_bridge"
+ros2 topic list | rg "^/viz/scan$"
+ros2 topic hz /viz/scan
+```
+
+If `/viz/scan` is >0 Hz, `ros_ui_bridge` is receiving `/scan` and forwarding it.
+
+### Step 3 — Confirm lidar is streaming over gRPC (UI-side)
+By default the gateway listens on `0.0.0.0:50051`.
+
+```bash
+ss -lntp | rg ":50051" || true
+grpcurl -plaintext -proto src/ros_ui_bridge/proto/ui_bridge.proto localhost:50051 list
+grpcurl -plaintext -proto src/ros_ui_bridge/proto/ui_bridge.proto -d '{}' \
+  localhost:50051 roblibs.ui_bridge.v1.UiBridge/StreamLidar
+```
+
+Expected:
+- The `list` call includes `roblibs.ui_bridge.v1.UiBridge`.
+- `StreamLidar` prints a stream of `LidarUpdate` messages while scans are active.
+
 #### Step 3 — Check the serial device isn’t missing/busy
 ```bash
 ls -la /dev/robot_display || true
