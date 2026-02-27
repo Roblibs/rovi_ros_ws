@@ -13,10 +13,14 @@ Intended usage:
 """
 
 import os
+import shutil
+import socket
+import subprocess
+from typing import Optional, Tuple
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction, SetLaunchConfiguration
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -55,6 +59,134 @@ def _publish_session_state(context, *args, **kwargs):  # noqa: ANN001
     ]
 
 
+def _systemd_unit_active(unit: str) -> bool:
+    systemctl = shutil.which("systemctl")
+    if not systemctl:
+        return False
+    try:
+        proc = subprocess.run(
+            [systemctl, "is-active", "--quiet", unit],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def _parse_host_port(bind: str) -> Optional[Tuple[str, int]]:
+    s = str(bind or "").strip()
+    if not s:
+        return None
+    # Common formats:
+    # - "0.0.0.0:50051"
+    # - ":50051" (rare)
+    # - "localhost:50051"
+    if ":" not in s:
+        return None
+    host, port_s = s.rsplit(":", 1)
+    host = host.strip() or "0.0.0.0"
+    try:
+        port = int(port_s.strip())
+    except ValueError:
+        return None
+    if port <= 0 or port > 65535:
+        return None
+    return host, port
+
+
+def _ui_bridge_bind_from_config(path: str) -> Optional[str]:
+    p = str(path or "").strip()
+    if not p or not os.path.exists(p):
+        return None
+    try:
+        import yaml  # type: ignore
+    except ModuleNotFoundError:
+        return None
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            doc = yaml.safe_load(f) or {}
+        grpc = doc.get("grpc") if isinstance(doc, dict) else None
+        bind = grpc.get("bind") if isinstance(grpc, dict) else None
+        bind_s = str(bind).strip() if bind is not None else ""
+        return bind_s or None
+    except Exception:
+        return None
+
+
+def _tcp_port_in_use(port: int) -> bool:
+    """Best-effort check if a TCP port is already bound locally."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("0.0.0.0", int(port)))
+            return False
+        finally:
+            s.close()
+    except OSError:
+        return True
+
+
+def _maybe_auto_disable_gateway(context, *args, **kwargs):  # noqa: ANN001
+    del args, kwargs
+
+    auto_disable = LaunchConfiguration("gateway_auto_disable").perform(context).strip().lower()
+    if auto_disable not in {"1", "true", "yes", "on"}:
+        return []
+
+    gateway_enabled = LaunchConfiguration("gateway_enabled").perform(context).strip().lower()
+    robot_mode = LaunchConfiguration("robot_mode").perform(context).strip()
+    if robot_mode != "real":
+        return []
+
+    if gateway_enabled not in {"1", "true", "yes", "on"}:
+        return [
+            LogInfo(
+                msg=(
+                    "[rovi_bringup] gateway_enabled:=false; expecting the gateway plane to already be running "
+                    "(systemd rovi-gateway.service or an external gateway.launch.py)."
+                )
+            )
+        ]
+
+    ui_bind = _ui_bridge_bind_from_config(LaunchConfiguration("ui_bridge_config").perform(context))
+    host_port = _parse_host_port(ui_bind) if ui_bind else None
+    grpc_port = host_port[1] if host_port else 50051
+
+    if _tcp_port_in_use(grpc_port):
+        return [
+            LogInfo(
+                msg=(
+                    f"[rovi_bringup] Detected an existing gRPC listener on port {grpc_port}; "
+                    "auto-disabling gateway_enabled to avoid starting a second gateway plane. "
+                    "(Override with: gateway_auto_disable:=false)"
+                )
+            ),
+            SetLaunchConfiguration("gateway_enabled", "false"),
+        ]
+    if _systemd_unit_active("rovi-gateway.service"):
+        return [
+            LogInfo(
+                msg=(
+                    "[rovi_bringup] rovi-gateway.service is active; auto-disabling "
+                    "gateway_enabled to avoid starting a second gateway plane. "
+                    "(Override with: gateway_auto_disable:=false)"
+                )
+            ),
+            SetLaunchConfiguration("gateway_enabled", "false"),
+        ]
+    return [
+        LogInfo(
+            msg=(
+                "[rovi_bringup] gateway_enabled:=true and no existing gateway detected; "
+                "starting gateway plane in this launch."
+            )
+        )
+    ]
+
+
 def generate_launch_description() -> LaunchDescription:
     bringup_share = get_package_share_directory('rovi_bringup')
     desc_share = get_package_share_directory('rovi_description')
@@ -87,6 +219,11 @@ def generate_launch_description() -> LaunchDescription:
         'gateway_enabled',
         default_value='true',
         description='Start the always-on gateway plane (backend + UI bridge + display). Set false when systemd owns the gateway.',
+    )
+    gateway_auto_disable = DeclareLaunchArgument(
+        'gateway_auto_disable',
+        default_value='true',
+        description='Auto-set gateway_enabled:=false when rovi-gateway.service is active (robot_mode=real).',
     )
     stack = DeclareLaunchArgument(
         'stack',
@@ -302,10 +439,12 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         robot_mode,
         gateway_enabled,
+        gateway_auto_disable,
         stack,
         use_sim_time,
         rviz,
         rviz_config,
+        OpaqueFunction(function=_maybe_auto_disable_gateway),
         OpaqueFunction(function=_publish_session_state),
         joy_enabled,
         cmd_vel_topic,

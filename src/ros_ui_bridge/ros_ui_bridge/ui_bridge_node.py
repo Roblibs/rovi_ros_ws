@@ -114,9 +114,22 @@ async def _serve_grpc(
 ) -> None:
     server = grpc.aio.server()
     ui_bridge_pb2_grpc.add_UiBridgeServicer_to_server(service, server)
-    server.add_insecure_port(bind)
-    await server.start()
-    logger.info(f"ros_ui_bridge gRPC listening on {bind}")
+    bound_port = server.add_insecure_port(bind)
+    if not bound_port:
+        # This is the typical symptom of a duplicate gateway plane (or another process)
+        # already holding the gRPC port.
+        logger.error(
+            f"ros_ui_bridge failed to bind gRPC on {bind} (port already in use or invalid bind); exiting"
+        )
+        stop_event.set()
+        return
+    try:
+        await server.start()
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"ros_ui_bridge gRPC failed to start on {bind}: {exc}")
+        stop_event.set()
+        return
+    logger.info(f"ros_ui_bridge gRPC listening on {bind} (bound_port={bound_port})")
 
     try:
         await stop_event.wait()

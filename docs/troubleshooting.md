@@ -163,6 +163,49 @@ What to do:
 
 See also: `docs/runtime.md`
 
+### `robot_serial_display`: values disappear when starting `mapping` (or another stack)
+
+This usually means one of:
+- The **UI gateway** (`ros_ui_bridge`) is down / restarted / moved to a different port, or
+- The **serial display client** is not running (or can’t open `/dev/robot_display`), or
+- You accidentally started a **second gateway plane** (two `ros_ui_bridge` / two `robot_serial_display` instances fighting for port `50051` or the serial device).
+
+#### Step 1 — Check gateway + display processes
+```bash
+# gRPC server should be listening
+ss -lntp | rg ":50051" || true
+
+# ROS nodes should exist
+ros2 node list | rg "ui_bridge_metrics|robot_serial_display"
+```
+
+If `:50051` is not listening, restart the gateway plane:
+```bash
+sudo systemctl restart rovi-gateway.service
+```
+
+#### Step 2 — Check for multiple gateways (common when launching stacks manually)
+```bash
+ps aux | rg "ros_ui_bridge|robot_serial_display|gateway.launch.py|rovi.launch.py" | rg -v rg
+```
+
+In **systemd mode**, stacks should be “stack-only” (the gateway plane is owned by `rovi-gateway.service`):
+- Prefer `sudo systemctl start rovi-mapping.service`, or
+- Run `mapping gateway_enabled:=false`
+
+You can also confirm what `mapping` is doing:
+```bash
+systemctl is-active rovi-gateway.service && echo "gateway service active"
+```
+
+#### Step 3 — Check the serial device isn’t missing/busy
+```bash
+ls -la /dev/robot_display || true
+sudo lsof /dev/robot_display 2>/dev/null || true
+```
+
+If another process holds the port, stop the extra instance (or reboot), then keep a single always-on display client.
+
 ### UI: floor topology not showing
 
 Symptom:

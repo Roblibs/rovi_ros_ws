@@ -39,7 +39,10 @@ class _SerialWriter:
             return self._serial
 
         try:
-            self._serial = Serial(self._port, baudrate=self._baudrate, timeout=1)
+            # Important: set a write timeout so a stalled USB ACM device cannot block this process forever.
+            # If the display resets or stops reading, writes can otherwise hang and the UI appears "dead"
+            # until the gateway/display process is restarted.
+            self._serial = Serial(self._port, baudrate=self._baudrate, timeout=1, write_timeout=1)
             self._logger.info(f"Opened display serial on {self._port} @ {self._baudrate} baud")
             self._last_open_error = None
         except SerialException as exc:

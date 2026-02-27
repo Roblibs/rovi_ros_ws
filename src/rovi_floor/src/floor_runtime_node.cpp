@@ -216,11 +216,20 @@ private:
     }
   }
 
+  void throttled_warn(const std::string & message)
+  {
+    const auto now = this->now();
+    if (!last_warn_time_ || (now - *last_warn_time_).seconds() > 2.0) {
+      last_warn_time_ = now;
+      RCLCPP_WARN(this->get_logger(), "%s", message.c_str());
+    }
+  }
+
   bool ensure_model_ready(const sensor_msgs::msg::Image & depth_msg)
   {
     const auto camera_info = last_camera_info_;
     if (!camera_info) {
-      throttled_error("Missing /camera/depth/camera_info (required for obstacle geometry model).");
+      throttled_warn("Waiting for /camera/depth/camera_info (required for obstacle geometry model).");
       return false;
     }
     if (camera_info->header.frame_id.empty() && depth_msg.header.frame_id.empty()) {
@@ -563,6 +572,7 @@ private:
   std::optional<ObstacleModel> model_;
 
   std::optional<rclcpp::Time> last_error_time_;
+  std::optional<rclcpp::Time> last_warn_time_;
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;

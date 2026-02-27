@@ -89,6 +89,12 @@ _rovi_gateway_service_active() {
   systemctl is-active --quiet rovi-gateway.service >/dev/null 2>&1
 }
 
+_rovi_port_listening() {
+  local port="$1"
+  command -v ss >/dev/null 2>&1 || return 1
+  ss -lnt 2>/dev/null | rg -q ":${port}\\b"
+}
+
 _rovi_launch_real_stack() {
   if [ $# -lt 1 ]; then
     echo "[rovi_env] Usage: _rovi_launch_real_stack <stack> [ros2 launch args...]" >&2
@@ -106,10 +112,17 @@ _rovi_launch_real_stack() {
 
   # If the always-on gateway plane is already running under systemd,
   # make stack launches "stack-only" automatically to avoid a second gateway.
-  if ! _rovi_args_have_gateway_enabled "$@"; then
+  if _rovi_args_have_gateway_enabled "$@"; then
+    echo "[rovi_env] gateway_enabled explicitly set by caller; not auto-adjusting." >&2
+  else
     if _rovi_gateway_service_active; then
       echo "[rovi_env] rovi-gateway.service is active; adding gateway_enabled:=false (stack-only launch)" >&2
       launch_args+=(gateway_enabled:=false)
+      if ! _rovi_port_listening 50051; then
+        echo "[rovi_env] WARN: rovi-gateway.service is active but :50051 is not listening yet; display/UI may be blank until it comes up." >&2
+      fi
+    else
+      echo "[rovi_env] rovi-gateway.service is not active; leaving gateway_enabled default (this launch will start a gateway plane)." >&2
     fi
   fi
 
