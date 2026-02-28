@@ -444,8 +444,6 @@ def generate_launch_description() -> LaunchDescription:
         use_sim_time,
         rviz,
         rviz_config,
-        OpaqueFunction(function=_maybe_auto_disable_gateway),
-        OpaqueFunction(function=_publish_session_state),
         joy_enabled,
         cmd_vel_topic,
         ui_bridge_config,
@@ -464,6 +462,9 @@ def generate_launch_description() -> LaunchDescription:
         mag_enabled,
         *camera_args,
         odom_mode,
+        # OpaqueFunctions must run after their referenced LaunchConfigurations are declared.
+        OpaqueFunction(function=_maybe_auto_disable_gateway),
+        OpaqueFunction(function=_publish_session_state),
         gateway,
         control_stack,
         stack_camera,

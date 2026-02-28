@@ -4,6 +4,14 @@ gateway:
 serial:
   port: "/dev/robot_display"
   baudrate: 256000
+  # ESP32 firmware limit (see /home/wass/dev/robot_serial_display):
+  # max JSON events per line is 5; extra events must be sent in multiple lines.
+  max_events_per_line: 5
+
+  # Debugging: log the exact JSON lines sent to the display (can be noisy).
+  log_payload: false
+  log_payload_hex: false
+  log_payload_truncate: 512
 
 display:
   selected_ids:
@@ -13,7 +21,6 @@ display:
     - id: "hz_driver"
     - id: "hz_color"
     - id: "hz_depth"
-    - id: "hz_slam"
 
 
 reconnect_delay_s: 2.0

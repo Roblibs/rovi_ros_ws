@@ -101,12 +101,112 @@ The “USB-only” theory got weaker because:
 - The camera is isolated on its own hub, yet `mapping`/`localization` still stop the display.
 - The camera FPS drop to ~3–4 FPS happens with a **PC subscriber** (RViz/viewer), which is consistent with CPU/network/DDS backpressure, not just USB.
 
+### Why CPU can drop when RViz/viewer is enabled
+
+The observed pattern:
+- `camera` alone: higher FPS, higher CPU
+- `camera` + PC RViz/view: lower FPS, *lower* CPU
+
+…is consistent with **backpressure**:
+- When a subscriber (over the network) can’t keep up, the camera pipeline can spend more time blocked in publish/transport and less time doing conversion work, so overall CPU % can drop while FPS drops.
+- Also, the CPU % you’re quoting is **whole-system average**; one core pegged can look like “25% total” on a 4-core system.
+
+To verify, prefer per-core and per-process views (see the tests below).
+
 The next step is to identify **which link in the chain** fails when the display blanks:
 
 1) **USB/serial reset?** (ESP32 disappears/re-enumerates)
 2) **Serial write stall?** (`serial_display` blocked or errors on `/dev/robot_display`)
 3) **gRPC stream disruption?** (`serial_display` loses `StreamStatus` even though `GetStatus` still works)
 4) **UI payload change triggers firmware bug?** (more fields / longer lines when stacks start)
+
+## Smoking-gun tests (to prove “not USB bandwidth congestion”)
+
+These tests are ordered to produce hard evidence quickly.
+
+| Goal | What you run during the failure | If this is true… | Congestion explanation gets weaker because… |
+|---|---|---|---|
+| Prove the ESP32 did **not** reset/disconnect | `sudo udevadm monitor --udev --subsystem-match=tty` + `sudo journalctl -k -f \| rg -i "usb|reset|disconnect|ttyacm|cdc_acm"` | No `remove/add` for `ttyACM*` | The link did not fall over at USB enumeration level |
+| Prove gRPC is still streaming *while display is blank* | `timeout 10 grpcurl ... UiBridge/StreamStatus \| head -n 40` | Stream keeps updating | The gateway plane is alive; failure is after gRPC (serial_display or firmware) |
+| Prove `serial_display` is blocked on serial writes | `ps -o pid,stat,pcpu,comm -p $(pgrep -n serial_display)` *(look for `D` state)* | `D` or near-0 CPU but port held | It’s not a “USB bandwidth” issue; it’s a stall/hang at the TTY write layer |
+| Prove the problem persists with the display on a separate physical receptacle | Temporarily plug display (alone) into a free Pi port (no hub), then repro | Still blanks | Eliminates hub contention and makes “pure USB bus congestion” unlikely |
+
+### Minimum “three terminal” capture for one reproduction
+
+Terminal A (USB evidence):
+```bash
+sudo journalctl -k -f | rg -i "usb|reset|disconnect|ttyacm|cdc_acm"
+```
+
+Terminal B (display/gRPC evidence):
+```bash
+journalctl -u rovi-gateway.service -f | rg -i "robot_serial_display|serial_display|gRPC stream error|UNAVAILABLE|Serial write failed"
+```
+
+Terminal C (CPU evidence):
+```bash
+top -o %CPU
+```
+
+## CPU + scheduling checks (more specific than a single “CPU %”)
+
+Per-core CPU (best quick view):
+```bash
+top
+# then press: 1
+```
+
+Per-process CPU (who spikes when mapping/localization starts):
+```bash
+ps -eo pid,ppid,stat,pcpu,pmem,comm --sort=-pcpu | head -n 25
+```
+
+If available (package `sysstat`), show per-core and interrupts over time:
+```bash
+mpstat -P ALL 1
+mpstat -I SCPU 1
+```
+
+## USB interrupt rate (and how to interpret it)
+
+`/proc/interrupts` is a snapshot counter. What you want is **interrupts per second** while reproducing.
+
+Quick manual comparison:
+```bash
+cat /proc/interrupts | rg -i "xhci|dwc2|usb"
+sleep 5
+cat /proc/interrupts | rg -i "xhci|dwc2|usb"
+```
+
+If `xhci-hcd:*` jumps extremely fast during the failure, that supports an “interrupt pressure / latency” hypothesis (still different from “USB bandwidth congestion”).
+
+Also check softirq pressure (USB and network often show up here):
+```bash
+cat /proc/softirqs | rg -i "NET_RX|NET_TX|HI|TASKLET"
+```
+
+## `usbtop` troubleshooting (why it says “No USB bus can be captured”)
+
+`usbtop` relies on Linux **usbmon** + **libpcap** seeing `usbmon*` capture interfaces.
+
+1) Enable usbmon and debugfs:
+```bash
+sudo modprobe usbmon
+sudo mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
+ls /sys/kernel/debug/usb/usbmon 2>/dev/null || true
+```
+
+2) Confirm the capture interfaces exist (this is the key step):
+```bash
+sudo tcpdump -D | rg -i "usbmon" || true
+```
+
+3) If you see `usbmon0`, `usbmon1`, … then run:
+```bash
+sudo usbtop -i usbmon0
+```
+
+If `tcpdump -D` shows **no** `usbmon*` interfaces, then either usbmon isn’t active on this kernel build or libpcap can’t access it; in that case, use ROS-side measurement (`ros2 topic bw ...`) + interrupt/softirq sampling as the primary evidence.
 
 ## Fast triage checklist (run when it “stops”)
 

@@ -206,4 +206,4 @@ grpcurl -plaintext -import-path ${ROVI_ROS_WS_DIR}/src/ros_ui_bridge/proto -prot
 ## See also
 
 - `docs/lidar.md` — LiDAR (`/scan`) troubleshooting (USB → ROS → gRPC).
-- `docs/usb_hub.md` — hub wiring + stack-load experiments and decoded `lsusb -t`.
+- `docs/usb_topology.md` — hub wiring + stack-load experiments and decoded `lsusb -t`.

@@ -15,6 +15,10 @@ class SerialDisplayConfig:
     baudrate: int
     selected_ids: list[str]
     selected_scales: dict[str, float]
+    max_events_per_line: int
+    log_payload: bool
+    log_payload_hex: bool
+    log_payload_truncate: int
     reconnect_delay_s: float
 
 
@@ -56,11 +60,21 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
     if env_port:
         serial_port = env_port
     baudrate = int(serial.get('baudrate', 256000))
+    max_events_per_line = int(serial.get('max_events_per_line', 5))
+    log_payload = bool(serial.get('log_payload', False))
+    log_payload_hex = bool(serial.get('log_payload_hex', False))
+    log_payload_truncate = int(serial.get('log_payload_truncate', 512))
     selected_ids, selected_scales = _read_selected_ids(display.get('selected_ids'))
     reconnect_delay_s = float(data.get('reconnect_delay_s', 2.0))
 
     if reconnect_delay_s <= 0:
         raise RuntimeError(f"reconnect_delay_s must be > 0 (got {reconnect_delay_s}) in: {config_path}")
+    if max_events_per_line < 0:
+        raise RuntimeError(
+            f"serial.max_events_per_line must be >= 0 (0 disables chunking; got {max_events_per_line}) in: {config_path}"
+        )
+    if log_payload_truncate < 0:
+        raise RuntimeError(f"serial.log_payload_truncate must be >= 0 (got {log_payload_truncate}) in: {config_path}")
 
     return SerialDisplayConfig(
         gateway_address=gateway_address,
@@ -68,6 +82,10 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
         baudrate=baudrate,
         selected_ids=selected_ids,
         selected_scales=selected_scales,
+        max_events_per_line=max_events_per_line,
+        log_payload=log_payload,
+        log_payload_hex=log_payload_hex,
+        log_payload_truncate=log_payload_truncate,
         reconnect_delay_s=reconnect_delay_s,
     )
 

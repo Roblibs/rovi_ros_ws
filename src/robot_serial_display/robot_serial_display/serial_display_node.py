@@ -19,10 +19,24 @@ from .config import SerialDisplayConfig, load_config
 
 
 class _SerialWriter:
-    def __init__(self, *, port: str, baudrate: int, logger) -> None:
+    def __init__(
+        self,
+        *,
+        port: str,
+        baudrate: int,
+        logger,
+        log_payload: bool,
+        log_payload_hex: bool,
+        log_payload_truncate: int,
+        max_events_per_line: int,
+    ) -> None:
         self._port = port
         self._baudrate = baudrate
         self._logger = logger
+        self._log_payload = bool(log_payload)
+        self._log_payload_hex = bool(log_payload_hex)
+        self._log_payload_truncate = int(log_payload_truncate)
+        self._max_events_per_line = int(max_events_per_line)
         self._serial: Optional[Serial] = None
         self._last_open_error: Optional[str] = None
 
@@ -53,17 +67,36 @@ class _SerialWriter:
             self._serial = None
         return self._serial
 
-    def write_json_line(self, payload: list[dict]) -> None:
+    def write_json_lines(self, payload: list[dict]) -> None:
         ser = self.ensure_open()
         if ser is None:
             return
 
-        line = _encode_payload(payload)
-        try:
-            ser.write(line.encode('utf-8'))
-        except SerialException:
-            self.close()
-            raise
+        for chunk in _chunk_payload(payload, max_events_per_line=self._max_events_per_line):
+            try:
+                line = _encode_payload(chunk)
+            except ValueError as exc:
+                # Most likely invalid JSON due to NaN/Inf; never send something the firmware can't parse.
+                self._logger.warning(f"Failed to encode display payload as strict JSON: {exc}")
+                continue
+
+            raw = line.encode('utf-8')
+            if self._log_payload:
+                preview = line.rstrip('\n')
+                if self._log_payload_truncate and len(preview) > self._log_payload_truncate:
+                    preview = preview[: self._log_payload_truncate] + f"...(truncated,len={len(line)})"
+                self._logger.info(f"Serial display tx events={len(chunk)} bytes={len(raw)} line={preview}")
+                if self._log_payload_hex:
+                    hex_preview = raw.hex()
+                    if self._log_payload_truncate and len(hex_preview) > self._log_payload_truncate:
+                        hex_preview = hex_preview[: self._log_payload_truncate] + f"...(truncated,len={len(raw)})"
+                    self._logger.info(f"Serial display tx hex={hex_preview}")
+
+            try:
+                ser.write(raw)
+            except SerialException:
+                self.close()
+                raise
 
 
 def _format_value(val: float, unit: str) -> str:
@@ -79,7 +112,16 @@ def _format_value(val: float, unit: str) -> str:
 
 
 def _encode_payload(payload: list[dict]) -> str:
-    return json.dumps(payload, separators=(',', ':')) + '\n'
+    # Strict JSON: avoid NaN/Inf (ArduinoJson rejects them).
+    return json.dumps(payload, separators=(',', ':'), allow_nan=False) + '\n'
+
+
+def _chunk_payload(payload: list[dict], *, max_events_per_line: int) -> list[list[dict]]:
+    if max_events_per_line <= 0:
+        return [payload]
+    if len(payload) <= max_events_per_line:
+        return [payload]
+    return [payload[i : i + max_events_per_line] for i in range(0, len(payload), max_events_per_line)]
 
 
 def _build_payload(
@@ -129,7 +171,15 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
 
 
 async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, debug: bool) -> None:
-    serial_writer = _SerialWriter(port=cfg.serial_port, baudrate=cfg.baudrate, logger=logger)
+    serial_writer = _SerialWriter(
+        port=cfg.serial_port,
+        baudrate=cfg.baudrate,
+        logger=logger,
+        log_payload=cfg.log_payload,
+        log_payload_hex=cfg.log_payload_hex,
+        log_payload_truncate=cfg.log_payload_truncate,
+        max_events_per_line=cfg.max_events_per_line,
+    )
     request = ui_bridge_pb2.StatusRequest()
     grpc_connected = False
     last_grpc_log_key: Optional[tuple[grpc.StatusCode, str]] = None
@@ -159,10 +209,8 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
             if debug:
                 logger.info(f"Initial status payload: {initial_payload or '(empty)'}")
             if initial_payload:
-                if debug:
-                    logger.info(f"Serial write line: {_encode_payload(initial_payload).strip()}")
                 try:
-                    serial_writer.write_json_line(initial_payload)
+                    serial_writer.write_json_lines(initial_payload)
                 except SerialException as exc:
                     logger.warning(f"Serial write failed: {exc}")
 
@@ -186,10 +234,14 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
                     )
                 if not payload:
                     continue
-                if debug:
-                    logger.info(f"Serial write line: {_encode_payload(payload).strip()}")
+                if cfg.max_events_per_line > 0 and len(payload) > cfg.max_events_per_line:
+                    # Matches the ESP32 display firmware limit (kMaxEventsPerLine). Without chunking, the firmware rejects the line.
+                    logger.warning(
+                        f"Display payload has too many events for one line (events={len(payload)} max={cfg.max_events_per_line}); "
+                        "sending in multiple lines"
+                    )
                 try:
-                    serial_writer.write_json_line(payload)
+                    serial_writer.write_json_lines(payload)
                 except SerialException as exc:
                     logger.warning(f"Serial write failed: {exc}")
 
