@@ -23,12 +23,14 @@ Raspberry Pi ports:
 
 | Scenario | CPU (approx) | Camera FPS (depth,color) | PC viewer / RViz | Serial display | Notes |
 |---|---:|---:|---|---|---|
-| Camera only | ~27% | ~29–30 | none | OK | Baseline |
-| Camera only + PC RViz/view | (not recorded) | ~3–4 | enabled | OK | Subscribing to raw images can backpressure/saturate CPU/network |
-| `mapping` (topology enabled) | (not recorded) | ~4–3 | gRPC viewer shows low FPS | **Stops** | Stops immediately on stack start |
-| `mapping` (no topology, no PC viewer) | (not recorded) | (not recorded) | none | **Stops** | Still stops → not “PC viewer only” |
-| `localization` | ~44% | (not recorded) | none | **Stops** | Stops on startup |
+| `camera` | 27% | 29, 30 | none | OK | Baseline |
+| `camera` + PC RViz/view | 18% | 3, 3 | enabled | OK | Subscribing to raw images can backpressure/saturate CPU/network |
+| `mapping` (no topology, no PC viewer) | 23% | 20, 20 | none | **Stops** | Stops on stack start |
+| `mapping` (topology, no PC) | 24% | 16, 15 | gRPC viewer shows low FPS | **Stops** | Stops on stack start |
+| `mapping` (topology, PC RViz/View) | 27% | 3, 3 | gRPC viewer shows low FPS | **Stops** | Stops on stack start |
+| `localization` | 25% | 15, 20 | none | **Stops** | Stops on stack start |
 
+Note : when Display stops on stack start, and when gRPC viewer is active the gRPC is still working visible on web UI client.
 Takeaway (so far): separating hubs reduces “pure USB contention” suspicion, but the failure still correlates with **starting compute-heavy stacks**.
 
 ## Decoding `lsusb -t` (your current snapshot)
