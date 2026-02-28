@@ -20,6 +20,8 @@ Related projects:
 | [stacks.md](./docs/stacks.md) | What runs in each stack (`teleop|camera|mapping|localization|nav`) and which sensors/topics to expect (real vs sim). |
 | [depth_camera_astra_stereo_s_u3.md](./docs/depth_camera_astra_stereo_s_u3.md) | Astra Stereo S U3 depth camera (depth via OpenNI2 + RGB via UVC): run, topics/TF, install notes, calibration pointers. |
 | [stereo_elp.md](./docs/stereo_elp.md) | ELP stereo camera notes and V4L2 formats. |
+| [usb.md](./docs/usb.md) | USB topology + troubleshooting (hubs/speeds, resets, serial devices, and bandwidth tools). |
+| [lidar.md](./docs/lidar.md) | LiDAR (`/scan`) bringup + troubleshooting (USB → ROS → gRPC). |
 | [runtime.md](./docs/runtime.md) | Runtime warnings/errors description. |
 | [troubleshooting.md](./docs/troubleshooting.md) | Common “if you see X, do Y” fixes (build + runtime). |
 

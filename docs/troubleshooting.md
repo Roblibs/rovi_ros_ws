@@ -150,6 +150,16 @@ What to do:
 
 See also: `docs/depth_camera_astra_stereo_s_u3.md`, `docs/runtime.md`
 
+## LiDAR
+
+### LiDAR missing (`/scan` not published)
+
+Symptom:
+- `/scan` topic is missing or has 0 Hz.
+
+What to do:
+- Follow the dedicated checklist in `docs/lidar.md` (USB device mapping → driver node → topic rate → gRPC stream).
+
 ## UI / display
 
 ### `robot_serial_display`: gRPC `Connection refused` at startup

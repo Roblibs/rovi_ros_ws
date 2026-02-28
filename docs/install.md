@@ -115,6 +115,8 @@ env | rg "ROVI_.*_PORT"
 unset ROVI_ROSMASTER_PORT ROVI_LIDAR_PORT ROVI_DISPLAY_PORT
 ```
 
+See also: `docs/usb.md` (tables + commands for `rovi_usb_setup.py`, `lsusb -t`, and bandwidth checks).
+
 With `teleop` running in another terminal:
 
 ```bash
