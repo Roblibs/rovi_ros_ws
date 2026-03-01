@@ -62,6 +62,8 @@ class UiBridgeRosNode(Node):
         super().__init__('ui_bridge_metrics')
 
         self._qos_best_effort = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+        # For high-bandwidth topics where we only need to count arrivals (topic_rate), keep the queue tiny.
+        self._qos_best_effort_minimal = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.BEST_EFFORT)
 
         # TF demux for visualization tools that can't filter individual transforms in a TFMessage.
         self._tf_demux_enabled = bool(tf_demux.enabled)
@@ -189,11 +191,45 @@ class UiBridgeRosNode(Node):
                     self._pending_topics.add(topic)
                     continue
 
-                sub = self.create_subscription(msg_cls, topic, lambda msg, t=topic: self._on_topic_message(t, msg), self._qos_best_effort)
+                sub = self._create_topic_subscription(topic=topic, msg_cls=msg_cls)
                 self._topic_subscriptions.append(sub)
                 self.get_logger().info(f"Subscribed for topic={topic} type={type_hint} (configured)")
             else:
                 self._pending_topics.add(topic)
+
+    def _create_topic_subscription(self, *, topic: str, msg_cls: Any) -> Any:
+        """Create a subscription for a topic based on how it's used.
+
+        For rate-only topics we subscribe with `raw=True` to avoid deserializing large messages (e.g., images)
+        just to count arrivals.
+        """
+        has_value_fields = bool(self._value_fields_by_topic.get(topic))
+        has_rate_fields = bool(self._rate_fields_by_topic.get(topic))
+
+        if has_rate_fields and not has_value_fields:
+            return self.create_subscription(
+                msg_cls,
+                topic,
+                lambda _raw_msg, t=topic: self._on_topic_rate_raw(t),
+                self._qos_best_effort_minimal,
+                raw=True,
+            )
+
+        return self.create_subscription(
+            msg_cls,
+            topic,
+            lambda msg, t=topic: self._on_topic_message(t, msg),
+            self._qos_best_effort,
+        )
+
+    def _on_topic_rate_raw(self, topic: str) -> None:
+        """Rate-only callback for raw subscriptions (avoids message deserialization)."""
+        now_ros = self.get_clock().now()
+        with self._lock:
+            for field in self._rate_fields_by_topic.get(topic, []):
+                tracker = self._rate_tracker_by_id[field.id]
+                tracker.on_event(time.monotonic())
+                self._rate_last_ros_stamp[field.id] = now_ros
 
     def _on_topic_message(self, topic: str, msg: Any) -> None:
         now_ros = self.get_clock().now()
@@ -278,7 +314,7 @@ class UiBridgeRosNode(Node):
                 self.get_logger().warn(f"Failed to import message type {type_str} for {topic}: {exc}")
                 continue
 
-            sub = self.create_subscription(msg_cls, topic, lambda msg, t=topic: self._on_topic_message(t, msg), self._qos_best_effort)
+            sub = self._create_topic_subscription(topic=topic, msg_cls=msg_cls)
             self._topic_subscriptions.append(sub)
             self._topic_type_by_topic[topic] = type_str
             resolved.append(topic)

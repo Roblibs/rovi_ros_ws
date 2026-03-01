@@ -15,6 +15,9 @@ Key options:
 - `serial.max_events_per_line`: max JSON events per line (ESP32 firmware default is 10; extra events are sent as multiple lines)
 - `serial.max_line_length`: max JSON line length in bytes (including trailing newline; ESP32 firmware default is 1024)
 - `serial.log_payload`: log the exact JSON line(s) written to the serial port (debug)
+- `serial.log_rx`: log lines received from the display firmware (debug; useful for seeing firmware-side parse errors like `EVENT:`)
+- `serial.tx_sync_newline`: write an extra newline (same as `serial.tx_line_ending`) before each JSON line to help recover if bytes are dropped (default `true`)
+- `serial.tx_line_ending`: line ending to use for TX (`lf`, `cr`, or `crlf`; default `crlf`)
 - `display.selected_ids`: ordered list of status field IDs to forward to the display (supports optional per-ID `scale`, e.g. `voltage` at x10)
 
 Override the serial port at runtime with `ROVI_DISPLAY_PORT` (useful for debugging without udev rules).

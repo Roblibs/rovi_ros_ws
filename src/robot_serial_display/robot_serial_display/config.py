@@ -20,6 +20,9 @@ class SerialDisplayConfig:
     log_payload: bool
     log_payload_hex: bool
     log_payload_truncate: int
+    log_rx: bool
+    tx_sync_newline: bool
+    tx_line_ending: str
     reconnect_delay_s: float
 
 
@@ -66,6 +69,9 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
     log_payload = bool(serial.get('log_payload', False))
     log_payload_hex = bool(serial.get('log_payload_hex', False))
     log_payload_truncate = int(serial.get('log_payload_truncate', 512))
+    log_rx = bool(serial.get('log_rx', False))
+    tx_sync_newline = bool(serial.get('tx_sync_newline', True))
+    tx_line_ending = str(serial.get('tx_line_ending', 'crlf')).strip().lower() or 'crlf'
     selected_ids, selected_scales = _read_selected_ids(display.get('selected_ids'))
     reconnect_delay_s = float(data.get('reconnect_delay_s', 2.0))
 
@@ -81,6 +87,10 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
         )
     if log_payload_truncate < 0:
         raise RuntimeError(f"serial.log_payload_truncate must be >= 0 (got {log_payload_truncate}) in: {config_path}")
+    if tx_line_ending not in {'lf', 'crlf', 'cr'}:
+        raise RuntimeError(
+            f"serial.tx_line_ending must be one of: lf|crlf|cr (got {tx_line_ending!r}) in: {config_path}"
+        )
 
     return SerialDisplayConfig(
         gateway_address=gateway_address,
@@ -93,6 +103,9 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
         log_payload=log_payload,
         log_payload_hex=log_payload_hex,
         log_payload_truncate=log_payload_truncate,
+        log_rx=log_rx,
+        tx_sync_newline=tx_sync_newline,
+        tx_line_ending=tx_line_ending,
         reconnect_delay_s=reconnect_delay_s,
     )
 

@@ -11,9 +11,15 @@ serial:
   max_line_length: 1024
 
   # Debugging: log the exact JSON lines sent to the display (can be noisy).
-  log_payload: false
-  log_payload_hex: false
-  log_payload_truncate: 512
+  log_payload: true
+  log_payload_hex: true
+  log_payload_truncate: 1024
+  # Debugging: mirror lines received from the display firmware (Serial RX) into the ROS logs.
+  log_rx: true
+  # Robustness: write an extra newline before each JSON line to re-sync if bytes are ever dropped on USB.
+  tx_sync_newline: true
+  # Line ending sent to the display firmware (firmware accepts \\n, \\r, or \\r\\n).
+  tx_line_ending: "crlf"
 
 display:
   selected_ids:

@@ -5,6 +5,8 @@ import argparse
 import asyncio
 import json
 import signal
+import threading
+import time
 import traceback
 from typing import Optional
 
@@ -28,6 +30,9 @@ class _SerialWriter:
         log_payload: bool,
         log_payload_hex: bool,
         log_payload_truncate: int,
+        log_rx: bool,
+        tx_sync_newline: bool,
+        tx_line_ending: str,
         max_events_per_line: int,
         max_line_length: int,
     ) -> None:
@@ -37,18 +42,60 @@ class _SerialWriter:
         self._log_payload = bool(log_payload)
         self._log_payload_hex = bool(log_payload_hex)
         self._log_payload_truncate = int(log_payload_truncate)
+        self._log_rx = bool(log_rx)
+        self._tx_sync_newline = bool(tx_sync_newline)
+        self._tx_line_ending = str(tx_line_ending).strip().lower() or 'crlf'
         self._max_events_per_line = int(max_events_per_line)
         self._max_line_length = int(max_line_length)
         self._serial: Optional[Serial] = None
         self._last_open_error: Optional[str] = None
+        self._rx_stop = threading.Event()
+        self._rx_thread: Optional[threading.Thread] = None
+
+    def _start_rx_thread(self) -> None:
+        if not self._log_rx:
+            return
+        if self._serial is None:
+            return
+        if self._rx_thread is not None and self._rx_thread.is_alive():
+            return
+
+        self._rx_stop.clear()
+
+        def _run() -> None:
+            assert self._serial is not None
+            while not self._rx_stop.is_set():
+                try:
+                    raw = self._serial.readline()
+                except Exception:
+                    return
+                if not raw:
+                    continue
+                try:
+                    line = raw.decode('utf-8', errors='replace').rstrip('\r\n')
+                except Exception:
+                    line = repr(raw)
+                if not line:
+                    continue
+                if line.startswith('EVENT:') or line.startswith('LINE:') or line.startswith('DEMO:'):
+                    self._logger.warning(f"Display rx: {line}")
+                else:
+                    self._logger.info(f"Display rx: {line}")
+
+        self._rx_thread = threading.Thread(target=_run, name='robot_serial_display_rx', daemon=True)
+        self._rx_thread.start()
 
     def close(self) -> None:
         if self._serial is None:
             return
+        self._rx_stop.set()
         try:
             self._serial.close()
         finally:
             self._serial = None
+            if self._rx_thread is not None:
+                self._rx_thread.join(timeout=0.5)
+                self._rx_thread = None
 
     def ensure_open(self) -> Optional[Serial]:
         if self._serial and self._serial.is_open:
@@ -61,6 +108,7 @@ class _SerialWriter:
             self._serial = Serial(self._port, baudrate=self._baudrate, timeout=1, write_timeout=1)
             self._logger.info(f"Opened display serial on {self._port} @ {self._baudrate} baud")
             self._last_open_error = None
+            self._start_rx_thread()
         except SerialException as exc:
             error = str(exc)
             if error != self._last_open_error:
@@ -74,21 +122,28 @@ class _SerialWriter:
         if ser is None:
             return
 
+        if self._tx_line_ending == 'lf':
+            line_ending = b'\n'
+        elif self._tx_line_ending == 'cr':
+            line_ending = b'\r'
+        else:
+            line_ending = b'\r\n'
+
         chunks = _chunk_payload(
             payload,
             max_events_per_line=self._max_events_per_line,
             max_line_length=self._max_line_length,
+            line_ending=line_ending,
             logger=self._logger,
         )
         for chunk in chunks:
             try:
-                line = _encode_payload(chunk)
+                raw = _encode_payload_bytes(chunk, line_ending=line_ending)
             except ValueError as exc:
                 # Most likely invalid JSON due to NaN/Inf; never send something the firmware can't parse.
                 self._logger.warning(f"Failed to encode display payload as strict JSON: {exc}")
                 continue
 
-            raw = line.encode('utf-8')
             if self._max_line_length > 0 and len(raw) > self._max_line_length:
                 # Should not happen if chunking is working; never send a line the firmware will reject.
                 self._logger.warning(
@@ -96,9 +151,13 @@ class _SerialWriter:
                 )
                 continue
             if self._log_payload:
-                preview = line.rstrip('\n')
+                try:
+                    preview = raw.decode('utf-8', errors='replace')
+                except Exception:
+                    preview = repr(raw)
+                preview = preview.rstrip('\r\n')
                 if self._log_payload_truncate and len(preview) > self._log_payload_truncate:
-                    preview = preview[: self._log_payload_truncate] + f"...(truncated,len={len(line)})"
+                    preview = preview[: self._log_payload_truncate] + f"...(truncated,len={len(raw)})"
                 self._logger.info(f"Serial display tx events={len(chunk)} bytes={len(raw)} line={preview}")
                 if self._log_payload_hex:
                     hex_preview = raw.hex()
@@ -107,10 +166,47 @@ class _SerialWriter:
                     self._logger.info(f"Serial display tx hex={hex_preview}")
 
             try:
-                ser.write(raw)
+                if self._tx_sync_newline:
+                    # If the receiver ever misses a newline (USB glitch / buffer overrun), it may concatenate
+                    # subsequent JSON lines until it hits its max line length. A leading newline helps re-sync.
+                    if not self._write_all(ser, line_ending, desc='sync_newline'):
+                        self.close()
+                        return
+                if not self._write_all(ser, raw, desc='json_line'):
+                    self.close()
+                    return
+                try:
+                    ser.flush()
+                except Exception:
+                    pass
             except SerialException:
                 self.close()
                 raise
+
+    def _write_all(self, ser: Serial, buf: bytes, *, desc: str) -> bool:
+        """Write all bytes, retrying short writes, and log if the port stalls."""
+        total = 0
+        deadline = time.monotonic() + 2.0
+        while total < len(buf):
+            if time.monotonic() > deadline:
+                self._logger.warning(
+                    f"Serial write timed out for {desc} (wrote {total}/{len(buf)} bytes)"
+                )
+                return False
+            try:
+                n = ser.write(buf[total:])
+            except Exception as exc:
+                self._logger.warning(f"Serial write failed for {desc} after {total}/{len(buf)} bytes: {exc}")
+                return False
+            if not isinstance(n, int):
+                n = 0
+            if n <= 0:
+                self._logger.warning(
+                    f"Serial write made no progress for {desc} (wrote {total}/{len(buf)} bytes)"
+                )
+                return False
+            total += n
+        return True
 
 
 def _format_value(val: float, unit: str) -> str:
@@ -130,9 +226,10 @@ def _format_value(val: float, unit: str) -> str:
     return f"{val:.2f}"
 
 
-def _encode_payload(payload: list[dict]) -> str:
+def _encode_payload_bytes(payload: list[dict], *, line_ending: bytes) -> bytes:
     # Strict JSON: avoid NaN/Inf (ArduinoJson rejects them).
-    return json.dumps(payload, separators=(',', ':'), allow_nan=False) + '\n'
+    body = json.dumps(payload, separators=(',', ':'), allow_nan=False).encode('utf-8')
+    return body + line_ending
 
 
 def _chunk_payload(
@@ -140,6 +237,7 @@ def _chunk_payload(
     *,
     max_events_per_line: int,
     max_line_length: int,
+    line_ending: bytes,
     logger,
 ) -> list[list[dict]]:
     if not payload:
@@ -164,7 +262,7 @@ def _chunk_payload(
         for event in chunk:
             candidate = current + [event]
             try:
-                encoded = _encode_payload(candidate).encode('utf-8')
+                encoded = _encode_payload_bytes(candidate, line_ending=line_ending)
             except ValueError:
                 # Leave JSON validity enforcement to the caller; don't try to be clever here.
                 current = candidate
@@ -180,7 +278,7 @@ def _chunk_payload(
 
             # Try the event alone.
             try:
-                single = _encode_payload([event]).encode('utf-8')
+                single = _encode_payload_bytes([event], line_ending=line_ending)
             except ValueError:
                 out.append([event])
                 continue
@@ -254,6 +352,9 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
         log_payload=cfg.log_payload,
         log_payload_hex=cfg.log_payload_hex,
         log_payload_truncate=cfg.log_payload_truncate,
+        log_rx=cfg.log_rx,
+        tx_sync_newline=cfg.tx_sync_newline,
+        tx_line_ending=cfg.tx_line_ending,
         max_events_per_line=cfg.max_events_per_line,
         max_line_length=cfg.max_line_length,
     )
@@ -319,7 +420,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
                     )
                 if cfg.max_line_length > 0:
                     try:
-                        raw = _encode_payload(payload).encode('utf-8')
+                        raw = _encode_payload_bytes(payload, line_ending=b'\n')
                     except ValueError:
                         raw = b''
                     if raw and len(raw) > cfg.max_line_length:
