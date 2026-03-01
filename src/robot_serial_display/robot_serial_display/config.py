@@ -16,6 +16,7 @@ class SerialDisplayConfig:
     selected_ids: list[str]
     selected_scales: dict[str, float]
     max_events_per_line: int
+    max_line_length: int
     log_payload: bool
     log_payload_hex: bool
     log_payload_truncate: int
@@ -60,7 +61,8 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
     if env_port:
         serial_port = env_port
     baudrate = int(serial.get('baudrate', 256000))
-    max_events_per_line = int(serial.get('max_events_per_line', 5))
+    max_events_per_line = int(serial.get('max_events_per_line', 10))
+    max_line_length = int(serial.get('max_line_length', 1024))
     log_payload = bool(serial.get('log_payload', False))
     log_payload_hex = bool(serial.get('log_payload_hex', False))
     log_payload_truncate = int(serial.get('log_payload_truncate', 512))
@@ -73,6 +75,10 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
         raise RuntimeError(
             f"serial.max_events_per_line must be >= 0 (0 disables chunking; got {max_events_per_line}) in: {config_path}"
         )
+    if max_line_length < 0:
+        raise RuntimeError(
+            f"serial.max_line_length must be >= 0 (0 disables length check; got {max_line_length}) in: {config_path}"
+        )
     if log_payload_truncate < 0:
         raise RuntimeError(f"serial.log_payload_truncate must be >= 0 (got {log_payload_truncate}) in: {config_path}")
 
@@ -83,6 +89,7 @@ def load_config(path: str | Path | None) -> SerialDisplayConfig:
         selected_ids=selected_ids,
         selected_scales=selected_scales,
         max_events_per_line=max_events_per_line,
+        max_line_length=max_line_length,
         log_payload=log_payload,
         log_payload_hex=log_payload_hex,
         log_payload_truncate=log_payload_truncate,

@@ -83,6 +83,7 @@ Configuration is organized under `streams:`:
 
 - `streams.status` — cadence, default staleness window (`stale_after_s`), optional `debug_log`/`always_publish`, and `fields` (unit/min/max/target + source). Supported sources:
   - `system` / `cpu_percent`
+  - `system` / `mem_used_gib` (GiB; computed as `(total - available)`)
   - `system` / `service` (requires `service`, returns text from `systemctl is-active`)
   - `system` / `process` (requires `process`, optional `service` to scope to a unit cgroup; returns text `running|missing`)
   - `system` / `net_iface` (requires `iface`, returns text: `missing`, `down`, `up:no_ip`, `ip:<addr>`, `ip6:<addr>`)

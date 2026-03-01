@@ -29,6 +29,7 @@ class _SerialWriter:
         log_payload_hex: bool,
         log_payload_truncate: int,
         max_events_per_line: int,
+        max_line_length: int,
     ) -> None:
         self._port = port
         self._baudrate = baudrate
@@ -37,6 +38,7 @@ class _SerialWriter:
         self._log_payload_hex = bool(log_payload_hex)
         self._log_payload_truncate = int(log_payload_truncate)
         self._max_events_per_line = int(max_events_per_line)
+        self._max_line_length = int(max_line_length)
         self._serial: Optional[Serial] = None
         self._last_open_error: Optional[str] = None
 
@@ -72,7 +74,13 @@ class _SerialWriter:
         if ser is None:
             return
 
-        for chunk in _chunk_payload(payload, max_events_per_line=self._max_events_per_line):
+        chunks = _chunk_payload(
+            payload,
+            max_events_per_line=self._max_events_per_line,
+            max_line_length=self._max_line_length,
+            logger=self._logger,
+        )
+        for chunk in chunks:
             try:
                 line = _encode_payload(chunk)
             except ValueError as exc:
@@ -81,6 +89,12 @@ class _SerialWriter:
                 continue
 
             raw = line.encode('utf-8')
+            if self._max_line_length > 0 and len(raw) > self._max_line_length:
+                # Should not happen if chunking is working; never send a line the firmware will reject.
+                self._logger.warning(
+                    f"Dropping oversize display line (bytes={len(raw)} max={self._max_line_length})"
+                )
+                continue
             if self._log_payload:
                 preview = line.rstrip('\n')
                 if self._log_payload_truncate and len(preview) > self._log_payload_truncate:
@@ -106,6 +120,8 @@ def _format_value(val: float, unit: str) -> str:
         return f"{val:.0f}{unit}"
     if unit.lower() in ('v', 'volt', 'voltage'):
         return f"{val:.1f}{unit}"
+    if unit.lower() in ('gib',):
+        return f"{val:.1f}{unit}"
     if unit:
         return f"{val:.2f}{unit}"
     return f"{val:.2f}"
@@ -116,12 +132,66 @@ def _encode_payload(payload: list[dict]) -> str:
     return json.dumps(payload, separators=(',', ':'), allow_nan=False) + '\n'
 
 
-def _chunk_payload(payload: list[dict], *, max_events_per_line: int) -> list[list[dict]]:
-    if max_events_per_line <= 0:
+def _chunk_payload(
+    payload: list[dict],
+    *,
+    max_events_per_line: int,
+    max_line_length: int,
+    logger,
+) -> list[list[dict]]:
+    if not payload:
+        return []
+
+    if max_events_per_line <= 0 and max_line_length <= 0:
         return [payload]
-    if len(payload) <= max_events_per_line:
-        return [payload]
-    return [payload[i : i + max_events_per_line] for i in range(0, len(payload), max_events_per_line)]
+
+    # First: enforce events-per-line (simple slicing).
+    if max_events_per_line > 0:
+        event_chunks = [payload[i : i + max_events_per_line] for i in range(0, len(payload), max_events_per_line)]
+    else:
+        event_chunks = [payload]
+
+    # Second: enforce max line length (bytes, including trailing newline).
+    if max_line_length <= 0:
+        return event_chunks
+
+    out: list[list[dict]] = []
+    for chunk in event_chunks:
+        current: list[dict] = []
+        for event in chunk:
+            candidate = current + [event]
+            try:
+                encoded = _encode_payload(candidate).encode('utf-8')
+            except ValueError:
+                # Leave JSON validity enforcement to the caller; don't try to be clever here.
+                current = candidate
+                continue
+
+            if len(encoded) <= max_line_length:
+                current = candidate
+                continue
+
+            if current:
+                out.append(current)
+                current = []
+
+            # Try the event alone.
+            try:
+                single = _encode_payload([event]).encode('utf-8')
+            except ValueError:
+                out.append([event])
+                continue
+
+            if len(single) <= max_line_length:
+                current = [event]
+            else:
+                logger.warning(
+                    f"Dropping oversize display event that cannot fit in one line (bytes={len(single)} max={max_line_length})"
+                )
+
+        if current:
+            out.append(current)
+    return out
 
 
 def _build_payload(
@@ -179,6 +249,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
         log_payload_hex=cfg.log_payload_hex,
         log_payload_truncate=cfg.log_payload_truncate,
         max_events_per_line=cfg.max_events_per_line,
+        max_line_length=cfg.max_line_length,
     )
     request = ui_bridge_pb2.StatusRequest()
     grpc_connected = False
@@ -240,6 +311,15 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
                         f"Display payload has too many events for one line (events={len(payload)} max={cfg.max_events_per_line}); "
                         "sending in multiple lines"
                     )
+                if cfg.max_line_length > 0:
+                    try:
+                        raw = _encode_payload(payload).encode('utf-8')
+                    except ValueError:
+                        raw = b''
+                    if raw and len(raw) > cfg.max_line_length:
+                        logger.warning(
+                            f"Display payload line is too long (bytes={len(raw)} max={cfg.max_line_length}); sending in multiple lines"
+                        )
                 try:
                     serial_writer.write_json_lines(payload)
                 except SerialException as exc:

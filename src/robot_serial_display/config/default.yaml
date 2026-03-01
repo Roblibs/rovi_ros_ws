@@ -5,8 +5,10 @@ serial:
   port: "/dev/robot_display"
   baudrate: 256000
   # ESP32 firmware limit (see /home/wass/dev/robot_serial_display):
-  # max JSON events per line is 5; extra events must be sent in multiple lines.
-  max_events_per_line: 5
+  # max JSON events per line is 10; extra events must be sent in multiple lines.
+  max_events_per_line: 10
+  # max JSON line length in bytes (UTF-8, including trailing newline) is 1024.
+  max_line_length: 1024
 
   # Debugging: log the exact JSON lines sent to the display (can be noisy).
   log_payload: false
@@ -18,6 +20,9 @@ display:
     - id: "cpu"
     - id: "voltage"
       scale: 10
+    - id: "mem_used"
+      scale: 10
+    - id: "net_wlan0"
     - id: "hz_driver"
     - id: "hz_color"
     - id: "hz_depth"

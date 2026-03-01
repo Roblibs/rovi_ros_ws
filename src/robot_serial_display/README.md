@@ -12,7 +12,8 @@ Key options:
 
 - `gateway.address`: gRPC server address (default `127.0.0.1:50051`)
 - `serial.port` / `serial.baudrate`: serial device (e.g. `/dev/robot_display`)
-- `serial.max_events_per_line`: max JSON events per line (ESP32 firmware default is 5; extra events are sent as multiple lines)
+- `serial.max_events_per_line`: max JSON events per line (ESP32 firmware default is 10; extra events are sent as multiple lines)
+- `serial.max_line_length`: max JSON line length in bytes (including trailing newline; ESP32 firmware default is 1024)
 - `serial.log_payload`: log the exact JSON line(s) written to the serial port (debug)
 - `display.selected_ids`: ordered list of status field IDs to forward to the display (supports optional per-ID `scale`, e.g. `voltage` at x10)
 

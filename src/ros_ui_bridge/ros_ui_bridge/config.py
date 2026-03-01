@@ -63,7 +63,7 @@ def _parse_rate_or_period(section: dict[str, Any], default_rate_hz: float) -> fl
 @dataclass(frozen=True)
 class StatusFieldSource:
     provider: str  # system | ros
-    type: str  # cpu_percent | service | process | net_iface | topic_value | topic_rate | tf_rate
+    type: str  # cpu_percent | mem_used_gib | service | process | net_iface | topic_value | topic_rate | tf_rate
     topic: str | None
     msg_type: str | None
     value_key: str | None
@@ -325,6 +325,8 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
         if provider == 'system':
             if type_ == 'cpu_percent':
                 pass
+            elif type_ == 'mem_used_gib':
+                pass
             elif type_ == 'service':
                 if not service_str:
                     raise RuntimeError(f"status.fields[{field_id}] is missing 'source.service' for system/service")
@@ -336,7 +338,7 @@ def _parse_status_fields(value: Any, default_stale_after_s: float) -> list[Statu
                     raise RuntimeError(f"status.fields[{field_id}] is missing 'source.iface' for system/net_iface")
             else:
                 raise RuntimeError(
-                    f"status.fields[{field_id}] unsupported system source type '{type_}' (expected cpu_percent|service|process|net_iface)"
+                    f"status.fields[{field_id}] unsupported system source type '{type_}' (expected cpu_percent|mem_used_gib|service|process|net_iface)"
                 )
         elif provider == 'ros':
             if type_ == 'topic_value':

@@ -26,6 +26,15 @@ streams:
           provider: "system"
           type: "cpu_percent"
 
+      - id: "mem_used"
+        unit: "GiB"
+        min: 0
+        max: 16
+        target: 16
+        source:
+          provider: "system"
+          type: "mem_used_gib"
+
       # Systemd service status (text fields). Service names are configured without the `.service` suffix.
       - id: "svc_gateway"
         type: "text"

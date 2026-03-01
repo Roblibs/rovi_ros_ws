@@ -62,6 +62,11 @@ async def _publish_status_loop(
             if field.source.type == 'cpu_percent':
                 cpu_percent = float(psutil.cpu_percent(interval=None))
                 values.append(StatusFieldValue(id=field.id, value=cpu_percent, text=None, stamp=now_ros.to_msg()))
+            elif field.source.type == 'mem_used_gib':
+                vm = psutil.virtual_memory()
+                used_bytes = float(vm.total - vm.available)
+                used_gib = used_bytes / (1024.0 * 1024.0 * 1024.0)
+                values.append(StatusFieldValue(id=field.id, value=used_gib, text=None, stamp=now_ros.to_msg()))
             elif field.source.type == 'service':
                 service_name = (field.source.service or '').strip()
                 text = systemd_is_active(service_name) if service_name else 'unknown'
