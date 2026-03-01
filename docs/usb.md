@@ -66,6 +66,32 @@ Quick sums (payload only, assuming ~30 Hz):
 | “Did a tty device re-enumerate?” | `sudo udevadm monitor --udev --subsystem-match=tty` |
 | “What’s using the serial port?” | `sudo lsof /dev/ttyACM0` *(or `/dev/robot_display`)* |
 | “How much ROS bandwidth is this topic?” | `ros2 topic bw /camera/color/image` *(and `/camera/depth/image`, `/scan`)* |
+| “Make a shareable diagnostics bundle (Pi 5 display vs camera)” | `test usb` *(or `test usb capture`)* |
+| “Check usbmon first (recommended)” | `test usbmon` |
+
+## USB test commands (ROVI helpers)
+
+These commands generate **timestamped report bundles** under gitignored `output/`:
+
+- Make sure the helpers are loaded first (typical): `ws`
+- `test usb` → snapshot bundle (topology + current device state)
+- `test usbmon` → usbmon pre-check bundle (verifies usbmon/debugfs + display-bus sniff)
+- `test usb capture` → 30s capture bundle (defaults: usbmon enabled + serial write-test enabled; start camera during the window)
+
+Outputs:
+- `output/reports/YYYY-MM-DD/<command>/HHMMSS/report.md`
+
+Optional overrides (when needed):
+- `test usb capture --seconds 10`
+- `test usb capture --no-usbmon`
+- `test usb capture --no-write-test`
+- Add `--label <name>` to tag a run directory.
+
+Note:
+- If you previously ran a report as root and `output/reports` became root-owned, `test usb` may prompt for sudo to fix ownership.
+
+See also:
+- `docs/reports/README.md` (how to interpret report bundles + example syntheses)
 
 ## Commands (copy/paste)
 

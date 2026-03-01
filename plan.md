@@ -11,6 +11,7 @@ This file is an index of planning topics. Details live under `docs/plan/`.
 
 ## Display
 - Resolve startup robustness for UI/display path: `robot_serial_display` initial gRPC connection failure before `ros_ui_bridge` is ready.
+- [USB display vs camera diagnostics reports](docs/plan/usb_display_camera_troubleshooting_reports.md): one-command, timestamped bundles to troubleshoot Pi 5 “display starves when camera starts”.
 
 ## Services
 - Follow-ups: expand per-stack process/status catalogs, add richer systemd diagnostics fields, and harden the gRPC control plane (auth/bind separation/audit).

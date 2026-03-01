@@ -527,3 +527,72 @@ tools() {
       ;;
   esac
 }
+
+test() {
+  # Preserve bash builtin `test` for non-ROVI use:
+  # - `test usb ...` and `test usbmon ...` are ROVI helpers
+  # - everything else delegates to `builtin test ...`
+  if [ $# -eq 0 ]; then
+    builtin test
+    return $?
+  fi
+
+  local tool="${ROVI_ROS_WS_DIR}/tools/rovi_usb_cam_display_report.py"
+  local reports_root="${ROVI_ROS_WS_DIR}/output/reports"
+
+  _rovi_ensure_reports_writable() {
+    if [ -d "${reports_root}" ] && [ ! -w "${reports_root}" ]; then
+      echo "[rovi_env] ${reports_root} is not writable (likely created by sudo); fixing ownership..." >&2
+      sudo chown -R "$(id -u):$(id -g)" "${reports_root}" || return 1
+    fi
+    return 0
+  }
+
+  case "$1" in
+    usb)
+      shift
+      _rovi_ensure_reports_writable || return $?
+      local mode="snapshot"
+      if [ $# -gt 0 ] && [[ "${1}" != -* ]]; then
+        mode="$1"
+        shift
+      fi
+
+      case "${mode}" in
+        snapshot|"")
+          python3 "${tool}" snapshot "$@"
+          ;;
+        capture)
+          # Default `capture` enables usbmon and usually needs root for modprobe/debugfs.
+          # If caller disables usbmon, avoid forcing sudo.
+          if ! printf "%s\n" "$@" | rg -q -- "--no-usbmon" && [ "$(id -u)" -ne 0 ]; then
+            sudo -E python3 "${tool}" capture "$@"
+          else
+            python3 "${tool}" capture "$@"
+          fi
+          ;;
+        *)
+          echo "[rovi_env] Usage: test usb {snapshot|capture} [...args]" >&2
+          echo "[rovi_env] Examples:" >&2
+          echo "  test usb" >&2
+          echo "  test usb capture" >&2
+          echo "  test usb capture --seconds 10 --no-usbmon" >&2
+          return 2
+          ;;
+      esac
+      ;;
+    usbmon)
+      shift
+      _rovi_ensure_reports_writable || return $?
+      if [ "$(id -u)" -ne 0 ]; then
+        sudo -E python3 "${tool}" usbmon "$@"
+      else
+        python3 "${tool}" usbmon "$@"
+      fi
+      ;;
+    *)
+      builtin test "$@"
+      return $?
+      ;;
+  esac
+}
