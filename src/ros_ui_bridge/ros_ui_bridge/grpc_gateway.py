@@ -361,7 +361,9 @@ def _field_meta_to_proto(meta) -> ui_bridge_pb2.StatusFieldMeta:
 
 
 def _field_value_to_proto(value) -> ui_bridge_pb2.StatusFieldValue:
-    msg = ui_bridge_pb2.StatusFieldValue(id=value.id, value=float(value.value), stamp=_time_to_proto(value.stamp))
+    msg = ui_bridge_pb2.StatusFieldValue(id=value.id, stamp=_time_to_proto(value.stamp))
+    if getattr(value, 'value', None) is not None:
+        msg.value = float(value.value)
     text = getattr(value, 'text', None)
     if text is not None:
         msg.text = str(text)

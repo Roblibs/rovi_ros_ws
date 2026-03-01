@@ -70,7 +70,7 @@ async def _publish_status_loop(
             elif field.source.type == 'service':
                 service_name = (field.source.service or '').strip()
                 text = systemd_is_active(service_name) if service_name else 'unknown'
-                values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
+                values.append(StatusFieldValue(id=field.id, value=None, text=text, stamp=now_ros.to_msg()))
             elif field.source.type == 'process':
                 process_name = (field.source.process or '').strip()
                 service_name = (field.source.service or '').strip() if field.source.service else None
@@ -79,17 +79,19 @@ async def _publish_status_loop(
                     text = 'running' if running else 'missing'
                 else:
                     text = 'unknown'
-                values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
+                values.append(StatusFieldValue(id=field.id, value=None, text=text, stamp=now_ros.to_msg()))
             elif field.source.type == 'net_iface':
                 iface = (field.source.iface or '').strip()
                 text = iface_status_text(iface) if iface else 'unknown'
-                values.append(StatusFieldValue(id=field.id, value=0.0, text=text, stamp=now_ros.to_msg()))
+                values.append(StatusFieldValue(id=field.id, value=None, text=text, stamp=now_ros.to_msg()))
 
         # ROS-derived fields (topic values + rates).
         for field_id, value, stamp in ros_node.collect_ros_values(now_ros=now_ros):
             values.append(StatusFieldValue(id=field_id, value=value, text=None, stamp=stamp))
 
-        signature = tuple(sorted((v.id, v.value, v.text or '', v.stamp.sec, v.stamp.nanosec) for v in values))
+        signature = tuple(
+            sorted((v.id, float(v.value) if v.value is not None else 0.0, v.text or '', v.stamp.sec, v.stamp.nanosec) for v in values)
+        )
 
         # If we've never sent anything and have no values yet, stay quiet to avoid empty spam.
         if last_signature is None and not signature and not always_publish:

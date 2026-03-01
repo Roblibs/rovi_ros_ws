@@ -92,6 +92,30 @@ Configuration is organized under `streams:`:
   - `ros` / `tf_rate` (parent, child)
   - Optional per-field staleness override via `source.stale_after_s`.
   - Field value type: float by default; set field `type: text` to publish `StatusFieldValue.text` instead of a float.
+
+### Choosing the `net_iface` name
+
+`system/net_iface` uses the **Linux network interface name** (the same string you see in `ip link`, e.g. `wlan0`, `eth0`, `wlx<mac>`). The bridge reads it via `psutil.net_if_stats()` / `psutil.net_if_addrs()`.
+
+Quick ways to list interfaces and pick the active one:
+
+```bash
+ip -o link show
+ip -o -4 addr show
+ip route show default
+```
+
+If you have NetworkManager:
+
+```bash
+nmcli -t -f DEVICE,TYPE,STATE,CONNECTION dev status
+```
+
+Then set the config, e.g.:
+
+- `source: { provider: "system", type: "net_iface", iface: "wlxc83a35b07b9d" }`
+
+Note: it’s common for USB Wi‑Fi dongles to show up as `wlx<mac>` while `wlan0` may be down/unmanaged on some systems.
 - `streams.robot_state` — pose/wheel stream downsampling (optional), topics, frames, wheel joints
 - `streams.lidar` — lidar stream downsampling (optional), input/output topics, frame_id (optional; omit to disable)
 - `robot_model` — GLB path and chunk size

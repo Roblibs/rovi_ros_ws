@@ -42,9 +42,10 @@ streams:
 
       # Wi-Fi / network interface readiness (text field).
       # Values: missing|down|up:no_ip|ip:<addr>|ip6:<addr>
-      - id: "net_wlan0"
+      # Tip: list interfaces with `ip -o link show` / `ip -o -4 addr show` and set `iface` to the active device name.
+      - id: "wlan"
         type: "text"
-        source: { provider: "system", type: "net_iface", iface: "wlan0" }
+        source: { provider: "system", type: "net_iface", iface: "wlxc83a35b07b9d" }
 
       - id: "svc_teleop"
         type: "text"

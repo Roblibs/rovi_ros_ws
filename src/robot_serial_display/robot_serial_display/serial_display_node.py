@@ -121,7 +121,10 @@ def _format_value(val: float, unit: str) -> str:
     if unit.lower() in ('v', 'volt', 'voltage'):
         return f"{val:.1f}{unit}"
     if unit.lower() in ('gib',):
-        return f"{val:.1f}{unit}"
+        s = f"{val:.1f}"
+        if s.endswith(".0"):
+            s = s[:-2]
+        return f"{s}{unit}"
     if unit:
         return f"{val:.2f}{unit}"
     return f"{val:.2f}"
@@ -199,33 +202,36 @@ def _build_payload(
     selected_ids: list[str],
     selected_scales: dict[str, float],
     meta_by_id: dict[str, ui_bridge_pb2.StatusFieldMeta],
-    values_by_id: dict[str, float],
+    values_by_id: dict[str, ui_bridge_pb2.StatusFieldValue],
 ) -> list[dict]:
     payload: list[dict] = []
     for field_id in _dedupe_preserve_order(selected_ids):
         meta = meta_by_id.get(field_id)
-        val = values_by_id.get(field_id)
-        if meta is None or val is None:
+        field_value = values_by_id.get(field_id)
+        if meta is None or field_value is None:
             continue
 
-        encoded_value: float | int
-        display_val = val
-        scale = selected_scales.get(field_id, 1.0)
-        scaled_val = val * scale
-        encoded_value = int(round(scaled_val))
+        value_type = getattr(meta, 'type', ui_bridge_pb2.StatusFieldMeta.StatusFieldType.STATUS_FIELD_TYPE_FLOAT)
+        is_text = meta.HasField('type') and value_type == ui_bridge_pb2.StatusFieldMeta.StatusFieldType.STATUS_FIELD_TYPE_TEXT
 
-        text = _format_value(display_val, meta.unit)
-        if meta.HasField('target'):
-            target_text = _format_value(meta.target, meta.unit)
-            text = f"{text}/{target_text}"
+        if is_text:
+            text = str(field_value.text) if field_value.HasField('text') else ''
+            event: dict[str, object] = {'id': field_id, 'text': text}
+        else:
+            if not field_value.HasField('value'):
+                continue
+            val = float(field_value.value)
+            scale = selected_scales.get(field_id, 1.0)
+            scaled_val = val * scale
+            encoded_value = int(round(scaled_val))
 
-        payload.append(
-            {
-                'id': field_id,
-                'value': encoded_value,
-                'text': text,
-            }
-        )
+            text = _format_value(val, meta.unit)
+            if meta.HasField('target'):
+                target_text = _format_value(meta.target, meta.unit)
+                text = f"{text}/{target_text}"
+            event = {'id': field_id, 'value': encoded_value, 'text': text}
+
+        payload.append(event)
     return payload
 
 
@@ -255,7 +261,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
     grpc_connected = False
     last_grpc_log_key: Optional[tuple[grpc.StatusCode, str]] = None
     meta_by_id: dict[str, ui_bridge_pb2.StatusFieldMeta] = {}
-    values_by_id: dict[str, float] = {}
+    values_by_id: dict[str, ui_bridge_pb2.StatusFieldValue] = {}
 
     while not stop_event.is_set():
         channel: Optional[grpc.aio.Channel] = None
@@ -266,7 +272,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
             # Fetch metadata + latest values first (single response).
             snapshot = await stub.GetStatus(request)
             meta_by_id = {f.id: f for f in snapshot.fields}
-            values_by_id = {v.id: float(v.value) for v in snapshot.values}
+            values_by_id = {v.id: v for v in snapshot.values}
             if not grpc_connected:
                 logger.info(f"Connected to UI gateway at {cfg.gateway_address}")
                 grpc_connected = True
@@ -290,7 +296,7 @@ async def _run(cfg: SerialDisplayConfig, *, stop_event: asyncio.Event, logger, d
                     break
 
                 # Update values map with the non-stale values received; missing ids are considered stale.
-                values_by_id = {v.id: float(v.value) for v in update.values}
+                values_by_id = {v.id: v for v in update.values}
 
                 payload = _build_payload(
                     selected_ids=cfg.selected_ids,

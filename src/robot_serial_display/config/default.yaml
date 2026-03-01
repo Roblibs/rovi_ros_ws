@@ -22,7 +22,7 @@ display:
       scale: 10
     - id: "mem_used"
       scale: 10
-    - id: "net_wlan0"
+    - id: "wlan"
     - id: "hz_driver"
     - id: "hz_color"
     - id: "hz_depth"

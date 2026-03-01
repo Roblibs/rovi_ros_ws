@@ -22,7 +22,7 @@ class StatusFieldMeta:
 @dataclass(frozen=True)
 class StatusFieldValue:
     id: str
-    value: float
+    value: Optional[float]
     text: Optional[str]
     stamp: RosTime
 
